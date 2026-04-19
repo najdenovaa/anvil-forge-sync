@@ -1,8 +1,8 @@
 import { PlatformProvider } from "./PlatformContext";
 import { TopBar } from "./TopBar";
-import { ComponentLibrary } from "./ComponentLibrary";
+import { LeftAIPanel } from "./LeftAIPanel";
 import { ForgeCanvas } from "./ForgeCanvas";
-import { RightPanel } from "./RightPanel";
+import { RightInspector } from "./RightInspector";
 
 export function AnvlApp() {
   return (
@@ -10,11 +10,11 @@ export function AnvlApp() {
       <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
         <TopBar />
         <div className="flex min-h-0 flex-1">
-          <ComponentLibrary />
+          <LeftAIPanel />
           <main className="relative min-w-0 flex-1">
             <ForgeCanvas />
           </main>
-          <RightPanel />
+          <RightInspector />
         </div>
       </div>
     </PlatformProvider>
