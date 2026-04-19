@@ -1,23 +1,16 @@
 import { useState } from "react";
 import { Sparkles, ArrowUp, Plus, History, Paperclip } from "lucide-react";
+import { useI18n } from "./I18nContext";
 import { cn } from "@/lib/utils";
 
 export function LeftAIPanel() {
   const [input, setInput] = useState("");
+  const { t } = useI18n();
 
   const messages = [
-    {
-      role: "assistant" as const,
-      text: "I'm your AI Architect. Describe the bot you want and I'll lay out the flow on the canvas.",
-    },
-    {
-      role: "user" as const,
-      text: "Add a /pricing command that sends an inline keyboard with three plans.",
-    },
-    {
-      role: "assistant" as const,
-      text: "Done — I added a Command trigger, a Text message, and an Inline keyboard with Basic / Pro / Team. Connected them on the canvas.",
-    },
+    { role: "assistant" as const, text: t("ai.msg.intro") },
+    { role: "user" as const, text: t("ai.msg.user_example") },
+    { role: "assistant" as const, text: t("ai.msg.assistant_example") },
   ];
 
   return (
@@ -27,13 +20,13 @@ export function LeftAIPanel() {
           <div className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-background">
             <Sparkles className="h-2.5 w-2.5" />
           </div>
-          <span className="text-[12.5px] font-semibold tracking-tight">AI Architect</span>
+          <span className="text-[12.5px] font-semibold tracking-tight">{t("ai.title")}</span>
         </div>
         <div className="flex items-center gap-0.5">
-          <IconBtn label="History">
+          <IconBtn label={t("ai.history")}>
             <History className="h-3.5 w-3.5" />
           </IconBtn>
-          <IconBtn label="New chat">
+          <IconBtn label={t("ai.new")}>
             <Plus className="h-3.5 w-3.5" />
           </IconBtn>
         </div>
@@ -52,7 +45,7 @@ export function LeftAIPanel() {
           >
             {m.role === "assistant" && (
               <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                <Sparkles className="h-3 w-3" /> Architect
+                <Sparkles className="h-3 w-3" /> {t("ai.label")}
               </div>
             )}
             {m.text}
@@ -69,7 +62,7 @@ export function LeftAIPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             rows={2}
-            placeholder="Describe your bot…"
+            placeholder={t("ai.placeholder")}
             className="flex-1 resize-none bg-transparent text-[12.5px] outline-none placeholder:text-muted-foreground"
           />
           <button
@@ -80,8 +73,8 @@ export function LeftAIPanel() {
           </button>
         </div>
         <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-muted-foreground">
-          <span>⌘↵ to send</span>
-          <span>gpt-5 · architect</span>
+          <span>{t("ai.send_hint")}</span>
+          <span>{t("ai.model")}</span>
         </div>
       </div>
     </aside>

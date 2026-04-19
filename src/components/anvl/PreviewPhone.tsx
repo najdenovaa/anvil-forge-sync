@@ -1,15 +1,16 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
+import { useI18n } from "./I18nContext";
 import { Battery, Signal, Wifi, ArrowLeft, MoreVertical, Mic, Paperclip, Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function PreviewPhone() {
   const { platform } = usePlatform();
+  const { t } = useI18n();
   const isTg = platform === "telegram";
 
   return (
     <div className="hairline relative w-[280px] overflow-hidden rounded-[36px] bg-black p-2 shadow-[0_30px_80px_-30px_oklch(0_0_0_/_80%)]">
-      {/* Bezel */}
       <div className="relative overflow-hidden rounded-[28px]">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -23,7 +24,6 @@ export function PreviewPhone() {
               isTg ? "bg-[oklch(0.22_0.03_260)]" : "bg-[oklch(0.96_0_0)] text-[oklch(0.16_0_0)]",
             )}
           >
-            {/* Status bar */}
             <div
               className={cn(
                 "flex items-center justify-between px-4 pt-2 text-[10px] font-medium",
@@ -38,13 +38,10 @@ export function PreviewPhone() {
               </div>
             </div>
 
-            {/* Header */}
             <div
               className={cn(
                 "flex items-center gap-2 border-b px-3 py-2",
-                isTg
-                  ? "border-white/5 bg-[oklch(0.27_0.04_260)]"
-                  : "border-black/5 bg-white",
+                isTg ? "border-white/5 bg-[oklch(0.27_0.04_260)]" : "border-black/5 bg-white",
               )}
             >
               <ArrowLeft className="h-4 w-4 opacity-70" />
@@ -57,20 +54,19 @@ export function PreviewPhone() {
                 {isTg ? "TG" : "M"}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-semibold">Welcome Bot</div>
+                <div className="truncate text-[12px] font-semibold">{t("preview.bot_name")}</div>
                 <div
                   className={cn(
                     "truncate text-[10px]",
                     isTg ? "text-white/50" : "text-black/50",
                   )}
                 >
-                  bot · online
+                  {t("preview.bot_status")}
                 </div>
               </div>
               <MoreVertical className="h-4 w-4 opacity-70" />
             </div>
 
-            {/* Chat area */}
             <div
               className={cn(
                 "flex-1 space-y-2 overflow-hidden px-3 py-3",
@@ -79,19 +75,16 @@ export function PreviewPhone() {
                   : "bg-[oklch(0.97_0_0)]",
               )}
             >
-              <UserBubble platform={platform}>/start</UserBubble>
-              <BotBubble platform={platform}>
-                Hi Sasha — welcome to Anvl. I help you ship bots & mini-apps in minutes.
-              </BotBubble>
+              <UserBubble platform={platform}>{t("preview.user_msg")}</UserBubble>
+              <BotBubble platform={platform}>{t("preview.bot_msg_1")}</BotBubble>
               <BotBubble platform={platform}>
                 <div className="space-y-1">
-                  <span>Pick an option:</span>
+                  <span>{t("preview.bot_msg_2")}</span>
                   <InlineKb platform={platform} />
                 </div>
               </BotBubble>
             </div>
 
-            {/* Composer */}
             <div
               className={cn(
                 "flex items-center gap-2 border-t px-3 py-2",
@@ -105,7 +98,7 @@ export function PreviewPhone() {
                   isTg ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40",
                 )}
               >
-                Message
+                {t("preview.composer")}
               </div>
               <Smile className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
               <Mic className={cn("h-4 w-4", isTg ? "text-tg" : "text-max")} />
@@ -113,11 +106,9 @@ export function PreviewPhone() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Notch */}
         <div className="absolute left-1/2 top-0 h-4 w-20 -translate-x-1/2 rounded-b-2xl bg-black" />
       </div>
 
-      {/* Platform tag */}
       <div className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {platform}
       </div>
@@ -175,7 +166,8 @@ function BotBubble({
 
 function InlineKb({ platform }: { platform: "telegram" | "max" }) {
   const isTg = platform === "telegram";
-  const items = ["Open app", "Pricing", "Help"];
+  const { t } = useI18n();
+  const items = [t("preview.btn.open"), t("preview.btn.pricing"), t("preview.btn.help")];
   return (
     <div className="mt-1.5 grid grid-cols-1 gap-1">
       {items.map((it) => (
