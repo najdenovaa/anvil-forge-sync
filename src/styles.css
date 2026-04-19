@@ -121,6 +121,8 @@
   /* Brand hints (used sparingly, mostly for preview frames) */
   --tg: oklch(0.7 0.13 230);
   --max: oklch(0.72 0.18 30);
+  --status-ok: oklch(0.78 0.16 155);
+  --status-warn: oklch(0.82 0.15 75);
 }
 
 .dark {
