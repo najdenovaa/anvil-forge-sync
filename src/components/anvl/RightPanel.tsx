@@ -125,10 +125,10 @@ function PlatformSettings() {
       <SectionHeader title="Cloud status" />
       <div className="hairline mb-5 grid grid-cols-2 gap-2 rounded-lg bg-surface p-3">
         <Stat icon={<Cloud className="h-3 w-3" />} label="Production" value="anvl.app" />
-        <Stat icon={<Check className="h-3 w-3 text-emerald-400" />} label="Webhook" value="Healthy" />
-        <Stat icon={<Check className="h-3 w-3 text-emerald-400" />} label="Telegram" value="200 OK" />
+        <Stat icon={<Check className="h-3 w-3 text-status-ok" />} label="Webhook" value="Healthy" />
+        <Stat icon={<Check className="h-3 w-3 text-status-ok" />} label="Telegram" value="200 OK" />
         <Stat
-          icon={<AlertCircle className="h-3 w-3 text-amber-400" />}
+          icon={<AlertCircle className="h-3 w-3 text-status-warn" />}
           label="Max"
           value="Reauth"
         />

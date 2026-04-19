@@ -60,6 +60,8 @@
   --color-hairline: var(--hairline);
   --color-tg: var(--tg);
   --color-max: var(--max);
+  --color-status-ok: var(--status-ok);
+  --color-status-warn: var(--status-warn);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
