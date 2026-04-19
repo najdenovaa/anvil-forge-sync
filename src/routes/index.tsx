@@ -1,26 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AnvlApp } from "@/components/anvl/AnvlApp";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Anvl AI — Visual IDE for Telegram & Max bots" },
+      {
+        name: "description",
+        content:
+          "Anvl AI is a visual constructor and code generator for Telegram and Max Messenger bots and mini-apps. Build flows, design Mini Apps, and deploy in minutes.",
+      },
+      { property: "og:title", content: "Anvl AI — Build bots for Telegram & Max" },
+      {
+        property: "og:description",
+        content:
+          "A high-fidelity visual IDE for designing and shipping bots and mini-apps across Telegram and Max simultaneously.",
+      },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
-
 function Index() {
-  return <PlaceholderIndex />;
+  return <AnvlApp />;
 }
