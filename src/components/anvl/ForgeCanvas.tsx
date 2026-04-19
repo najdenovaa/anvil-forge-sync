@@ -26,7 +26,11 @@ const initialNodes: Node[] = [
     id: "1",
     type: "anvl",
     position: { x: 40, y: 120 },
-    data: { kind: "trigger.command", title: "/start", preview: "When user sends /start" },
+    data: {
+      kind: "trigger.command",
+      titleKey: "canvas.start.title",
+      previewKey: "canvas.start.preview",
+    },
   },
   {
     id: "2",
@@ -34,21 +38,29 @@ const initialNodes: Node[] = [
     position: { x: 320, y: 80 },
     data: {
       kind: "message.text",
-      title: "Welcome",
-      preview: "Hi {{user.first_name}} — welcome to Anvl.",
+      titleKey: "canvas.welcome.title",
+      previewKey: "canvas.welcome.preview",
     },
   },
   {
     id: "3",
     type: "anvl",
     position: { x: 320, y: 240 },
-    data: { kind: "keyboard.inline", title: "Main menu", preview: "Open app · Pricing · Help" },
+    data: {
+      kind: "keyboard.inline",
+      titleKey: "canvas.menu.title",
+      previewKey: "canvas.menu.preview",
+    },
   },
   {
     id: "4",
     type: "anvl",
     position: { x: 620, y: 240 },
-    data: { kind: "miniapp.screen", title: "Dashboard", preview: "WebView · /app/home" },
+    data: {
+      kind: "miniapp.screen",
+      titleKey: "canvas.dashboard.title",
+      previewKey: "canvas.dashboard.preview",
+    },
   },
 ];
 
@@ -97,7 +109,7 @@ function CanvasInner() {
           id,
           type: "anvl",
           position,
-          data: { kind, title: NODE_CATALOG[kind].label },
+          data: { kind },
         },
       ]);
     },
@@ -124,7 +136,6 @@ function CanvasInner() {
         <Controls showInteractive={false} />
       </ReactFlow>
 
-      {/* Floating preview */}
       <div className="pointer-events-none absolute right-5 top-5 z-10">
         <div className="pointer-events-auto">
           <PreviewPhone />
