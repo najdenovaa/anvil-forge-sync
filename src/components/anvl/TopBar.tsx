@@ -1,5 +1,6 @@
 import { ChevronDown, Rocket, Sparkles, Send } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
+import { useI18n, type Lang } from "./I18nContext";
 import { cn } from "@/lib/utils";
 
 function AnvlMark() {
@@ -21,6 +22,7 @@ function AnvlMark() {
 
 export function TopBar() {
   const { platform, setPlatform } = usePlatform();
+  const { t, lang, setLang } = useI18n();
 
   return (
     <header className="glass relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-hairline px-4">
@@ -28,8 +30,8 @@ export function TopBar() {
         <AnvlMark />
         <div className="hidden h-5 w-px bg-hairline md:block" />
         <button className="hidden items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground md:flex">
-          <span className="text-foreground">Welcome Bot</span>
-          <span className="text-muted-foreground">/ main flow</span>
+          <span className="text-foreground">{t("topbar.project")}</span>
+          <span className="text-muted-foreground">{t("topbar.flow")}</span>
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </button>
       </div>
@@ -39,28 +41,70 @@ export function TopBar() {
           <PlatformPill
             active={platform === "telegram"}
             onClick={() => setPlatform("telegram")}
-            label="Telegram"
+            label={t("platform.telegram")}
             icon={<Send className="h-3.5 w-3.5" />}
           />
           <PlatformPill
             active={platform === "max"}
             onClick={() => setPlatform("max")}
-            label="Max"
+            label={t("platform.max")}
             icon={<Sparkles className="h-3.5 w-3.5" />}
           />
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        <LangToggle lang={lang} setLang={setLang} t={t} />
         <button className="hidden items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground sm:flex">
-          Preview
+          {t("topbar.preview")}
         </button>
         <button className="group flex items-center gap-2 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition hover:bg-foreground/90">
           <Rocket className="h-3.5 w-3.5" />
-          Deploy
+          {t("topbar.deploy")}
         </button>
       </div>
     </header>
+  );
+}
+
+function LangToggle({
+  lang,
+  setLang,
+  t,
+}: {
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  t: (k: string) => string;
+}) {
+  return (
+    <div className="hairline flex items-center rounded-full bg-surface p-0.5">
+      <LangPill active={lang === "ru"} onClick={() => setLang("ru")} label={t("lang.ru")} />
+      <LangPill active={lang === "en"} onClick={() => setLang("en")} label={t("lang.en")} />
+    </div>
+  );
+}
+
+function LangPill({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wider transition",
+        active
+          ? "bg-foreground text-background"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Settings2, LayoutGrid, Cloud, Check, AlertCircle } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
+import { useI18n } from "./I18nContext";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ type Tab = "components" | "settings";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
+  const { t } = useI18n();
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-l border-hairline bg-sidebar">
@@ -18,14 +20,14 @@ export function RightInspector() {
           onClick={() => setTab("components")}
           icon={<LayoutGrid className="h-3.5 w-3.5" />}
         >
-          Components
+          {t("inspector.components")}
         </TabBtn>
         <TabBtn
           active={tab === "settings"}
           onClick={() => setTab("settings")}
           icon={<Settings2 className="h-3.5 w-3.5" />}
         >
-          Settings
+          {t("inspector.settings")}
         </TabBtn>
       </div>
       <div className="flex-1 overflow-hidden">
@@ -63,6 +65,7 @@ function TabBtn({
 }
 
 function ComponentsPane() {
+  const { t } = useI18n();
   const all = Object.values(NODE_CATALOG);
 
   const onDragStart = (e: React.DragEvent, kind: NodeKind) => {
@@ -77,7 +80,7 @@ function ComponentsPane() {
         return (
           <div key={group} className="mb-4">
             <div className="mb-1.5 px-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {group}
+              {t(`group.${group}`)}
             </div>
             <div className="space-y-1">
               {items.map((item) => (
@@ -92,10 +95,10 @@ function ComponentsPane() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12.5px] font-medium leading-tight">
-                      {item.label}
+                      {t(item.labelKey)}
                     </div>
                     <div className="truncate text-[11px] text-muted-foreground">
-                      {item.description}
+                      {t(item.descKey)}
                     </div>
                   </div>
                 </div>
@@ -110,48 +113,59 @@ function ComponentsPane() {
 
 function SettingsPane() {
   const { platform } = usePlatform();
+  const { t } = useI18n();
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
-      <SectionHeader title="Cloud status" />
+      <SectionHeader title={t("settings.cloud_status")} />
       <div className="hairline mb-5 grid grid-cols-2 gap-2 rounded-lg bg-surface p-3">
-        <Stat icon={<Cloud className="h-3 w-3" />} label="Production" value="anvl.app" />
-        <Stat icon={<Check className="h-3 w-3 text-status-ok" />} label="Webhook" value="Healthy" />
-        <Stat icon={<Check className="h-3 w-3 text-status-ok" />} label="Telegram" value="200 OK" />
+        <Stat icon={<Cloud className="h-3 w-3" />} label={t("settings.production")} value="anvl.app" />
+        <Stat
+          icon={<Check className="h-3 w-3 text-status-ok" />}
+          label={t("settings.webhook")}
+          value={t("settings.healthy")}
+        />
+        <Stat
+          icon={<Check className="h-3 w-3 text-status-ok" />}
+          label={t("settings.tg_status")}
+          value="200 OK"
+        />
         <Stat
           icon={<AlertCircle className="h-3 w-3 text-status-warn" />}
-          label="Max"
-          value="Reauth"
+          label={t("settings.max_status")}
+          value={t("settings.reauth")}
         />
       </div>
 
       {platform === "telegram" ? <TelegramSettings /> : <MaxSettings />}
 
-      <SectionHeader title="Mini App" className="mt-6" />
-      <Field label="WebView URL" value="https://app.anvl.ai/u/welcome-bot" />
-      <Field label="Init mode" value="Telegram.WebApp · Max SDK" />
+      <SectionHeader title={t("settings.miniapp")} className="mt-6" />
+      <Field label={t("settings.webview_url")} value="https://app.anvl.ai/u/welcome-bot" />
+      <Field label={t("settings.init_mode")} value="Telegram.WebApp · Max SDK" />
     </div>
   );
 }
 
 function TelegramSettings() {
+  const { t } = useI18n();
   return (
     <>
-      <SectionHeader title="Telegram · BotFather" />
-      <Field label="Bot username" value="@welcome_anvl_bot" />
-      <Field label="Bot token" value="••••••••••••:AAFx-9KQ" mono />
-      <Field label="Webhook" value="https://api.anvl.ai/tg/wh/3a91" mono />
+      <SectionHeader title={t("settings.tg_section")} />
+      <Field label={t("settings.bot_username")} value="@welcome_anvl_bot" />
+      <Field label={t("settings.bot_token")} value="••••••••••••:AAFx-9KQ" mono />
+      <Field label={t("settings.webhook_field")} value="https://api.anvl.ai/tg/wh/3a91" mono />
     </>
   );
 }
 
 function MaxSettings() {
+  const { t } = useI18n();
   return (
     <>
-      <SectionHeader title="Max Messenger · Developer" />
-      <Field label="App ID" value="max_app_8821" mono />
-      <Field label="API key" value="••••••••••••mx_4f" mono />
-      <Field label="Channel" value="welcome-bot" />
+      <SectionHeader title={t("settings.max_section")} />
+      <Field label={t("settings.app_id")} value="max_app_8821" mono />
+      <Field label={t("settings.api_key")} value="••••••••••••mx_4f" mono />
+      <Field label={t("settings.channel")} value="welcome-bot" />
     </>
   );
 }

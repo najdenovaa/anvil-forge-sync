@@ -12,92 +12,104 @@ import {
   Webhook,
   type LucideIcon,
 } from "lucide-react";
-import type { NodeKind, NodeMeta } from "./anvl-types";
+import type { NodeKind } from "./anvl-types";
 
-export const NODE_CATALOG: Record<NodeKind, NodeMeta & { icon: LucideIcon }> = {
+export type NodeGroup = "Triggers" | "Messages" | "Keyboards" | "Mini App" | "Logic";
+
+export interface NodeMetaI18n {
+  kind: NodeKind;
+  group: NodeGroup;
+  /** i18n key for label */
+  labelKey: string;
+  /** i18n key for description */
+  descKey: string;
+  icon: LucideIcon;
+}
+
+export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
   "trigger.command": {
     kind: "trigger.command",
     group: "Triggers",
-    label: "Command",
-    description: "Fires on /command",
+    labelKey: "node.trigger.command.label",
+    descKey: "node.trigger.command.desc",
     icon: Slash,
   },
   "trigger.message": {
     kind: "trigger.message",
     group: "Triggers",
-    label: "Message",
-    description: "Any incoming text",
+    labelKey: "node.trigger.message.label",
+    descKey: "node.trigger.message.desc",
     icon: MessageSquare,
   },
   "trigger.callback": {
     kind: "trigger.callback",
     group: "Triggers",
-    label: "Callback",
-    description: "Inline button tap",
+    labelKey: "node.trigger.callback.label",
+    descKey: "node.trigger.callback.desc",
     icon: MousePointerClick,
   },
   "message.text": {
     kind: "message.text",
     group: "Messages",
-    label: "Text",
-    description: "Send a text reply",
+    labelKey: "node.message.text.label",
+    descKey: "node.message.text.desc",
     icon: Type,
   },
   "message.photo": {
     kind: "message.photo",
     group: "Messages",
-    label: "Photo",
-    description: "Send an image",
+    labelKey: "node.message.photo.label",
+    descKey: "node.message.photo.desc",
     icon: ImageIcon,
   },
   "message.document": {
     kind: "message.document",
     group: "Messages",
-    label: "Document",
-    description: "Send a file",
+    labelKey: "node.message.document.label",
+    descKey: "node.message.document.desc",
     icon: FileText,
   },
   "keyboard.inline": {
     kind: "keyboard.inline",
     group: "Keyboards",
-    label: "Inline",
-    description: "Buttons under message",
+    labelKey: "node.keyboard.inline.label",
+    descKey: "node.keyboard.inline.desc",
     icon: LayoutGrid,
   },
   "keyboard.reply": {
     kind: "keyboard.reply",
     group: "Keyboards",
-    label: "Reply",
-    description: "Custom reply keyboard",
+    labelKey: "node.keyboard.reply.label",
+    descKey: "node.keyboard.reply.desc",
     icon: Keyboard,
   },
   "miniapp.screen": {
     kind: "miniapp.screen",
     group: "Mini App",
-    label: "Screen",
-    description: "WebView screen",
+    labelKey: "node.miniapp.screen.label",
+    descKey: "node.miniapp.screen.desc",
     icon: AppWindow,
   },
   "logic.condition": {
     kind: "logic.condition",
     group: "Logic",
-    label: "Condition",
-    description: "If / else branch",
+    labelKey: "node.logic.condition.label",
+    descKey: "node.logic.condition.desc",
     icon: GitBranch,
   },
   "action.api": {
     kind: "action.api",
     group: "Logic",
-    label: "API call",
-    description: "Outbound HTTP request",
+    labelKey: "node.action.api.label",
+    descKey: "node.action.api.desc",
     icon: Webhook,
   },
 };
 
-export const NODE_GROUPS = [
+export const NODE_GROUPS: NodeGroup[] = [
   "Triggers",
   "Messages",
   "Keyboards",
   "Mini App",
   "Logic",
-] as const;
+];
