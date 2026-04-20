@@ -154,6 +154,118 @@ function buildPrompt(miniAppEnabled: boolean, platform: string): string {
   return BASE_PROMPT.replace("<MINIAPP_SCHEMA>", schema) + rules + platformLine;
 }
 
+function buildTools(miniAppEnabled: boolean) {
+  const tools: any[] = [
+    {
+      type: "function",
+      function: {
+        name: "reset_canvas",
+        description: "Clear the canvas. Call this FIRST before adding new nodes for a fresh blueprint.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_node",
+        description: "Add a node to the canvas.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Stable short id like 'n1','n2'." },
+            kind: {
+              type: "string",
+              enum: [
+                "trigger.command", "trigger.message", "trigger.callback",
+                "message.text", "message.photo", "message.document",
+                "keyboard.inline", "keyboard.reply",
+                "miniapp.screen", "logic.condition", "action.api",
+              ],
+            },
+            title: { type: "string" },
+            preview: { type: "string", description: "Short preview text shown inside the node card." },
+          },
+          required: ["id", "kind", "title", "preview"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "connect",
+        description: "Connect two nodes with an edge.",
+        parameters: {
+          type: "object",
+          properties: { from: { type: "string" }, to: { type: "string" } },
+          required: ["from", "to"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_param",
+        description: "Set a parameter on a node (e.g. text, url, method, condition).",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            key: { type: "string" },
+            value: { type: "string" },
+          },
+          required: ["id", "key", "value"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_preview",
+        description: "Merge a patch into the chat preview state.",
+        parameters: {
+          type: "object",
+          properties: {
+            botName: { type: "string" },
+            botStatus: { type: "string" },
+            userMessage: { type: "string" },
+            botMessages: { type: "array", items: { type: "string" } },
+            buttons: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  action: { type: "string" },
+                  primary: { type: "boolean" },
+                },
+                required: ["label", "action"],
+              },
+            },
+            initialScreen: { type: "string" },
+          },
+          additionalProperties: true,
+        },
+      },
+    },
+  ];
+
+  if (miniAppEnabled) {
+    tools.push({
+      type: "function",
+      function: {
+        name: "set_miniapp",
+        description: "Merge a patch into the mini-app spec (title, accent, hero, items, plans, tabs, stats).",
+        parameters: { type: "object", additionalProperties: true },
+      },
+    });
+  }
+
+  return tools;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
