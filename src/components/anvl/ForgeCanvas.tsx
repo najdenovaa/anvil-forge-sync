@@ -35,7 +35,8 @@ function CanvasInner() {
     [setEdges],
   );
   const onConnect = useCallback(
-    (c: Connection) => setEdges((es) => addEdge({ ...c, animated: true }, es)),
+    (c: Connection) =>
+      setEdges((es) => addEdge({ ...c, animated: true, type: "smoothstep" }, es)),
     [setEdges],
   );
 
@@ -78,7 +79,10 @@ function CanvasInner() {
         fitView
         fitViewOptions={{ padding: 0.25 }}
         proOptions={{ hideAttribution: true }}
-        defaultEdgeOptions={{ animated: true }}
+        defaultEdgeOptions={{ animated: true, type: "smoothstep" }}
+        connectionRadius={48}
+        snapToGrid
+        snapGrid={[8, 8]}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="oklch(1 0 0 / 8%)" />
         <Controls showInteractive={false} />
