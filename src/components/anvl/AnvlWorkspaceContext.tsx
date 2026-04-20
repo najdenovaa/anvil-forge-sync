@@ -8,6 +8,10 @@ import {
 } from "react";
 import type { Edge, Node } from "reactflow";
 import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
+import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
+import type { FlowSnapshot } from "@/lib/anvl-flow-storage";
+
+const DEFAULT_FLOW_SLUG = "default";
 
 const initialNodes: Node[] = [
   {
@@ -57,6 +61,9 @@ interface WorkspaceCtx {
   generatedCode: string;
   setGeneratedCode: React.Dispatch<React.SetStateAction<string>>;
   applyBlueprint: (blueprint: AnvlBlueprint) => void;
+  saveStatus: SaveStatus;
+  lastSavedAt: Date | null;
+  snapshotNow: (note?: string) => Promise<void>;
 }
 
 const Ctx = createContext<WorkspaceCtx | null>(null);
@@ -108,6 +115,24 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const hydrate = useCallback((snap: FlowSnapshot) => {
+    if (snap.nodes?.length) setNodes(snap.nodes);
+    if (snap.edges?.length) setEdges(snap.edges);
+    if (snap.preview) setPreview(snap.preview);
+    if (snap.miniapp) setMiniApp(snap.miniapp);
+    if (snap.generatedCode) setGeneratedCode(snap.generatedCode);
+  }, []);
+
+  const { status: saveStatus, lastSavedAt, snapshotNow } = useFlowPersistence({
+    slug: DEFAULT_FLOW_SLUG,
+    nodes,
+    edges,
+    preview,
+    miniapp: miniApp,
+    generatedCode,
+    onHydrate: hydrate,
+  });
+
   const value = useMemo(
     () => ({
       nodes,
@@ -119,8 +144,11 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
       generatedCode,
       setGeneratedCode,
       applyBlueprint,
+      saveStatus,
+      lastSavedAt,
+      snapshotNow,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint],
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, saveStatus, lastSavedAt, snapshotNow],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
