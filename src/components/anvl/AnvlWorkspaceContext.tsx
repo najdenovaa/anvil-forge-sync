@@ -61,6 +61,13 @@ interface WorkspaceCtx {
   generatedCode: string;
   setGeneratedCode: React.Dispatch<React.SetStateAction<string>>;
   applyBlueprint: (blueprint: AnvlBlueprint) => void;
+  /** Tool-calling primitives — incremental mutations from the AI agent. */
+  addAiNode: (id: string, kind: string, title: string, preview: string) => void;
+  connectAiNodes: (from: string, to: string) => void;
+  updateAiNodeParam: (id: string, key: string, value: string) => void;
+  mergePreview: (patch: Partial<AnvlPreviewState>) => void;
+  mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
+  resetAiCanvas: () => void;
   saveStatus: SaveStatus;
   lastSavedAt: Date | null;
   snapshotNow: (note?: string) => Promise<void>;
