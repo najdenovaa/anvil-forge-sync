@@ -363,7 +363,7 @@ export function LeftAIPanel() {
             className="flex-1 resize-none bg-transparent text-[12.5px] outline-none placeholder:text-muted-foreground"
           />
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={!input.trim() || isStreaming}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition disabled:opacity-30"
           >
