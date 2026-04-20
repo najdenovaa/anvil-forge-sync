@@ -1,6 +1,7 @@
-import { ChevronDown, Rocket, Send, AppWindow } from "lucide-react";
+import { ChevronDown, Rocket, Send, AppWindow, Check, Loader2, AlertCircle, History } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 import maxLogo from "@/assets/max-logo.png";
@@ -86,6 +87,7 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
+        <SaveIndicator />
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <button className="hidden items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground sm:flex">
           {t("topbar.preview")}
@@ -96,6 +98,47 @@ export function TopBar() {
         </button>
       </div>
     </header>
+  );
+}
+
+function SaveIndicator() {
+  const { saveStatus, lastSavedAt, snapshotNow } = useAnvlWorkspace();
+
+  const label = (() => {
+    if (saveStatus === "saving") return "Saving…";
+    if (saveStatus === "error") return "Save failed";
+    if (saveStatus === "saved" && lastSavedAt) {
+      const diff = Math.max(0, Math.floor((Date.now() - lastSavedAt.getTime()) / 1000));
+      if (diff < 5) return "Saved";
+      if (diff < 60) return `Saved ${diff}s ago`;
+      return `Saved ${Math.floor(diff / 60)}m ago`;
+    }
+    return "Auto-save";
+  })();
+
+  const Icon =
+    saveStatus === "saving" ? Loader2 : saveStatus === "error" ? AlertCircle : Check;
+
+  return (
+    <div className="hairline hidden items-center gap-2 rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground md:flex">
+      <Icon
+        className={cn(
+          "h-3 w-3",
+          saveStatus === "saving" && "animate-spin text-foreground/70",
+          saveStatus === "error" && "text-destructive",
+          saveStatus === "saved" && "text-emerald-400",
+        )}
+      />
+      <span suppressHydrationWarning>{label}</span>
+      <button
+        type="button"
+        onClick={() => snapshotNow("manual")}
+        title="Save snapshot version"
+        className="-mr-1 ml-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+      >
+        <History className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
