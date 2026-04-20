@@ -3,8 +3,8 @@ import { ArrowUp, Bot, MessageSquare, Zap, Globe } from "lucide-react";
 import { useI18n } from "./I18nContext";
 import { useAnvlShell } from "./AnvlAppShellContext";
 import { usePlatform } from "./PlatformContext";
+import { AnvlLogo } from "./AnvlLogo";
 import { cn } from "@/lib/utils";
-import anvlLogo from "@/assets/anvl-logo.png";
 
 const SUGGESTIONS_RU = [
   { icon: Bot, label: "VPN-бот с тарифами и Mini App" },
@@ -72,13 +72,8 @@ export function LandingHero() {
 
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <div className="flex items-center">
-          <img
-            src={anvlLogo}
-            alt="ANVL"
-            className="h-12 w-auto object-contain"
-            draggable={false}
-          />
+        <div className="flex items-center text-foreground">
+          <AnvlLogo className="h-[72px] w-auto" />
         </div>
         <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface/60 p-0.5 text-[11px] font-medium backdrop-blur">
           <button
