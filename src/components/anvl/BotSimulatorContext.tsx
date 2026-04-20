@@ -37,6 +37,8 @@ interface SimulatorCtx {
   history: string[];
   /** Composed bot message + buttons for the current node. */
   message: SimMessage | null;
+  /** Effective node kind we walked to (after skipping silent triggers/messages). */
+  effectiveKind: NodeKind | null;
   /** Last branch decision for condition nodes ("yes" | "no"), surfaced in UI. */
   lastBranch: "yes" | "no" | null;
   /** Whether the current node is awaiting user text input. */
