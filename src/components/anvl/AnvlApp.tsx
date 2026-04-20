@@ -4,6 +4,7 @@ import { MiniAppProvider } from "./MiniAppContext";
 import { AnvlWorkspaceProvider } from "./AnvlWorkspaceContext";
 import { AnvlAppShellProvider, useAnvlShell } from "./AnvlAppShellContext";
 import { TelegramWebAppProvider } from "./TelegramWebAppContext";
+import { SelectionProvider } from "./SelectionContext";
 import { TopBar } from "./TopBar";
 import { LeftAIPanel } from "./LeftAIPanel";
 import { ForgeCanvas } from "./ForgeCanvas";
@@ -36,9 +37,11 @@ export function AnvlApp() {
         <MiniAppProvider>
           <TelegramWebAppProvider>
             <AnvlWorkspaceProvider>
-              <AnvlAppShellProvider>
-                <Shell />
-              </AnvlAppShellProvider>
+              <SelectionProvider>
+                <AnvlAppShellProvider>
+                  <Shell />
+                </AnvlAppShellProvider>
+              </SelectionProvider>
             </AnvlWorkspaceProvider>
           </TelegramWebAppProvider>
         </MiniAppProvider>

@@ -17,12 +17,14 @@ import "reactflow/dist/style.css";
 import { ForgeNode } from "./ForgeNode";
 import { PreviewPhone } from "./PreviewPhone";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import { useSelection } from "./SelectionContext";
 import { NODE_CATALOG } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 
 function CanvasInner() {
   const { screenToFlowPosition } = useReactFlow();
   const { nodes, edges, setNodes, setEdges } = useAnvlWorkspace();
+  const { setSelectedId } = useSelection();
 
   const nodeTypes = useMemo(() => ({ anvl: ForgeNode }), []);
 
@@ -76,6 +78,8 @@ function CanvasInner() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeClick={(_, node) => setSelectedId(node.id)}
+        onPaneClick={() => setSelectedId(null)}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         proOptions={{ hideAttribution: true }}
