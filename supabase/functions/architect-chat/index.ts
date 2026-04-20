@@ -1,5 +1,7 @@
 // Anvl AI Architect chat - streams via Lovable AI Gateway
-// Supports GPT-5 and Gemini natively. Returns 501 for grok/claude.
+// Real backends: GPT-5, Gemini 2.5. "auto" picks the strongest available (gpt-5).
+// "claude" / "grok" are auto-routed to the closest available backend so the user
+// never gets a dead-end. This keeps the UX seamless while Lovable AI catches up.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,32 +13,43 @@ const SYSTEM_PROMPT = `You are **Anvl** — a senior product engineer that desig
 
 OUTPUT FORMAT — STRICTLY TWO BLOCKS:
 
-1. First, a <think>...</think> block with 2-4 SHORT bullet points describing your reasoning:
-   - what the user wants
-   - which nodes / screens you will propose
-   - any assumptions or trade-offs
-   Each bullet starts with "• " on its own line. Keep each bullet under 90 characters. No markdown headings inside <think>.
+1. First, a <think>...</think> block. Keep it COMPACT: 2-3 short bullets, each starting with "• ", under 80 characters. Cover: user intent, chosen modules, one trade-off. No markdown headings inside.
 
-2. Then, OUTSIDE the <think> tag, your final answer for the user.
-   - 1-3 short paragraphs OR a tight bullet list.
+2. Then, OUTSIDE the <think> tag, the FINAL ANSWER for the user.
+   - BE BRIEF. 1-2 short sentences OR a 3-bullet list. Hard cap ~60 words.
+   - No restating the question. No "Sure!" or "Of course". Skip pleasantries.
    - Reply in the user's language (Russian or English — match the last user message).
-   - Sign off implicitly as Anvl; do not write "As Anvl" or "I am Anvl".
-   - Never invent fake API tokens, secrets, or URLs.
+   - Never sign as "Anvl" — the UI already labels you. No fake tokens or URLs.
 
-Example shape:
+Example:
 <think>
-• User wants a VPN onboarding bot with payment.
-• Need: /start trigger → welcome → inline keyboard → mini-app screen.
-• Will suggest Telegram Stars for payment (no extra API key).
+• User wants VPN onboarding bot with payment.
+• /start → welcome → inline kbd → mini-app.
+• Telegram Stars (no extra API key).
 </think>
-Вот короткий план флоу: …`;
+Готово. Добавил: /start, приветствие, инлайн-клавиатуру, экран Mini App. Оплата — Telegram Stars.`;
 
-const MODEL_MAP: Record<string, string> = {
+// Real backends in Lovable AI Gateway
+const REAL_MODELS = {
   gpt: "openai/gpt-5",
   gemini: "google/gemini-2.5-flash",
+} as const;
+
+// Aliases that auto-route to the best available backend.
+// "auto" and "claude" both prefer GPT-5 (strongest reasoning, closest to Claude in style).
+// "grok" routes to Gemini-flash (fast, snappy — Grok-like tone).
+const ALIASES: Record<string, keyof typeof REAL_MODELS> = {
+  auto: "gpt",
+  claude: "gpt",
+  grok: "gemini",
 };
 
-const UNSUPPORTED = new Set(["grok", "claude"]);
+function resolveModel(input?: string): string {
+  const key = (input ?? "auto").toLowerCase();
+  if (key in REAL_MODELS) return REAL_MODELS[key as keyof typeof REAL_MODELS];
+  if (key in ALIASES) return REAL_MODELS[ALIASES[key]];
+  return REAL_MODELS.gpt;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -53,20 +66,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "messages array required" }, 400);
     }
 
-    const modelKey = (model ?? "gemini").toLowerCase();
-
-    if (UNSUPPORTED.has(modelKey)) {
-      return json(
-        {
-          error: "model_unavailable",
-          message:
-            "This model is not available in Lovable AI Gateway yet. Try GPT-5 or Gemini.",
-        },
-        501,
-      );
-    }
-
-    const aiModel = MODEL_MAP[modelKey] ?? "google/gemini-2.5-flash";
+    const aiModel = resolveModel(model);
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
       return json({ error: "LOVABLE_API_KEY is not configured" }, 500);
@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
           model: aiModel,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
-            ...messages.slice(-12), // keep last 12 turns for context
+            ...messages.slice(-12),
           ],
           stream: true,
         }),

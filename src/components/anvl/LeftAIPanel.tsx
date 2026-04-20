@@ -16,21 +16,23 @@ import {
 import { useI18n } from "./I18nContext";
 import { cn } from "@/lib/utils";
 
-type ModelId = "gpt" | "grok" | "gemini" | "claude";
+type ModelId = "auto" | "gpt" | "gemini" | "grok" | "claude";
 
 interface ModelDef {
   id: ModelId;
   labelKey: string;
   short: string;
-  available: boolean;
+  /** All models route through Anvl; none are dead-ends. */
+  routed?: boolean;
   accent: string;
 }
 
 const MODELS: ModelDef[] = [
-  { id: "gpt", labelKey: "ai.model.gpt", short: "GPT", available: true, accent: "oklch(0.72_0.16_150)" },
-  { id: "gemini", labelKey: "ai.model.gemini", short: "GEM", available: true, accent: "oklch(0.65_0.18_260)" },
-  { id: "grok", labelKey: "ai.model.grok", short: "GROK", available: false, accent: "oklch(0.72_0.18_30)" },
-  { id: "claude", labelKey: "ai.model.claude", short: "CL", available: false, accent: "oklch(0.72_0.16_60)" },
+  { id: "auto", labelKey: "ai.model.auto", short: "AUTO", accent: "oklch(0.78_0.14_85)" },
+  { id: "claude", labelKey: "ai.model.claude", short: "CL", routed: true, accent: "oklch(0.72_0.16_60)" },
+  { id: "gpt", labelKey: "ai.model.gpt", short: "GPT", accent: "oklch(0.72_0.16_150)" },
+  { id: "gemini", labelKey: "ai.model.gemini", short: "GEM", accent: "oklch(0.65_0.18_260)" },
+  { id: "grok", labelKey: "ai.model.grok", short: "GROK", routed: true, accent: "oklch(0.72_0.18_30)" },
 ];
 
 interface Msg {
@@ -46,7 +48,7 @@ interface Msg {
 
 export function LeftAIPanel() {
   const { t } = useI18n();
-  const [model, setModel] = useState<ModelId>("gemini");
+  const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: t("ai.msg.intro") },
@@ -95,17 +97,7 @@ export function LeftAIPanel() {
 
     const stopStepper = () => clearInterval(stepTimer);
 
-    // Unsupported models — friendly fallback
-    const def = MODELS.find((m) => m.id === model)!;
-    if (!def.available) {
-      stopStepper();
-      setMessages([
-        ...baseHistory,
-        { role: "assistant", content: t("ai.unavailable") },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
+    // All models route through Anvl backend; no client-side fallback needed.
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
@@ -536,9 +528,9 @@ function ModelDropdown({
                 {m.short}
               </span>
               <span className="flex-1 font-medium">{t(m.labelKey)}</span>
-              {!m.available && (
+              {m.routed && (
                 <span className="rounded bg-accent px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("ai.model.soon")}
+                  {t("ai.model.routed")}
                 </span>
               )}
               {m.id === current && <Check className="h-3 w-3" />}
