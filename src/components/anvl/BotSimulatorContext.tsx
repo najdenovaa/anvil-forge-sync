@@ -55,6 +55,9 @@ interface SimulatorCtx {
   restart: () => void;
   /** Manually jump (used by canvas click-to-simulate). */
   jumpTo: (nodeId: string) => void;
+  /** Camera follow toggle: canvas centers on activeNodeId when true. */
+  cameraFollow: boolean;
+  setCameraFollow: (v: boolean) => void;
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
