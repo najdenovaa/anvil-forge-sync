@@ -171,6 +171,7 @@ function ChatView({
   miniAppEnabled: boolean;
 }) {
   const { t } = useI18n();
+  const [menuOpen, setMenuOpen] = useState(false);
   const botMessages = activeScreen?.botMessages?.length
     ? activeScreen.botMessages
     : preview.botMessages?.length
@@ -190,6 +191,11 @@ function ChatView({
   const buttons = miniAppEnabled
     ? rawButtons
     : rawButtons.filter((b) => b.action !== "open_miniapp" && b.action !== "locations");
+
+  const handleMenuPick = (action: PreviewAction) => {
+    setMenuOpen(false);
+    onAction(action);
+  };
 
   return (
     <>
@@ -219,7 +225,7 @@ function ChatView({
 
       <div
         className={cn(
-          "flex-1 space-y-2 overflow-hidden px-3 py-3",
+          "relative flex-1 space-y-2 overflow-hidden px-3 py-3",
           isTg
             ? "bg-[radial-gradient(circle_at_30%_20%,oklch(0.3_0.05_260)_0%,oklch(0.18_0.03_260)_70%)]"
             : "bg-[oklch(0.97_0_0)]",
@@ -244,25 +250,101 @@ function ChatView({
             {t("preview.opening")}
           </div>
         )}
+
+        <AnimatePresence>
+          {menuOpen && buttons.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(
+                "absolute bottom-2 left-2 right-2 z-10 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur",
+                isTg
+                  ? "border-white/10 bg-[oklch(0.24_0.03_260)/0.96]"
+                  : "border-black/10 bg-white/95",
+              )}
+            >
+              <div className={cn("px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider", isTg ? "text-white/40" : "text-black/40")}>
+                {isTg ? "Bot Menu" : "Меню"}
+              </div>
+              <div className={cn("divide-y", isTg ? "divide-white/5" : "divide-black/5")}>
+                {buttons.map((it) => (
+                  <button
+                    key={`menu-${it.action}-${it.label}`}
+                    onClick={() => handleMenuPick(it.action)}
+                    className={cn(
+                      "block w-full px-3 py-2 text-left text-[11px] font-medium transition",
+                      isTg ? "text-white hover:bg-white/5" : "text-black hover:bg-black/5",
+                    )}
+                  >
+                    <span className={cn("mr-1.5 text-[10px]", isTg ? "text-tg" : "text-max")}>/</span>
+                    {it.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div
         className={cn(
-          "flex items-center gap-2 border-t px-3 py-2",
+          "flex items-center gap-2 border-t px-2 py-2",
           isTg ? "border-white/5 bg-[oklch(0.24_0.03_260)]" : "border-black/5 bg-white",
         )}
       >
-        <Paperclip className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition",
+            menuOpen
+              ? isTg
+                ? "bg-tg text-white"
+                : "bg-max text-white"
+              : isTg
+                ? "bg-white/5 text-white/70 hover:bg-white/10"
+                : "bg-black/5 text-black/60 hover:bg-black/10",
+          )}
+          aria-label="menu"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={menuOpen ? "x" : "menu"}
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex"
+            >
+              {menuOpen ? <X className="h-3.5 w-3.5" /> : <Menu className="h-3.5 w-3.5" />}
+            </motion.span>
+          </AnimatePresence>
+        </button>
         <div
           className={cn(
-            "flex-1 rounded-full px-3 py-1.5 text-[11px]",
-            isTg ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40",
+            "flex flex-1 items-center gap-1.5 rounded-full px-2.5 py-1.5",
+            isTg ? "bg-white/5" : "bg-black/5",
           )}
         >
-          {t("preview.composer")}
+          <Smile className={cn("h-3.5 w-3.5 shrink-0", isTg ? "text-white/40" : "text-black/35")} />
+          <span className={cn("flex-1 truncate text-[11px]", isTg ? "text-white/40" : "text-black/40")}>
+            {t("preview.composer")}
+          </span>
+          <Paperclip className={cn("h-3.5 w-3.5 shrink-0", isTg ? "text-white/40" : "text-black/35")} />
         </div>
-        <Smile className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
-        <Mic className={cn("h-4 w-4", isTg ? "text-tg" : "text-max")} />
+        <button
+          type="button"
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+            isTg ? "bg-tg text-white" : "bg-max text-white",
+          )}
+          aria-label="send"
+        >
+          <Mic className="h-3.5 w-3.5 [.has-text_&]:hidden" />
+          <Send className="hidden h-3.5 w-3.5 [.has-text_&]:block" />
+        </button>
       </div>
     </>
   );
