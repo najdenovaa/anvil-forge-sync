@@ -114,7 +114,7 @@ function FlowSlugLabel() {
 }
 
 function SaveIndicator() {
-  const { saveStatus, lastSavedAt, snapshotNow } = useAnvlWorkspace();
+  const { saveStatus, lastSavedAt } = useAnvlWorkspace();
 
   const label = (() => {
     if (saveStatus === "saving") return "Saving…";
