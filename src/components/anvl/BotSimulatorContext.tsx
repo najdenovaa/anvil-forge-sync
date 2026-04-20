@@ -273,10 +273,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     [activeNodeId, nodes],
   );
 
-  const message = useMemo(() => {
+  const composed = useMemo(() => {
     if (!activeNode) return null;
     return composeMessage(activeNode, nodes, edges);
   }, [activeNode, nodes, edges]);
+
+  const message = composed?.message ?? null;
+  const effectiveKind = composed?.effectiveKind ?? null;
 
   const awaitingInput = useMemo(() => {
     if (!activeNode) return false;
