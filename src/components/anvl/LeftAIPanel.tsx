@@ -164,13 +164,27 @@ export function LeftAIPanel() {
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
       const wireMessages = baseHistory.map((m) => ({ role: m.role, content: m.content }));
+
+      // Snapshot current canvas so the AI generates code that reflects the
+      // user's actual params (text values, URLs, conditions...) rather than
+      // re-inventing them from scratch.
+      const flowSnapshot = {
+        nodes: nodes.map((n) => ({
+          id: n.id,
+          kind: (n.data?.kind as string) ?? "message.text",
+          title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
+          params: (n.data?.params as Record<string, string>) ?? {},
+        })),
+        edges: edges.map((e) => ({ from: e.source, to: e.target })),
+      };
+
       const resp = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: wireMessages, model, miniApp: miniAppEnabled, platform }),
+        body: JSON.stringify({ messages: wireMessages, model, miniApp: miniAppEnabled, platform, flowSnapshot }),
       });
 
       if (resp.status === 429) {
