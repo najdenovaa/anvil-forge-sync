@@ -37,6 +37,8 @@ interface SimulatorCtx {
   history: string[];
   /** Composed bot message + buttons for the current node. */
   message: SimMessage | null;
+  /** Effective node kind we walked to (after skipping silent triggers/messages). */
+  effectiveKind: NodeKind | null;
   /** Last branch decision for condition nodes ("yes" | "no"), surfaced in UI. */
   lastBranch: "yes" | "no" | null;
   /** Whether the current node is awaiting user text input. */
@@ -90,27 +92,30 @@ function parseButtons(raw: string | undefined): SimButton[] {
 }
 
 /** Build the bot message + buttons that should be shown when we land on `node`. */
-function composeMessage(node: Node, nodes: Node[], edges: Edge[]): SimMessage {
-  const kind = node.data?.kind as NodeKind | undefined;
-  const params = (node.data?.params as Record<string, string>) ?? {};
-  const title = (node.data?.title as string) ?? "";
-
-  // Walk forward through silent nodes (triggers/messages without user choice)
-  // to gather the full bubble text and reach a node that defines buttons.
+function composeMessage(
+  node: Node,
+  nodes: Node[],
+  edges: Edge[],
+): { message: SimMessage; effectiveNodeId: string; effectiveKind: NodeKind | null } {
   const visited = new Set<string>();
   let cursor: Node | undefined = node;
   const lines: string[] = [];
   let imageUrl: string | undefined;
   let buttonsNode: Node | undefined;
+  let stopKind: NodeKind | null = null;
+  let lastVisited: Node = node;
 
   while (cursor && !visited.has(cursor.id)) {
     visited.add(cursor.id);
+    lastVisited = cursor;
     const k = cursor.data?.kind as NodeKind | undefined;
     const p = (cursor.data?.params as Record<string, string>) ?? {};
+    const title = (cursor.data?.title as string) ?? "";
 
     if (k === "message.text") {
       if (p.text) lines.push(p.text);
       else if (cursor.data?.preview) lines.push(cursor.data.preview as string);
+      else if (title) lines.push(title);
     } else if (k === "message.photo") {
       imageUrl = p.url;
       if (p.caption) lines.push(p.caption);
@@ -118,12 +123,14 @@ function composeMessage(node: Node, nodes: Node[], edges: Edge[]): SimMessage {
       lines.push(`📎 ${p.filename ?? "file"}`);
     } else if (KEYBOARD_KINDS.includes(k as NodeKind)) {
       buttonsNode = cursor;
+      stopKind = k as NodeKind;
       break;
     } else if (k === "miniapp.screen") {
       lines.push(`🪟 ${p.screenId ?? title ?? "Mini App"}`);
+      stopKind = k;
       break;
     } else if (k === "logic.condition") {
-      // Condition handled by caller (we stop here so the UI can surface a branch toggle).
+      stopKind = k;
       break;
     } else if (k === "action.api") {
       lines.push(`⚡ ${p.method ?? "POST"} ${p.url ?? ""}`.trim());
@@ -131,48 +138,75 @@ function composeMessage(node: Node, nodes: Node[], edges: Edge[]): SimMessage {
       // Trigger nodes only seed the conversation — keep moving.
     }
 
+    // If current node has multiple outgoing edges → treat it as an implicit
+    // switch (synthesize buttons from targets) and stop here.
+    // (Keyboard / condition / miniapp / photo all already broke out above.)
+    const outAll = edges.filter((e) => e.source === cursor!.id);
+    if (outAll.length >= 2) {
+      buttonsNode = cursor;
+      break;
+    }
+
     // Advance: take the FIRST outgoing edge.
-    const next = edges.find((e) => e.source === cursor!.id);
+    const next = outAll[0];
     cursor = next ? nodes.find((n) => n.id === next.target) : undefined;
   }
+
+  const effectiveNode = buttonsNode ?? lastVisited;
+  const effectiveKind = (effectiveNode.data?.kind as NodeKind | undefined) ?? null;
 
   let buttons: SimButton[] = [];
   if (buttonsNode) {
     const p = (buttonsNode.data?.params as Record<string, string>) ?? {};
     const parsed = parseButtons(p.buttons);
+    const outgoing = edges.filter((e) => e.source === buttonsNode!.id);
+
     if (parsed.length > 0) {
-      // Match each button to an outgoing edge so that pressing it can jump.
-      const outgoing = edges.filter((e) => e.source === buttonsNode!.id);
       buttons = parsed.map((b, i) => ({
         ...b,
-        // Prefer sourceHandle id when AI provides it; else by index.
-        id: outgoing[i]?.sourceHandle ?? `${buttonsNode!.id}:${i}`,
+        id: outgoing[i]?.sourceHandle ?? outgoing[i]?.id ?? `${buttonsNode!.id}:${i}`,
       }));
     } else {
-      // No params.buttons — derive labels from outgoing edges' target node titles.
-      const outgoing = edges.filter((e) => e.source === buttonsNode!.id);
-      buttons = outgoing.slice(0, 4).map((e, i) => {
+      // Synthesize from outgoing edges → use target node's title or kind.
+      buttons = outgoing.slice(0, 6).map((e, i) => {
         const target = nodes.find((n) => n.id === e.target);
-        const label = (target?.data?.title as string) ?? `Step ${i + 1}`;
-        return { id: e.id, label, action: label, primary: i === 0 };
+        const tParams = (target?.data?.params as Record<string, string>) ?? {};
+        const label =
+          (target?.data?.title as string) ||
+          tParams.text ||
+          tParams.caption ||
+          tParams.screenId ||
+          `Шаг ${i + 1}`;
+        const clipped = label.length > 28 ? label.slice(0, 27) + "…" : label;
+        return {
+          id: e.sourceHandle ?? e.id,
+          label: clipped,
+          action: clipped,
+          primary: i === 0,
+        };
       });
     }
   }
 
-  // Headline: original node title if no inline message produced one.
-  if (lines.length === 0 && title) lines.push(title);
-
-  // Last-resort fallback so the bubble is never empty.
+  // Headline fallback: original node title.
+  const seedTitle = (node.data?.title as string) ?? "";
+  if (lines.length === 0 && seedTitle) lines.push(seedTitle);
   if (lines.length === 0) {
-    lines.push(kind ? `(${kind})` : "…");
+    const k = (node.data?.kind as NodeKind | undefined) ?? null;
+    lines.push(k ? `(${k})` : "…");
   }
 
-  return { text: lines.join("\n"), imageUrl, buttons };
+  return {
+    message: { text: lines.join("\n"), imageUrl, buttons },
+    effectiveNodeId: effectiveNode.id,
+    effectiveKind: stopKind ?? effectiveKind,
+  };
 }
 
 /**
  * Resolve which canvas node we should hop to when a button is pressed on
- * `currentId`. Tries (1) sourceHandle = button.id, then (2) Nth outgoing edge.
+ * `currentId`. Tries (1) sourceHandle = button.id, then (2) edge.id match,
+ * then (3) Nth outgoing edge.
  */
 function resolveTarget(
   currentId: string,
@@ -180,9 +214,9 @@ function resolveTarget(
   edges: Edge[],
 ): string | null {
   const outgoing = edges.filter((e) => e.source === currentId);
-  // Strategy 1: sourceHandle match
+  // Strategy 1: sourceHandle / edge.id match
   const byHandle = outgoing.find(
-    (e) => (e.sourceHandle ?? null) === btn.id || `${currentId}:${btn.id}` === btn.id,
+    (e) => (e.sourceHandle ?? null) === btn.id || e.id === btn.id,
   );
   if (byHandle) return byHandle.target;
 
@@ -197,24 +231,12 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
 
   const entryId = useMemo(() => findEntry(nodes), [nodes]);
 
-  const hasButtonsOnCanvas = useMemo(
-    () =>
-      nodes.some((n) => {
-        const kind = n.data?.kind as NodeKind | undefined;
-        if (!kind) return false;
-        if (KEYBOARD_KINDS.includes(kind)) return true;
-        // A node with multiple outgoing edges effectively acts as a switch.
-        const out = edges.filter((e) => e.source === n.id);
-        return out.length >= 2;
-      }),
-    [nodes, edges],
-  );
-
-  // Simulator is "available" when there is at least one trigger node AND
-  // the AI hasn't shipped a chat-only preview.screens fallback.
+  // Simulator is available whenever the canvas has at least one trigger/entry
+  // node and at least one outgoing edge — composeMessage will synthesize
+  // buttons from edges/targets even without explicit keyboard nodes.
   const available = useMemo(
-    () => nodes.length > 0 && !!entryId && hasButtonsOnCanvas,
-    [nodes, entryId, hasButtonsOnCanvas],
+    () => nodes.length > 0 && !!entryId && edges.length > 0,
+    [nodes, entryId, edges],
   );
 
   const [activeNodeId, setActiveNodeId] = useState<string | null>(entryId);
@@ -239,10 +261,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     [activeNodeId, nodes],
   );
 
-  const message = useMemo(() => {
+  const composed = useMemo(() => {
     if (!activeNode) return null;
     return composeMessage(activeNode, nodes, edges);
   }, [activeNode, nodes, edges]);
+
+  const message = composed?.message ?? null;
+  const effectiveKind = composed?.effectiveKind ?? null;
 
   const awaitingInput = useMemo(() => {
     if (!activeNode) return false;
@@ -342,6 +367,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       activeNodeId,
       history,
       message,
+      effectiveKind,
       lastBranch: lastBranch ?? (pendingBranch === "yes" ? null : "no"),
       awaitingInput,
       press,
@@ -356,6 +382,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       activeNodeId,
       history,
       message,
+      effectiveKind,
       lastBranch,
       pendingBranch,
       awaitingInput,
