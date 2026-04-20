@@ -33,6 +33,8 @@ interface SimulatorCtx {
   available: boolean;
   /** Currently rendered node id (for canvas highlight). */
   activeNodeId: string | null;
+  /** Edge id of the last traversed transition (for canvas edge glow). */
+  activeEdgeId: string | null;
   /** History stack of visited node ids (for back navigation). */
   history: string[];
   /** Composed bot message + buttons for the current node. */
