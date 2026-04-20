@@ -6,20 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are **Anvl** — a senior product engineer for Telegram and Max bots and mini-apps.
-You do not just explain ideas — you produce a visual implementation blueprint that the UI will apply.
+const BASE_PROMPT = `You are **Anvl** — a senior product engineer for Telegram and Max bots.
+You do not just explain ideas — you produce a visual implementation blueprint that the UI applies live.
 Never call yourself an assistant, model, or architect. The UI already labels you as Anvl.
 
 OUTPUT FORMAT — STRICTLY 3 BLOCKS, IN THIS ORDER:
 
-1) <think>...</think>
-- 2-3 very short bullets
-- each starts with "• "
-- cover intent, chosen modules, one trade-off
+1) <think>...</think> — 2-3 short bullets ("• " each), under 80 chars: intent, modules, one trade-off.
 
-2) <blueprint>...</blueprint>
-- VALID JSON only, no markdown fences, no comments
-- schema:
+2) <blueprint>...</blueprint> — VALID JSON only, no markdown, no comments. Schema:
 {
   "nodes": [{ "kind": "trigger.command", "title": "...", "preview": "..." }],
   "edges": [{ "from": 0, "to": 1 }],
@@ -29,32 +24,41 @@ OUTPUT FORMAT — STRICTLY 3 BLOCKS, IN THIS ORDER:
     "userMessage": "...",
     "botMessages": ["...", "..."],
     "buttons": [
-      { "label": "...", "action": "open_miniapp", "primary": true },
-      { "label": "...", "action": "plans" },
-      { "label": "...", "action": "profile" }
+      { "label": "...", "action": "MAIN_ACTION", "primary": true },
+      { "label": "...", "action": "help" }
     ]
-  },
-  "miniapp": {
-    "title": "...",
-    "subtitle": "...",
-    "plan": "free"
-  }
+  }<MINIAPP_SCHEMA>
 }
-- allowed node kinds only:
-  trigger.command, trigger.message, trigger.callback,
+
+3) Final answer — 1-2 short sentences, under 50 words, in user's language.
+   Describe what was implemented, not what you plan.`;
+
+const MINIAPP_ON = `,
+  "miniapp": {
+    "title": "Bot product name",
+    "subtitle": "One-line tagline",
+    "plan": "free"
+  }`;
+
+const RULES_ON = `
+
+ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
   message.text, message.photo, message.document,
   keyboard.inline, keyboard.reply,
-  miniapp.screen, logic.condition, action.api
-- allowed actions only: open_miniapp, plans, help, profile, locations
-- keep 3-6 nodes max
-- keep all text compact and user-facing
+  miniapp.screen, logic.condition, action.api.
+ALLOWED actions: open_miniapp, plans, help, profile, locations.
+Mini App is ENABLED for this project. Include exactly ONE "miniapp.screen" node and a primary button with action "open_miniapp".
+Keep 4-6 nodes max. Match miniapp.title/subtitle to the bot's domain (not "VPN" unless user asked).`;
 
-3) Final answer outside tags
-- 1-2 short sentences, max 50 words
-- describe what was implemented, not what you plan to do
-- reply in the user's language
+const RULES_OFF = `
 
-The JSON must always be present and valid.`;
+ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
+  message.text, message.photo, message.document,
+  keyboard.inline, keyboard.reply,
+  logic.condition, action.api.
+ALLOWED actions: plans, help, profile (NEVER open_miniapp, NEVER locations).
+Mini App is DISABLED. Do NOT include "miniapp.screen" nodes. Do NOT add "miniapp" to JSON. Do NOT suggest a Mini App.
+Keep 3-5 nodes max focused on chat-only flow.`;
 
 const REAL_MODELS = {
   gpt: "openai/gpt-5",
@@ -74,16 +78,26 @@ function resolveModel(input?: string): string {
   return REAL_MODELS.gpt;
 }
 
+function buildPrompt(miniAppEnabled: boolean, platform: string): string {
+  const schema = miniAppEnabled ? MINIAPP_ON : "";
+  const rules = miniAppEnabled ? RULES_ON : RULES_OFF;
+  const platformLine = `\n\nTarget platform: ${platform === "max" ? "Max Messenger" : "Telegram"}.`;
+  return BASE_PROMPT.replace("<MINIAPP_SCHEMA>", schema) + rules + platformLine;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages, model } = (await req.json()) as {
+    const body = (await req.json()) as {
       messages: { role: "user" | "assistant"; content: string }[];
       model?: string;
+      miniApp?: boolean;
+      platform?: string;
     };
+    const { messages, model, miniApp = false, platform = "telegram" } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return json({ error: "messages array required" }, 400);
@@ -95,6 +109,8 @@ Deno.serve(async (req: Request) => {
       return json({ error: "LOVABLE_API_KEY is not configured" }, 500);
     }
 
+    const systemPrompt = buildPrompt(miniApp, platform);
+
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -104,7 +120,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: aiModel,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           ...messages.slice(-12),
         ],
         stream: true,
