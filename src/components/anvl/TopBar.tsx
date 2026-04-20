@@ -1,7 +1,9 @@
-import { ChevronDown, Rocket, Send, AppWindow, Check, Loader2, AlertCircle, History } from "lucide-react";
+import { ChevronDown, Rocket, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import { VersionHistory } from "./VersionHistory";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 import maxLogo from "@/assets/max-logo.png";
@@ -28,11 +30,15 @@ export function TopBar() {
       <div className="flex items-center gap-6">
         <AnvlMark />
         <div className="hidden h-5 w-px bg-hairline md:block" />
-        <button className="hidden items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground md:flex">
+        <Link
+          to="/flows"
+          className="hidden items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground md:flex"
+        >
+          <FolderOpen className="h-3.5 w-3.5 opacity-70" />
           <span className="text-foreground">{t("topbar.project")}</span>
-          <span className="text-muted-foreground" suppressHydrationWarning>{t("topbar.flow")}</span>
+          <FlowSlugLabel />
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-        </button>
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">
@@ -88,6 +94,7 @@ export function TopBar() {
 
       <div className="flex items-center gap-2">
         <SaveIndicator />
+        <VersionHistory />
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <button className="hidden items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground sm:flex">
           {t("topbar.preview")}
@@ -99,6 +106,11 @@ export function TopBar() {
       </div>
     </header>
   );
+}
+
+function FlowSlugLabel() {
+  const { slug } = useAnvlWorkspace();
+  return <span className="font-mono text-[11px] text-muted-foreground">{slug}</span>;
 }
 
 function SaveIndicator() {
