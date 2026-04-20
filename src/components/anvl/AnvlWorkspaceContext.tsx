@@ -82,9 +82,11 @@ const Ctx = createContext<WorkspaceCtx | null>(null);
 export function AnvlWorkspaceProvider({
   children,
   slug = DEFAULT_FLOW_SLUG,
+  persist = true,
 }: {
   children: ReactNode;
   slug?: string;
+  persist?: boolean;
 }) {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
@@ -202,6 +204,7 @@ export function AnvlWorkspaceProvider({
     miniapp: miniApp,
     generatedCode,
     onHydrate: hydrate,
+    enabled: persist,
   });
 
   const value = useMemo(
