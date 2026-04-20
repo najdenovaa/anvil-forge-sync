@@ -100,7 +100,16 @@ function sanitizeBlueprintForMode(blueprint: AnvlBlueprint, miniAppEnabled: bool
 
 export function LeftAIPanel() {
   const { t } = useI18n();
-  const { applyBlueprint, setGeneratedCode } = useAnvlWorkspace();
+  const {
+    applyBlueprint,
+    setGeneratedCode,
+    addAiNode,
+    connectAiNodes,
+    updateAiNodeParam,
+    mergePreview,
+    mergeMiniApp,
+    resetAiCanvas,
+  } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
