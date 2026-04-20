@@ -72,14 +72,13 @@ export function LandingHero() {
 
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center">
           <img
             src={anvlLogo}
-            alt="Anvl"
-            className="h-8 w-8 rounded-lg object-cover"
+            alt="ANVL"
+            className="h-12 w-auto object-contain"
             draggable={false}
           />
-          <span className="text-[14px] font-semibold tracking-[0.18em]">ANVL</span>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface/60 p-0.5 text-[11px] font-medium backdrop-blur">
           <button

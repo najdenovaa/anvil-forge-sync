@@ -6,19 +6,13 @@ import anvlLogo from "@/assets/anvl-logo.png";
 
 function AnvlMark() {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center">
       <img
         src={anvlLogo}
-        alt="Anvl"
-        className="h-7 w-7 rounded-md object-cover"
+        alt="ANVL"
+        className="h-10 w-auto object-contain"
         draggable={false}
       />
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-[15px] font-semibold tracking-tight">ANVL</span>
-        <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          AI
-        </span>
-      </div>
     </div>
   );
 }
