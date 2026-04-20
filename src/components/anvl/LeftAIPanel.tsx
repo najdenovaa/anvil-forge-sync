@@ -14,7 +14,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useI18n } from "./I18nContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { cn } from "@/lib/utils";
+import { safeParseAnvlBlueprint } from "@/lib/anvl-blueprint";
 
 type ModelId = "auto" | "gpt" | "gemini" | "grok" | "claude";
 
@@ -22,7 +24,6 @@ interface ModelDef {
   id: ModelId;
   labelKey: string;
   short: string;
-  /** All models route through Anvl; none are dead-ends. */
   routed?: boolean;
   accent: string;
 }
@@ -38,26 +39,21 @@ const MODELS: ModelDef[] = [
 interface Msg {
   role: "user" | "assistant";
   content: string;
-  /** Captured reasoning from <think>...</think> block. Streamed live, frozen on completion. */
   thoughts?: string;
-  /** While true, render the live "thinking" stepper instead of message body. */
   pending?: boolean;
-  /** 0..2 — index of the active reasoning step shown in the live stepper. */
   step?: number;
 }
 
 export function LeftAIPanel() {
   const { t } = useI18n();
+  const { applyBlueprint } = useAnvlWorkspace();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: t("ai.msg.intro") },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Re-translate intro when language changes (only if it's still the only message)
   useEffect(() => {
     setMessages((prev) =>
       prev.length === 1 && prev[0].role === "assistant"
@@ -83,7 +79,6 @@ export function LeftAIPanel() {
     setMessages([...baseHistory, placeholder]);
     setIsStreaming(true);
 
-    // Animate the "thinking" stepper while waiting for first content token
     const stepTimer = setInterval(() => {
       setMessages((prev) => {
         const copy = prev.slice();
@@ -97,11 +92,8 @@ export function LeftAIPanel() {
 
     const stopStepper = () => clearInterval(stepTimer);
 
-    // All models route through Anvl backend; no client-side fallback needed.
-
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
-      // Send only clean role/content pairs to the model
       const wireMessages = baseHistory.map((m) => ({ role: m.role, content: m.content }));
       const resp = await fetch(url, {
         method: "POST",
@@ -126,24 +118,17 @@ export function LeftAIPanel() {
         setIsStreaming(false);
         return;
       }
-      if (resp.status === 501) {
-        stopStepper();
-        setMessages([...baseHistory, { role: "assistant", content: t("ai.unavailable") }]);
-        setIsStreaming(false);
-        return;
-      }
       if (!resp.ok || !resp.body) throw new Error("network");
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let raw = ""; // full streamed text including <think> tags
+      let raw = "";
       let thoughts = "";
+      let blueprintRaw = "";
       let answer = "";
-      // Streaming parser state for <think>...</think>
-      // 0 = before <think> (assume thinking by default), 1 = inside think, 2 = after think
-      let phase: 0 | 1 | 2 = 0;
-      let pending = ""; // tail buffer to detect tag boundaries
+      let phase: 0 | 1 | 2 | 3 | 4 = 0;
+      let pending = "";
 
       const flush = () => {
         setMessages((prev) => {
@@ -154,47 +139,49 @@ export function LeftAIPanel() {
             ...last,
             thoughts,
             content: answer,
-            pending: phase !== 2 && answer.length === 0,
+            pending: phase !== 4 && answer.length === 0,
           };
           return copy;
         });
       };
 
+      const THINK_OPEN = "<think>";
+      const THINK_CLOSE = "</think>";
+      const BLUEPRINT_OPEN = "<blueprint>";
+      const BLUEPRINT_CLOSE = "</blueprint>";
+      const SAFE_TAIL = 16;
+
       const ingest = (chunk: string) => {
         raw += chunk;
         pending += chunk;
 
-        // Process pending while we can make decisions
-        // We keep up to 12 chars in pending to safely detect "<think>" / "</think>"
-        const SAFE_TAIL = 12;
         while (pending.length > 0) {
           if (phase === 0) {
-            const open = pending.indexOf("<think>");
+            const open = pending.indexOf(THINK_OPEN);
             if (open !== -1) {
-              // Anything before <think> is treated as answer (rare, but safe)
               answer += pending.slice(0, open);
-              pending = pending.slice(open + "<think>".length);
+              pending = pending.slice(open + THINK_OPEN.length);
               phase = 1;
               stopStepper();
               continue;
             }
-            // If no clear opener and we have enough buffer, but model didn't emit <think>,
-            // treat as direct answer.
             if (pending.length > SAFE_TAIL) {
               const safe = pending.slice(0, pending.length - SAFE_TAIL);
               if (safe.length) {
                 answer += safe;
                 pending = pending.slice(safe.length);
+                phase = 4;
                 stopStepper();
               }
             }
             break;
           }
+
           if (phase === 1) {
-            const close = pending.indexOf("</think>");
+            const close = pending.indexOf(THINK_CLOSE);
             if (close !== -1) {
               thoughts += pending.slice(0, close);
-              pending = pending.slice(close + "</think>".length);
+              pending = pending.slice(close + THINK_CLOSE.length);
               phase = 2;
               continue;
             }
@@ -205,11 +192,47 @@ export function LeftAIPanel() {
             }
             break;
           }
-          // phase === 2 — straight to answer
+
+          if (phase === 2) {
+            const open = pending.indexOf(BLUEPRINT_OPEN);
+            if (open !== -1) {
+              answer += pending.slice(0, open);
+              pending = pending.slice(open + BLUEPRINT_OPEN.length);
+              phase = 3;
+              continue;
+            }
+            if (pending.length > SAFE_TAIL) {
+              const safe = pending.slice(0, pending.length - SAFE_TAIL);
+              if (safe.length) {
+                answer += safe;
+                pending = pending.slice(safe.length);
+                phase = 4;
+              }
+            }
+            break;
+          }
+
+          if (phase === 3) {
+            const close = pending.indexOf(BLUEPRINT_CLOSE);
+            if (close !== -1) {
+              blueprintRaw += pending.slice(0, close);
+              pending = pending.slice(close + BLUEPRINT_CLOSE.length);
+              phase = 4;
+              continue;
+            }
+            if (pending.length > SAFE_TAIL) {
+              const safe = pending.slice(0, pending.length - SAFE_TAIL);
+              blueprintRaw += safe;
+              pending = pending.slice(safe.length);
+            }
+            break;
+          }
+
           answer += pending;
           pending = "";
           break;
         }
+
         flush();
       };
 
@@ -241,26 +264,25 @@ export function LeftAIPanel() {
           }
         }
       }
-      // Flush remaining buffered text
+
       if (pending.length > 0) {
-        if ((phase as number) === 1) thoughts += pending;
+        if (phase === 1) thoughts += pending;
+        else if (phase === 3) blueprintRaw += pending;
         else answer += pending;
         pending = "";
       }
-      // If model never emitted a closing tag but we got nothing in answer,
-      // promote thoughts to answer so user still sees something.
-      if (!answer.trim() && thoughts.trim()) {
-        answer = thoughts.trim();
-        thoughts = "";
-      }
-      // Mark assistant message as finalized
+
+      const finalAnswer = (answer || raw).trim();
+      const blueprint = safeParseAnvlBlueprint(blueprintRaw.trim());
+      if (blueprint) applyBlueprint(blueprint);
+
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
         if (last?.role === "assistant") {
           copy[copy.length - 1] = {
             role: "assistant",
-            content: answer || raw, // raw fallback if parser failed entirely
+            content: finalAnswer,
             thoughts: thoughts.trim() || undefined,
           };
         }
@@ -290,7 +312,6 @@ export function LeftAIPanel() {
 
   return (
     <aside className="flex w-[340px] shrink-0 flex-col border-r border-hairline bg-sidebar">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
         <div className="flex items-center gap-2 px-1">
           <div className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-background">
@@ -308,10 +329,8 @@ export function LeftAIPanel() {
         </div>
       </div>
 
-      {/* Model picker */}
       <ModelDropdown current={model} onChange={setModel} />
 
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((m, i) => (
           <MessageBubble key={i} msg={m} />
@@ -323,7 +342,6 @@ export function LeftAIPanel() {
         )}
       </div>
 
-      {/* Composer */}
       <div className="border-t border-hairline p-3">
         <div className="hairline flex items-end gap-2 rounded-xl bg-surface px-3 py-2 focus-within:border-foreground/30">
           <button className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground">
@@ -373,15 +391,10 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
   return (
     <div className="max-w-[88%] space-y-1.5">
-      {/* Live "thinking" stepper while we wait for first content token */}
       {isLive && <ThinkingStepper step={msg.step ?? 0} liveThoughts={msg.thoughts ?? ""} />}
 
-      {/* Final / streaming answer bubble */}
       {(msg.content.length > 0 || !isLive) && (
         <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-foreground/90">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            <Sparkles className="h-3 w-3" /> {t("ai.label")}
-          </div>
           {msg.content ? (
             <div className="whitespace-pre-wrap">{msg.content}</div>
           ) : (
@@ -390,7 +403,6 @@ function MessageBubble({ msg }: { msg: Msg }) {
             </span>
           )}
 
-          {/* Collapsed reasoning trace, available after answer is in */}
           {!isLive && hasThoughts && (
             <div className="mt-2 border-t border-hairline pt-2">
               <button
