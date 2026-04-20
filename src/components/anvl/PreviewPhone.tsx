@@ -1,29 +1,53 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
-import { Battery, Signal, Wifi, ArrowLeft, MoreVertical, Mic, Paperclip, Smile } from "lucide-react";
+import { useMiniApp } from "./MiniAppContext";
+import { VpnMiniApp } from "./VpnMiniApp";
+import {
+  Battery,
+  Signal,
+  Wifi,
+  ArrowLeft,
+  MoreVertical,
+  Mic,
+  Paperclip,
+  Smile,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function PreviewPhone() {
   const { platform } = usePlatform();
   const { t } = useI18n();
+  const { view, open, close } = useMiniApp();
   const isTg = platform === "telegram";
+  const [opening, setOpening] = useState(false);
+
+  const handleOpen = () => {
+    setOpening(true);
+    setTimeout(() => {
+      setOpening(false);
+      open();
+    }, 600);
+  };
 
   return (
     <div className="hairline relative w-[280px] overflow-hidden rounded-[36px] bg-black p-2 shadow-[0_30px_80px_-30px_oklch(0_0_0_/_80%)]">
       <div className="relative overflow-hidden rounded-[28px]">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={platform}
+            key={`${platform}-${view}`}
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
               "flex h-[520px] flex-col",
               isTg ? "bg-[oklch(0.22_0.03_260)]" : "bg-[oklch(0.96_0_0)] text-[oklch(0.16_0_0)]",
             )}
           >
+            {/* Status bar */}
             <div
               className={cn(
                 "flex items-center justify-between px-4 pt-2 text-[10px] font-medium",
@@ -38,71 +62,13 @@ export function PreviewPhone() {
               </div>
             </div>
 
-            <div
-              className={cn(
-                "flex items-center gap-2 border-b px-3 py-2",
-                isTg ? "border-white/5 bg-[oklch(0.27_0.04_260)]" : "border-black/5 bg-white",
-              )}
-            >
-              <ArrowLeft className="h-4 w-4 opacity-70" />
-              <div
-                className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold",
-                  isTg ? "bg-tg text-white" : "bg-max text-white",
-                )}
-              >
-                {isTg ? "TG" : "M"}
+            {view === "chat" ? (
+              <ChatView isTg={isTg} onOpen={handleOpen} opening={opening} />
+            ) : (
+              <div className="flex-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <VpnMiniApp />
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-semibold">{t("preview.bot_name")}</div>
-                <div
-                  className={cn(
-                    "truncate text-[10px]",
-                    isTg ? "text-white/50" : "text-black/50",
-                  )}
-                >
-                  {t("preview.bot_status")}
-                </div>
-              </div>
-              <MoreVertical className="h-4 w-4 opacity-70" />
-            </div>
-
-            <div
-              className={cn(
-                "flex-1 space-y-2 overflow-hidden px-3 py-3",
-                isTg
-                  ? "bg-[radial-gradient(circle_at_30%_20%,oklch(0.3_0.05_260)_0%,oklch(0.18_0.03_260)_70%)]"
-                  : "bg-[oklch(0.97_0_0)]",
-              )}
-            >
-              <UserBubble platform={platform}>{t("preview.user_msg")}</UserBubble>
-              <BotBubble platform={platform}>{t("preview.bot_msg_1")}</BotBubble>
-              <BotBubble platform={platform}>
-                <div className="space-y-1">
-                  <span>{t("preview.bot_msg_2")}</span>
-                  <InlineKb platform={platform} />
-                </div>
-              </BotBubble>
-            </div>
-
-            <div
-              className={cn(
-                "flex items-center gap-2 border-t px-3 py-2",
-                isTg ? "border-white/5 bg-[oklch(0.24_0.03_260)]" : "border-black/5 bg-white",
-              )}
-            >
-              <Paperclip className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
-              <div
-                className={cn(
-                  "flex-1 rounded-full px-3 py-1.5 text-[11px]",
-                  isTg ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40",
-                )}
-              >
-                {t("preview.composer")}
-              </div>
-              <Smile className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
-              <Mic className={cn("h-4 w-4", isTg ? "text-tg" : "text-max")} />
-            </div>
+            )}
           </motion.div>
         </AnimatePresence>
 
@@ -110,20 +76,110 @@ export function PreviewPhone() {
       </div>
 
       <div className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {platform}
+        {platform} · {view === "chat" ? "chat" : "mini app"}
       </div>
+
+      {/* Floating chip to return when in mini app — also accessible from inside mini app */}
+      {view === "miniapp" && (
+        <button
+          onClick={close}
+          className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface-elevated px-3 py-1 text-[9.5px] font-medium text-foreground/80 shadow-elevated hover:text-foreground"
+        >
+          {t("vpn.back_to_chat")}
+        </button>
+      )}
     </div>
   );
 }
 
-function UserBubble({
-  children,
-  platform,
+function ChatView({
+  isTg,
+  onOpen,
+  opening,
 }: {
-  children: React.ReactNode;
-  platform: "telegram" | "max";
+  isTg: boolean;
+  onOpen: () => void;
+  opening: boolean;
 }) {
-  const isTg = platform === "telegram";
+  const { t } = useI18n();
+  return (
+    <>
+      <div
+        className={cn(
+          "flex items-center gap-2 border-b px-3 py-2",
+          isTg ? "border-white/5 bg-[oklch(0.27_0.04_260)]" : "border-black/5 bg-white",
+        )}
+      >
+        <ArrowLeft className="h-4 w-4 opacity-70" />
+        <div
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold",
+            isTg ? "bg-tg text-white" : "bg-max text-white",
+          )}
+        >
+          {isTg ? "TG" : "M"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-semibold">{t("preview.bot_name")}</div>
+          <div
+            className={cn(
+              "truncate text-[10px]",
+              isTg ? "text-white/50" : "text-black/50",
+            )}
+          >
+            {t("preview.bot_status")}
+          </div>
+        </div>
+        <MoreVertical className="h-4 w-4 opacity-70" />
+      </div>
+
+      <div
+        className={cn(
+          "flex-1 space-y-2 overflow-hidden px-3 py-3",
+          isTg
+            ? "bg-[radial-gradient(circle_at_30%_20%,oklch(0.3_0.05_260)_0%,oklch(0.18_0.03_260)_70%)]"
+            : "bg-[oklch(0.97_0_0)]",
+        )}
+      >
+        <UserBubble isTg={isTg}>{t("preview.user_msg")}</UserBubble>
+        <BotBubble isTg={isTg}>{t("preview.bot_msg_1")}</BotBubble>
+        <BotBubble isTg={isTg}>
+          <div className="space-y-1">
+            <span>{t("preview.bot_msg_2")}</span>
+            <InlineKb isTg={isTg} onOpen={onOpen} opening={opening} />
+          </div>
+        </BotBubble>
+        {opening && (
+          <div className="flex items-center justify-center gap-1.5 pt-1 text-[10px] opacity-60">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t("preview.opening")}
+          </div>
+        )}
+      </div>
+
+      <div
+        className={cn(
+          "flex items-center gap-2 border-t px-3 py-2",
+          isTg ? "border-white/5 bg-[oklch(0.24_0.03_260)]" : "border-black/5 bg-white",
+        )}
+      >
+        <Paperclip className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
+        <div
+          className={cn(
+            "flex-1 rounded-full px-3 py-1.5 text-[11px]",
+            isTg ? "bg-white/5 text-white/40" : "bg-black/5 text-black/40",
+          )}
+        >
+          {t("preview.composer")}
+        </div>
+        <Smile className={cn("h-4 w-4", isTg ? "text-white/50" : "text-black/40")} />
+        <Mic className={cn("h-4 w-4", isTg ? "text-tg" : "text-max")} />
+      </div>
+    </>
+  );
+}
+
+function UserBubble({ children, isTg }: { children: React.ReactNode; isTg: boolean }) {
   return (
     <div className="flex justify-end">
       <div
@@ -140,14 +196,7 @@ function UserBubble({
   );
 }
 
-function BotBubble({
-  children,
-  platform,
-}: {
-  children: React.ReactNode;
-  platform: "telegram" | "max";
-}) {
-  const isTg = platform === "telegram";
+function BotBubble({ children, isTg }: { children: React.ReactNode; isTg: boolean }) {
   return (
     <div className="flex justify-start">
       <div
@@ -164,23 +213,40 @@ function BotBubble({
   );
 }
 
-function InlineKb({ platform }: { platform: "telegram" | "max" }) {
-  const isTg = platform === "telegram";
+function InlineKb({
+  isTg,
+  onOpen,
+  opening,
+}: {
+  isTg: boolean;
+  onOpen: () => void;
+  opening: boolean;
+}) {
   const { t } = useI18n();
-  const items = [t("preview.btn.open"), t("preview.btn.pricing"), t("preview.btn.help")];
+  const items: { key: string; primary?: boolean; onClick?: () => void }[] = [
+    { key: "preview.btn.open", primary: true, onClick: onOpen },
+    { key: "preview.btn.pricing" },
+    { key: "preview.btn.help" },
+  ];
   return (
     <div className="mt-1.5 grid grid-cols-1 gap-1">
       {items.map((it) => (
         <button
-          key={it}
+          key={it.key}
+          onClick={it.onClick}
+          disabled={opening && it.primary}
           className={cn(
-            "rounded-lg px-2 py-1 text-[10.5px] font-medium transition",
-            isTg
-              ? "bg-white/5 text-tg hover:bg-white/10"
-              : "bg-[oklch(0.97_0_0)] text-max hover:bg-[oklch(0.94_0_0)]",
+            "rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition disabled:opacity-50",
+            it.primary
+              ? isTg
+                ? "bg-tg text-white hover:opacity-90"
+                : "bg-max text-white hover:opacity-90"
+              : isTg
+                ? "bg-white/5 text-tg hover:bg-white/10"
+                : "bg-[oklch(0.97_0_0)] text-max hover:bg-[oklch(0.94_0_0)]",
           )}
         >
-          {it}
+          {t(it.key)}
         </button>
       ))}
     </div>
