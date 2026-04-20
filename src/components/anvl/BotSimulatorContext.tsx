@@ -246,6 +246,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<string[]>([]);
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
+  const [cameraFollow, setCameraFollow] = useState(false);
 
   // Re-pin when the canvas changes (e.g. AI applies a new flow).
   const lastEntryRef = useMemo(() => ({ id: entryId }), [entryId]);
