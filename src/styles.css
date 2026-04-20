@@ -195,6 +195,59 @@
   -webkit-backdrop-filter: blur(28px) saturate(170%);
 }
 
+/* Reasoning bubble — slight tint with shimmer border */
+.reasoning-glass {
+  background: linear-gradient(
+    135deg,
+    oklch(0.24 0.02 270 / 70%) 0%,
+    oklch(0.2 0.03 280 / 60%) 100%
+  );
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid oklch(1 0 0 / 10%);
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 8%) inset,
+    0 0 24px -4px oklch(0.7 0.18 280 / 18%);
+}
+
+/* Active simulator node — animated halo */
+.sim-active {
+  box-shadow:
+    0 0 0 1.5px oklch(0.78 0.18 145 / 95%),
+    0 0 0 6px oklch(0.78 0.18 145 / 14%),
+    0 0 32px -2px oklch(0.78 0.18 145 / 35%),
+    var(--shadow-node-selected);
+  animation: sim-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sim-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1.5px oklch(0.78 0.18 145 / 95%),
+      0 0 0 6px oklch(0.78 0.18 145 / 14%),
+      0 0 32px -2px oklch(0.78 0.18 145 / 35%),
+      var(--shadow-node-selected);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px oklch(0.82 0.18 145 / 100%),
+      0 0 0 10px oklch(0.78 0.18 145 / 10%),
+      0 0 48px 0 oklch(0.78 0.18 145 / 50%),
+      var(--shadow-node-selected);
+  }
+}
+
+/* Caret for the typewriter effect */
+.tw-caret::after {
+  content: "▍";
+  display: inline-block;
+  margin-left: 1px;
+  color: oklch(0.78 0.18 280 / 80%);
+  animation: tw-blink 0.9s steps(2, start) infinite;
+}
+@keyframes tw-blink {
+  to { opacity: 0; }
+}
+
 /* Glow used for icon halos inside nodes */
 .node-halo {
   position: relative;
