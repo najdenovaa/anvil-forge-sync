@@ -198,6 +198,20 @@ export function LeftAIPanel() {
       let pending = "";
       let blueprintApplied = false;
       let codeApplied = false;
+      // Tool-calling state: assemble streaming tool_calls by index
+      const toolBuf: { name: string; args: string; done: boolean }[] = [];
+      const applyToolCall = (name: string, argsRaw: string) => {
+        let args: any;
+        try { args = JSON.parse(argsRaw); } catch { return; }
+        try {
+          if (name === "reset_canvas") resetAiCanvas();
+          else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
+          else if (name === "connect") connectAiNodes(args.from, args.to);
+          else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
+          else if (name === "set_preview") mergePreview(args);
+          else if (name === "set_miniapp") mergeMiniApp(args);
+        } catch (err) { console.warn("tool apply failed", name, err); }
+      };
 
       const flush = () => {
         if (!blueprintApplied && blueprintRaw.includes("\"nodes\"") && blueprintRaw.includes("\"preview\"")) {
