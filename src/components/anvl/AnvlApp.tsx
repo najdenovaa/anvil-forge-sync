@@ -30,13 +30,13 @@ function Shell() {
   );
 }
 
-export function AnvlApp({ slug }: { slug?: string } = {}) {
+export function AnvlApp({ slug, persist = true }: { slug?: string; persist?: boolean } = {}) {
   return (
     <I18nProvider>
       <PlatformProvider>
         <MiniAppProvider>
           <TelegramWebAppProvider>
-            <AnvlWorkspaceProvider slug={slug}>
+            <AnvlWorkspaceProvider slug={slug} persist={persist}>
               <SelectionProvider>
                 <AnvlAppShellProvider>
                   <Shell />
