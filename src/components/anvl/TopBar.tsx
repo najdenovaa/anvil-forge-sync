@@ -1,4 +1,4 @@
-import { ChevronDown, Rocket, Sparkles, Send } from "lucide-react";
+import { ChevronDown, Rocket, Sparkles, Send, AppWindow } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ function AnvlMark() {
 }
 
 export function TopBar() {
-  const { platform, setPlatform } = usePlatform();
+  const { platform, setPlatform, miniAppEnabled, setMiniAppEnabled } = usePlatform();
   const { t, lang, setLang } = useI18n();
 
   return (
@@ -51,6 +51,30 @@ export function TopBar() {
             icon={<Sparkles className="h-3.5 w-3.5" />}
           />
         </div>
+
+        <button
+          onClick={() => setMiniAppEnabled(!miniAppEnabled)}
+          title={t("platform.miniapp.hint")}
+          className={cn(
+            "hairline flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition",
+            miniAppEnabled
+              ? "border-transparent bg-foreground text-background"
+              : "bg-surface text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border transition",
+              miniAppEnabled
+                ? "border-background bg-background text-foreground"
+                : "border-muted-foreground/40",
+            )}
+          >
+            {miniAppEnabled && <span className="text-[9px] font-bold leading-none">✓</span>}
+          </span>
+          <AppWindow className="h-3.5 w-3.5" />
+          {t("platform.miniapp")}
+        </button>
       </div>
 
       <div className="flex items-center gap-2">
