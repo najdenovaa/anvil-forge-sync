@@ -279,14 +279,9 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
         botMessages: Array.isArray(preview.botMessages)
           ? preview.botMessages.filter((item): item is string => typeof item === "string").slice(0, 3)
           : undefined,
-        buttons: Array.isArray(preview.buttons)
-          ? preview.buttons
-              .filter(
-                (button): button is AnvlPreviewButton =>
-                  !!button && typeof button.label === "string" && isAction(button.action),
-              )
-              .slice(0, 3)
-          : undefined,
+        buttons: parsePreviewButtons(preview.buttons),
+        initialScreen: isStr(preview.initialScreen) ? preview.initialScreen : undefined,
+        screens: parsePreviewScreens(preview.screens),
       };
     }
 
