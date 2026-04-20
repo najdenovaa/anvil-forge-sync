@@ -126,7 +126,7 @@ function SaveIndicator() {
           "h-3 w-3",
           saveStatus === "saving" && "animate-spin text-foreground/70",
           saveStatus === "error" && "text-destructive",
-          saveStatus === "saved" && "text-emerald-400",
+          saveStatus === "saved" && "text-foreground",
         )}
       />
       <span suppressHydrationWarning>{label}</span>
