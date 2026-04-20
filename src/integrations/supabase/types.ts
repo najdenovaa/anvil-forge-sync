@@ -14,7 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      flow_versions: {
+        Row: {
+          created_at: string
+          edges: Json
+          flow_id: string
+          generated_code: string
+          id: string
+          miniapp: Json
+          nodes: Json
+          note: string | null
+          preview: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          edges: Json
+          flow_id: string
+          generated_code?: string
+          id?: string
+          miniapp?: Json
+          nodes: Json
+          note?: string | null
+          preview?: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          edges?: Json
+          flow_id?: string
+          generated_code?: string
+          id?: string
+          miniapp?: Json
+          nodes?: Json
+          note?: string | null
+          preview?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_versions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flows: {
+        Row: {
+          created_at: string
+          current_version: number
+          edges: Json
+          generated_code: string
+          id: string
+          miniapp: Json
+          miniapp_enabled: boolean
+          nodes: Json
+          platform: string
+          preview: Json
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_version?: number
+          edges?: Json
+          generated_code?: string
+          id?: string
+          miniapp?: Json
+          miniapp_enabled?: boolean
+          nodes?: Json
+          platform?: string
+          preview?: Json
+          slug: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_version?: number
+          edges?: Json
+          generated_code?: string
+          id?: string
+          miniapp?: Json
+          miniapp_enabled?: boolean
+          nodes?: Json
+          platform?: string
+          preview?: Json
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
