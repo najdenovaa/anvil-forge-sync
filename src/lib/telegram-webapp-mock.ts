@@ -204,7 +204,7 @@ export function createTelegramWebAppMock(opts: TmaMockOptions = {}): TmaMockHand
       return this;
     },
     notificationOccurred(type) {
-      const map = { success: [10, 40, 10], warning: [12, 60, 12], error: [20, 30, 20, 30, 20] } as const;
+      const map: Record<string, number[]> = { success: [10, 40, 10], warning: [12, 60, 12], error: [20, 30, 20, 30, 20] };
       safeVibrate(map[type] ?? 10);
       return this;
     },
