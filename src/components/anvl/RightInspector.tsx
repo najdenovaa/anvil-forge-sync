@@ -1,34 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2 } from "lucide-react";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2 } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import { useSelection } from "./SelectionContext";
+import { NodeInspector } from "./NodeInspector";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "settings" | "code";
+type Tab = "components" | "node" | "settings" | "code";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
   const { t } = useI18n();
+  const { selectedId } = useSelection();
+
+  // Auto-switch to "Node" tab when a node is selected on the canvas.
+  useEffect(() => {
+    if (selectedId) setTab("node");
+  }, [selectedId]);
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-l border-hairline bg-sidebar">
-      <div className="flex items-center gap-1 border-b border-hairline px-3 py-2">
-        <TabBtn
-          active={tab === "components"}
-          onClick={() => setTab("components")}
-          icon={<LayoutGrid className="h-3.5 w-3.5" />}
-        >
+      <div className="flex items-center gap-1 border-b border-hairline px-2 py-2">
+        <TabBtn active={tab === "components"} onClick={() => setTab("components")} icon={<LayoutGrid className="h-3.5 w-3.5" />}>
           {t("inspector.components")}
         </TabBtn>
-        <TabBtn
-          active={tab === "settings"}
-          onClick={() => setTab("settings")}
-          icon={<Settings2 className="h-3.5 w-3.5" />}
-        >
+        <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />}>
+          Node
+        </TabBtn>
+        <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />}>
           {t("inspector.settings")}
         </TabBtn>
         <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />}>
@@ -45,7 +48,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
