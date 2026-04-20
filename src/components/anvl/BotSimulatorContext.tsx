@@ -231,24 +231,12 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
 
   const entryId = useMemo(() => findEntry(nodes), [nodes]);
 
-  const hasButtonsOnCanvas = useMemo(
-    () =>
-      nodes.some((n) => {
-        const kind = n.data?.kind as NodeKind | undefined;
-        if (!kind) return false;
-        if (KEYBOARD_KINDS.includes(kind)) return true;
-        // A node with multiple outgoing edges effectively acts as a switch.
-        const out = edges.filter((e) => e.source === n.id);
-        return out.length >= 2;
-      }),
-    [nodes, edges],
-  );
-
-  // Simulator is "available" when there is at least one trigger node AND
-  // the AI hasn't shipped a chat-only preview.screens fallback.
+  // Simulator is available whenever the canvas has at least one trigger/entry
+  // node and at least one outgoing edge — composeMessage will synthesize
+  // buttons from edges/targets even without explicit keyboard nodes.
   const available = useMemo(
-    () => nodes.length > 0 && !!entryId && hasButtonsOnCanvas,
-    [nodes, entryId, hasButtonsOnCanvas],
+    () => nodes.length > 0 && !!entryId && edges.length > 0,
+    [nodes, entryId, edges],
   );
 
   const [activeNodeId, setActiveNodeId] = useState<string | null>(entryId);
