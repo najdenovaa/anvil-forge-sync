@@ -14,8 +14,7 @@ function AnvlMark() {
       <img
         src={anvlLogo}
         alt="ANVL"
-        className="h-15 w-auto object-contain"
-        style={{ mixBlendMode: "lighten", background: "transparent" }}
+        className="h-16 w-auto object-contain"
         draggable={false}
       />
     </div>
