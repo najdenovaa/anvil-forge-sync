@@ -11,6 +11,27 @@ interface AnvlNodeData {
   title?: string;
   previewKey?: string;
   preview?: string;
+  params?: Record<string, string>;
+}
+
+/** What param keys to surface on the node card, by kind. */
+const PARAM_PREVIEW: Partial<Record<NodeKind, { key: string; prefix?: string }[]>> = {
+  "trigger.command":  [{ key: "command" }],
+  "trigger.message":  [{ key: "match", prefix: "~" }],
+  "trigger.callback": [{ key: "data", prefix: "cb:" }],
+  "message.text":     [{ key: "text" }],
+  "message.photo":    [{ key: "url" }, { key: "caption" }],
+  "message.document": [{ key: "filename" }, { key: "url" }],
+  "keyboard.inline":  [{ key: "buttons" }],
+  "keyboard.reply":   [{ key: "buttons" }],
+  "miniapp.screen":   [{ key: "screenId", prefix: "#" }, { key: "url" }],
+  "logic.condition":  [{ key: "expression", prefix: "if " }],
+  "action.api":       [{ key: "method" }, { key: "url" }],
+};
+
+function clip(s: string, n = 36): string {
+  const oneLine = s.replace(/\s+/g, " ").trim();
+  return oneLine.length > n ? oneLine.slice(0, n - 1) + "…" : oneLine;
 }
 
 const GROUP_ACCENT: Record<NodeGroup, string> = {
@@ -84,6 +105,32 @@ export function ForgeNode({ data, selected }: NodeProps<AnvlNodeData>) {
       <div className="border-t border-hairline px-3 py-2.5 text-[11.5px] leading-relaxed text-muted-foreground">
         {preview}
       </div>
+
+      {(() => {
+        const schema = PARAM_PREVIEW[data.kind];
+        if (!schema || !data.params) return null;
+        const chips = schema
+          .map((s) => {
+            const v = data.params?.[s.key];
+            if (!v || !v.trim()) return null;
+            return { key: s.key, label: clip((s.prefix ?? "") + v) };
+          })
+          .filter(Boolean) as { key: string; label: string }[];
+        if (chips.length === 0) return null;
+        return (
+          <div className="flex flex-wrap gap-1 border-t border-hairline px-3 py-2">
+            {chips.map((c) => (
+              <span
+                key={c.key}
+                className="hairline rounded-md bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] leading-none text-foreground/75"
+                title={data.params?.[c.key]}
+              >
+                {c.label}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
 
       <Handle type="source" position={Position.Right} className="!h-2.5 !w-2.5" />
     </motion.div>
