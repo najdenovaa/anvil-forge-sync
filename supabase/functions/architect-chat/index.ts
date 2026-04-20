@@ -35,9 +35,33 @@ OUTPUT FORMAT — STRICTLY 3 BLOCKS, IN THIS ORDER:
 
 const MINIAPP_ON = `,
   "miniapp": {
-    "title": "Bot product name",
-    "subtitle": "One-line tagline",
-    "plan": "free"
+    "title": "Bot product name (matches the bot's domain)",
+    "subtitle": "One-line tagline for the domain",
+    "accent": "blue|green|orange|violet|pink|red|teal",
+    "itemsLabel": "Tab title for the catalog (e.g. Menu, Servers, Courses, Restaurants, Cart)",
+    "hero": {
+      "title": "Big headline shown on home (e.g. 'Order food', 'Book a table', 'Connect VPN', 'Start lesson')",
+      "subtitle": "Short context line",
+      "cta": "Primary action button label (e.g. 'Place order', 'Connect', 'Start')",
+      "icon": "icon name from: home,cart,bag,shop,delivery,truck,food,menu,travel,music,heart,location,calendar,bell,bot,sparkles,zap,globe,camera,book,course,fitness,coffee,work,star,phone,mail,search,power"
+    },
+    "stats": [
+      { "label": "...", "value": "...", "unit": "..." },
+      { "label": "...", "value": "...", "unit": "..." }
+    ],
+    "items": [
+      { "title": "Domain item (dish, server, product, course...)", "subtitle": "...", "meta": "price/ping/distance", "emoji": "🍕", "badge": "PRO" }
+    ],
+    "plans": [
+      { "id": "basic", "name": "Basic", "price": "0", "unit": "/mo", "description": "...", "features": ["...", "..."] },
+      { "id": "pro",   "name": "Pro",   "price": "299₽", "unit": "/mo", "description": "...", "highlight": true, "features": ["...", "..."] }
+    ],
+    "tabs": [
+      { "id": "home",   "label": "Home",    "icon": "home" },
+      { "id": "items",  "label": "Catalog", "icon": "list" },
+      { "id": "plans",  "label": "Plans",   "icon": "plans" },
+      { "id": "profile","label": "Profile", "icon": "profile" }
+    ]
   }`;
 
 const RULES_ON = `
@@ -46,9 +70,20 @@ ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
   message.text, message.photo, message.document,
   keyboard.inline, keyboard.reply,
   miniapp.screen, logic.condition, action.api.
-ALLOWED actions: open_miniapp, plans, help, profile, locations.
-Mini App is ENABLED for this project. Include exactly ONE "miniapp.screen" node and a primary button with action "open_miniapp".
-Keep 4-6 nodes max. Match miniapp.title/subtitle to the bot's domain (not "VPN" unless user asked).`;
+ALLOWED preview.buttons actions: open_miniapp, plans, help, profile, locations.
+
+Mini App is ENABLED. You MUST tailor the entire "miniapp" object to the user's actual domain
+(food delivery, hotel booking, fitness, language tutor, e-commerce, support, music, VPN, etc.).
+NEVER ship VPN content unless the user asked for VPN. NEVER reuse VPN copy as a default.
+- Pick "accent" that matches the brand mood (food=orange, fitness=red, edu=violet, vpn=blue, travel=teal).
+- "itemsLabel" must reflect the catalog (Menu, Cart, Servers, Courses, Restaurants, Photos, Lessons, etc.).
+- "hero.title", "hero.cta", "hero.icon" must match the domain (e.g. food → "Order food", "Place order", icon "food").
+- "items": 4-6 realistic domain entries with meta (price for shop, distance for delivery, ping for vpn, level for edu).
+- "stats": 2-4 KPIs that make sense for the domain (orders, calories, speed, balance, points...).
+- "plans": 2-3 cards with prices that fit the domain (or omit if irrelevant — but include the field empty array []).
+- "tabs": 3-4 entries; first is "home", include "items" with the catalog id matching itemsLabel sense.
+- Include exactly ONE "miniapp.screen" node and a primary chat button with action "open_miniapp" labelled in the bot's language ("Открыть приложение"/"Open app" or domain-specific like "Открыть меню").
+Keep 4-6 nodes max.`;
 
 const RULES_OFF = `
 
