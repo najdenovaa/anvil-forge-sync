@@ -5,18 +5,15 @@ import { useI18n, type Lang } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { VersionHistory } from "./VersionHistory";
 import { cn } from "@/lib/utils";
-import anvlLogo from "@/assets/anvl-logo.png";
+import { AnvlLogo } from "./AnvlLogo";
 import maxLogo from "@/assets/max-logo.png";
 
 function AnvlMark() {
+  // Inline SVG wordmark: native transparent background, scales perfectly.
+  // ~50% larger than the original h-10 (≈40px) → h-15 (60px).
   return (
-    <div className="flex items-center">
-      <img
-        src={anvlLogo}
-        alt="ANVL"
-        className="h-16 w-auto object-contain"
-        draggable={false}
-      />
+    <div className="flex items-center text-foreground">
+      <AnvlLogo className="h-[60px] w-auto" />
     </div>
   );
 }
