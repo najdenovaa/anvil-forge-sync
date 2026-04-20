@@ -7,48 +7,28 @@ const corsHeaders = {
 };
 
 const BASE_PROMPT = `You are **Anvl** — a senior product engineer for Telegram and Max bots.
-You do not just explain ideas — you produce a visual implementation blueprint that the UI applies live.
-Never call yourself an assistant, model, or architect. The UI already labels you as Anvl.
+You build a visual implementation blueprint that the UI applies live via TOOL CALLS.
+Never call yourself an assistant, model, or architect. The UI labels you as Anvl.
 
-OUTPUT FORMAT — STRICTLY 4 BLOCKS, IN THIS ORDER. Every block is REQUIRED.
+You have TWO ways to deliver the blueprint:
 
-1) <think>...</think> — 2-3 short bullets ("• " each), under 80 chars: intent, modules, one trade-off.
+(A) PREFERRED — TOOL CALLING. Call these tools to mutate the canvas in real time:
+  • reset_canvas() — clear the canvas before adding new nodes (call FIRST).
+  • add_node(id, kind, title, preview) — add a node. id is short stable string ("n1","n2"…).
+  • connect(from, to) — add an edge between two node ids.
+  • set_param(id, key, value) — set a parameter on a node (text, url, method, condition…).
+  • set_preview(patch) — merge fields into chat preview (botName, botStatus, userMessage, botMessages, buttons, initialScreen, screens).
+  • set_miniapp(patch) — merge fields into the mini-app spec (only when Mini App is ON).
+  Then write a 1-2 sentence final answer in user's language describing what you built.
 
-2) <blueprint>...</blueprint> — VALID JSON only, no markdown, no comments. Schema:
-{
-  "nodes": [{ "kind": "trigger.command", "title": "...", "preview": "..." }],
-  "edges": [{ "from": 0, "to": 1 }],
-  "preview": {
-    "botName": "...",
-    "botStatus": "...",
-    "userMessage": "...",
-    "botMessages": ["...", "..."],
-    "buttons": [
-      { "label": "...", "action": "MAIN_ACTION", "primary": true },
-      { "label": "...", "action": "help" }
-    ],
-    "initialScreen": "main",
-    "screens": [
-      {
-        "id": "main",
-        "userMessage": "...",
-        "botMessages": ["..."],
-        "buttons": [
-          { "label": "...", "action": "screen:booking", "primary": true },
-          { "label": "...", "action": "screen:pricing" }
-        ]
-      }
-    ]
-  }<MINIAPP_SCHEMA>
-}
+(B) FALLBACK — TAGGED BLOCKS. If you cannot use tools, output 4 blocks in order:
+  1) <think>...</think> — 2-3 short bullets ("• " each), under 80 chars.
+  2) <blueprint>...</blueprint> — VALID JSON with { nodes, edges, preview<MINIAPP_SCHEMA> }.
+  3) <code>...</code> — runnable bot code (40-120 lines, single file).
+  4) Final answer — 1-2 short sentences, under 50 words.
 
-3) <code>...</code> — runnable bot code for the SELECTED platform (Telegram → Node.js
-   with grammY; Max → Node.js with axios + Max Bot API long polling). MUST be a single
-   self-contained file, 40-120 lines, with /commands, callbacks/buttons, and the domain
-   logic the user asked for. NO markdown fences, NO prose, NO placeholder TODOs — real code.
-
-4) Final answer — 1-2 short sentences, under 50 words, in user's language.
-   Describe what was implemented, not what you plan.`;
+ALWAYS prefer (A) when tools are available. Use (B) only as fallback.
+After tool calls, you may also emit a <code>...</code> block with runnable bot code.`;
 
 const MINIAPP_ON = `,
   "miniapp": {
@@ -174,6 +154,118 @@ function buildPrompt(miniAppEnabled: boolean, platform: string): string {
   return BASE_PROMPT.replace("<MINIAPP_SCHEMA>", schema) + rules + platformLine;
 }
 
+function buildTools(miniAppEnabled: boolean) {
+  const tools: any[] = [
+    {
+      type: "function",
+      function: {
+        name: "reset_canvas",
+        description: "Clear the canvas. Call this FIRST before adding new nodes for a fresh blueprint.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_node",
+        description: "Add a node to the canvas.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Stable short id like 'n1','n2'." },
+            kind: {
+              type: "string",
+              enum: [
+                "trigger.command", "trigger.message", "trigger.callback",
+                "message.text", "message.photo", "message.document",
+                "keyboard.inline", "keyboard.reply",
+                "miniapp.screen", "logic.condition", "action.api",
+              ],
+            },
+            title: { type: "string" },
+            preview: { type: "string", description: "Short preview text shown inside the node card." },
+          },
+          required: ["id", "kind", "title", "preview"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "connect",
+        description: "Connect two nodes with an edge.",
+        parameters: {
+          type: "object",
+          properties: { from: { type: "string" }, to: { type: "string" } },
+          required: ["from", "to"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_param",
+        description: "Set a parameter on a node (e.g. text, url, method, condition).",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            key: { type: "string" },
+            value: { type: "string" },
+          },
+          required: ["id", "key", "value"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_preview",
+        description: "Merge a patch into the chat preview state.",
+        parameters: {
+          type: "object",
+          properties: {
+            botName: { type: "string" },
+            botStatus: { type: "string" },
+            userMessage: { type: "string" },
+            botMessages: { type: "array", items: { type: "string" } },
+            buttons: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  action: { type: "string" },
+                  primary: { type: "boolean" },
+                },
+                required: ["label", "action"],
+              },
+            },
+            initialScreen: { type: "string" },
+          },
+          additionalProperties: true,
+        },
+      },
+    },
+  ];
+
+  if (miniAppEnabled) {
+    tools.push({
+      type: "function",
+      function: {
+        name: "set_miniapp",
+        description: "Merge a patch into the mini-app spec (title, accent, hero, items, plans, tabs, stats).",
+        parameters: { type: "object", additionalProperties: true },
+      },
+    });
+  }
+
+  return tools;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -185,8 +277,9 @@ Deno.serve(async (req: Request) => {
       model?: string;
       miniApp?: boolean;
       platform?: string;
+      tools?: boolean;
     };
-    const { messages, model, miniApp = false, platform = "telegram" } = body;
+    const { messages, model, miniApp = false, platform = "telegram", tools: enableTools = true } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return json({ error: "messages array required" }, 400);
@@ -199,6 +292,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const systemPrompt = buildPrompt(miniApp, platform);
+
+    const toolDefs = enableTools ? buildTools(miniApp) : undefined;
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -214,6 +309,7 @@ Deno.serve(async (req: Request) => {
         ],
         stream: true,
         max_tokens: 4096,
+        ...(toolDefs ? { tools: toolDefs, tool_choice: "auto" } : {}),
       }),
     });
 

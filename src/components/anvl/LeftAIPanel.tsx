@@ -100,7 +100,16 @@ function sanitizeBlueprintForMode(blueprint: AnvlBlueprint, miniAppEnabled: bool
 
 export function LeftAIPanel() {
   const { t } = useI18n();
-  const { applyBlueprint, setGeneratedCode } = useAnvlWorkspace();
+  const {
+    applyBlueprint,
+    setGeneratedCode,
+    addAiNode,
+    connectAiNodes,
+    updateAiNodeParam,
+    mergePreview,
+    mergeMiniApp,
+    resetAiCanvas,
+  } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
@@ -189,6 +198,20 @@ export function LeftAIPanel() {
       let pending = "";
       let blueprintApplied = false;
       let codeApplied = false;
+      // Tool-calling state: assemble streaming tool_calls by index
+      const toolBuf: { name: string; args: string; done: boolean }[] = [];
+      const applyToolCall = (name: string, argsRaw: string) => {
+        let args: any;
+        try { args = JSON.parse(argsRaw); } catch { return; }
+        try {
+          if (name === "reset_canvas") resetAiCanvas();
+          else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
+          else if (name === "connect") connectAiNodes(args.from, args.to);
+          else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
+          else if (name === "set_preview") mergePreview(args);
+          else if (name === "set_miniapp") mergeMiniApp(args);
+        } catch (err) { console.warn("tool apply failed", name, err); }
+      };
 
       const flush = () => {
         if (!blueprintApplied && blueprintRaw.includes("\"nodes\"") && blueprintRaw.includes("\"preview\"")) {
@@ -330,8 +353,28 @@ export function LeftAIPanel() {
           }
           try {
             const parsed = JSON.parse(json);
-            const delta = parsed.choices?.[0]?.delta?.content as string | undefined;
+            const choice = parsed.choices?.[0];
+            const delta = choice?.delta?.content as string | undefined;
             if (delta) ingest(delta);
+            // Tool calls — assemble streaming function calls and apply on completion
+            const tcDelta = choice?.delta?.tool_calls as Array<any> | undefined;
+            if (tcDelta) {
+              for (const tc of tcDelta) {
+                const idx = tc.index ?? 0;
+                if (!toolBuf[idx]) toolBuf[idx] = { name: "", args: "", done: false };
+                if (tc.function?.name) toolBuf[idx].name = tc.function.name;
+                if (tc.function?.arguments) toolBuf[idx].args += tc.function.arguments;
+              }
+            }
+            const finishReason = choice?.finish_reason;
+            if (finishReason === "tool_calls" || finishReason === "stop") {
+              for (const tc of toolBuf) {
+                if (tc && !tc.done && tc.name) {
+                  applyToolCall(tc.name, tc.args || "{}");
+                  tc.done = true;
+                }
+              }
+            }
           } catch {
             buffer = line + "\n" + buffer;
             break;
@@ -347,13 +390,26 @@ export function LeftAIPanel() {
         pending = "";
       }
 
+      // Apply any tool_calls that finished without an explicit finish_reason event.
+      for (const tc of toolBuf) {
+        if (tc && !tc.done && tc.name) {
+          applyToolCall(tc.name, tc.args || "{}");
+          tc.done = true;
+        }
+      }
+      const usedTools = toolBuf.some((tc) => tc?.done);
+
       const extractedThoughts = extractTaggedBlock(raw, "think").trim();
       const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
       const extractedCode = extractTaggedBlock(raw, "code").trim();
-      const finalAnswer = stripTaggedBlocks(raw).trim() || (answer || raw).trim();
-      const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
-      if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
-      setGeneratedCode(extractedCode);
+      const strippedAnswer = stripTaggedBlocks(raw).trim();
+      const finalAnswer = strippedAnswer || (usedTools ? t("ai.msg.tools_done") || "Готово." : (answer || raw).trim());
+      // Only fall back to legacy blueprint when no tools were used.
+      if (!usedTools) {
+        const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
+        if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
+      }
+      if (extractedCode) setGeneratedCode(extractedCode);
 
       setMessages((prev) => {
         const copy = prev.slice();
