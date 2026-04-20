@@ -26,7 +26,7 @@ function CanvasInner() {
   const { screenToFlowPosition, fitView } = useReactFlow();
   const { nodes, edges, setNodes, setEdges } = useAnvlWorkspace();
   const { setSelectedId } = useSelection();
-  const { activeNodeId, cameraFollow } = useBotSimulator();
+  const { activeNodeId, activeEdgeId, cameraFollow } = useBotSimulator();
 
   // Camera follow: when toggle is on, smoothly center the canvas on the
   // currently active simulator node (only if it exists on the graph).
@@ -42,6 +42,26 @@ function CanvasInner() {
     }, 30);
     return () => window.clearTimeout(t);
   }, [cameraFollow, activeNodeId, nodes, fitView]);
+
+  // Decorate the just-traversed edge with a glowing accent so the user can
+  // visually trace the simulator's path on the graph.
+  const decoratedEdges = useMemo(() => {
+    if (!activeEdgeId) return edges;
+    return edges.map((e) =>
+      e.id === activeEdgeId
+        ? {
+            ...e,
+            animated: true,
+            style: {
+              ...(e.style ?? {}),
+              stroke: "oklch(0.78 0.18 145 / 95%)",
+              strokeWidth: 2.4,
+              filter: "drop-shadow(0 0 6px oklch(0.78 0.18 145 / 60%))",
+            },
+          }
+        : e,
+    );
+  }, [edges, activeEdgeId]);
 
   const nodeTypes = useMemo(() => ({ anvl: ForgeNode }), []);
 
@@ -88,7 +108,7 @@ function CanvasInner() {
     <div className="relative h-full w-full forge-grid">
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={decoratedEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

@@ -33,6 +33,8 @@ interface SimulatorCtx {
   available: boolean;
   /** Currently rendered node id (for canvas highlight). */
   activeNodeId: string | null;
+  /** Edge id of the last traversed transition (for canvas edge glow). */
+  activeEdgeId: string | null;
   /** History stack of visited node ids (for back navigation). */
   history: string[];
   /** Composed bot message + buttons for the current node. */
@@ -243,6 +245,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   );
 
   const [activeNodeId, setActiveNodeId] = useState<string | null>(entryId);
+  const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
@@ -279,11 +282,12 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     return kind === "trigger.message" && (message?.buttons.length ?? 0) === 0;
   }, [activeNode, message]);
 
-  const jumpTo = useCallback((nodeId: string) => {
+  const jumpTo = useCallback((nodeId: string, edgeId?: string | null) => {
     setActiveNodeId((prev) => {
       if (prev) setHistory((h) => [...h, prev]);
       return nodeId;
     });
+    setActiveEdgeId(edgeId ?? null);
     setLastBranch(null);
   }, []);
 
@@ -305,7 +309,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       }
       if (!cursor) return;
       const target = resolveTarget(cursor.id, btn, edges);
-      if (target) jumpTo(target);
+      if (!target) return;
+      // Find the edge id we just traversed for canvas glow.
+      const outgoing = edges.filter((e) => e.source === cursor!.id);
+      const edge =
+        outgoing.find((e) => (e.sourceHandle ?? null) === btn.id || e.id === btn.id) ??
+        outgoing.find((e) => e.target === target);
+      jumpTo(target, edge?.id ?? null);
     },
     [activeNodeId, nodes, edges, jumpTo],
   );
@@ -348,6 +358,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       if (h.length === 0) return h;
       const prev = h[h.length - 1];
       setActiveNodeId(prev);
+      setActiveEdgeId(null);
       setLastBranch(null);
       return h.slice(0, -1);
     });
@@ -355,6 +366,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
 
   const restart = useCallback(() => {
     setActiveNodeId(entryId);
+    setActiveEdgeId(null);
     setHistory([]);
     setLastBranch(null);
     setPendingBranch("yes");
@@ -369,6 +381,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     () => ({
       available,
       activeNodeId,
+      activeEdgeId,
       history,
       message,
       effectiveKind,
@@ -386,6 +399,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     [
       available,
       activeNodeId,
+      activeEdgeId,
       history,
       message,
       effectiveKind,
@@ -401,6 +415,11 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       cameraFollow,
     ],
   );
+
+  // Keep entry in sync when AI rebuilds the flow.
+  useMemo(() => {
+    if (!activeNodeId && entryId) setActiveNodeId(entryId);
+  }, [activeNodeId, entryId]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -13,7 +13,7 @@ import {
   PencilLine,
   ChevronRight,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
@@ -694,7 +694,6 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
   useEffect(() => {
     if (revealed >= liveThoughts.length) return;
     const id = window.setTimeout(() => {
-      // Reveal in chunks to keep up with fast streams.
       const chunk = Math.max(2, Math.ceil((liveThoughts.length - revealed) / 24));
       setRevealed((r) => Math.min(liveThoughts.length, r + chunk));
     }, 18);
@@ -711,29 +710,54 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="reasoning-glass rounded-xl px-3 py-2.5"
+      layout
+      initial={{ opacity: 0, y: 6, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        layout: { type: "spring", stiffness: 260, damping: 28 },
+        duration: 0.28,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="reasoning-glass relative overflow-hidden rounded-xl px-3 py-2.5"
     >
-      <div className="mb-2 flex items-center gap-1.5">
+      {/* Animated shimmer sweep on the top border */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, oklch(0.78 0.18 280 / 80%), transparent)",
+        }}
+        animate={{ x: ["-100%", "100%"] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+      />
+
+      <motion.div layout="position" className="mb-2 flex items-center gap-1.5">
         <motion.div
-          animate={{ scale: [1, 1.12, 1], rotate: [0, -4, 4, 0] }}
+          animate={{ scale: [1, 1.14, 1], rotate: [0, -4, 4, 0] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground/10 text-[oklch(0.78_0.18_280)]"
+          className="relative flex h-5 w-5 items-center justify-center rounded-md bg-foreground/10 text-[oklch(0.78_0.18_280)]"
         >
-          <Brain className="h-3 w-3" />
+          {/* Soft glow halo behind brain */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-[-4px] rounded-lg blur-md"
+            style={{ background: "oklch(0.78 0.18 280 / 35%)" }}
+          />
+          <Brain className="relative h-3 w-3" />
         </motion.div>
-        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          {t("ai.label")} · {t("ai.thinking")}
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/85">
+          Architect Logic
         </span>
+        <span className="text-[10px] text-muted-foreground">· {t("ai.thinking")}</span>
         {stillTyping && (
-          <span className="ml-auto text-[9px] font-mono text-muted-foreground/70">
+          <span className="ml-auto font-mono text-[9px] text-muted-foreground/70">
             {revealed}/{liveThoughts.length}
           </span>
         )}
-      </div>
-      <ol className="mb-2 space-y-1">
+      </motion.div>
+
+      <motion.ol layout="position" className="mb-2 space-y-1">
         {steps.map((s, i) => {
           const Icon = s.icon;
           const state = i < step ? "done" : i === step ? "active" : "pending";
@@ -751,7 +775,7 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
                 className={cn(
                   "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
                   state === "done" && "border-foreground/40 bg-foreground/10",
-                  state === "active" && "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)]",
+                  state === "active" && "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
                   state === "pending" && "border-hairline",
                 )}
               >
@@ -767,14 +791,25 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
             </li>
           );
         })}
-      </ol>
-      {liveThoughts.trim().length > 0 && (
-        <div className="mt-2 max-h-32 overflow-hidden rounded-md border border-hairline bg-background/30 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
-          <span className={cn("whitespace-pre-wrap font-mono", stillTyping && "tw-caret")}>
-            {visibleThoughts}
-          </span>
-        </div>
-      )}
+      </motion.ol>
+
+      <AnimatePresence initial={false}>
+        {liveThoughts.trim().length > 0 && (
+          <motion.div
+            key="thoughts-stream"
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-2 max-h-32 overflow-hidden rounded-md border border-hairline bg-background/40 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/85"
+          >
+            <span className={cn("whitespace-pre-wrap font-mono", stillTyping && "tw-caret")}>
+              {visibleThoughts}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

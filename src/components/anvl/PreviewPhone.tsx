@@ -120,58 +120,139 @@ export function PreviewPhone() {
   const themeVars = TG_THEME[theme] as Record<string, string>;
 
   return (
-    <div className="hairline relative w-[280px] overflow-hidden rounded-[36px] bg-black p-2 shadow-[0_30px_80px_-30px_oklch(0_0_0_/_80%)]">
-      <div className="relative overflow-hidden rounded-[28px]" style={themeVars as React.CSSProperties}>
-        <AppRoot
-          appearance={theme}
-          platform="ios"
-          /* AppRoot wants to be a normal block; we drive its size via parent */
-          style={{ display: "block" }}
+    <div className="relative w-[284px]">
+      {/* Soft ambient glow behind the device — lifts it off the canvas */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-10 -z-10 rounded-[80px] opacity-70 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 50% 55%, oklch(0.78 0.14 230 / 22%) 0%, oklch(0.16 0.004 270 / 0%) 70%)",
+        }}
+      />
+
+      {/* Phone shell — photoreal aluminium bezel */}
+      <div
+        className="relative w-full overflow-hidden rounded-[44px] p-[6px]"
+        style={{
+          background:
+            "linear-gradient(160deg, oklch(0.34 0.005 270) 0%, oklch(0.12 0.004 270) 38%, oklch(0.05 0 0) 60%, oklch(0.22 0.004 270) 100%)",
+          boxShadow:
+            // Outer drop shadow (massive soft glow)
+            "0 40px 80px -20px oklch(0 0 0 / 80%), 0 20px 40px -10px oklch(0 0 0 / 60%), 0 0 60px -10px oklch(0.78 0.14 230 / 14%)," +
+            // Inner top highlight + bottom shadow for depth
+            " inset 0 1.5px 0 0 oklch(1 0 0 / 18%), inset 0 -1px 0 0 oklch(0 0 0 / 60%), inset 0 0 0 1px oklch(1 0 0 / 6%)",
+        }}
+      >
+        {/* Inner screen well — slight inset so it reads like glass under bezel */}
+        <div
+          className="relative overflow-hidden rounded-[38px]"
+          style={{
+            ...(themeVars as React.CSSProperties),
+            boxShadow:
+              "inset 0 0 0 1px oklch(0 0 0 / 80%), inset 0 2px 6px 0 oklch(0 0 0 / 60%)",
+          }}
         >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={`${platform}-${view}-${theme}`}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.02 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="flex h-[520px] flex-col"
+          <AppRoot
+            appearance={theme}
+            platform="ios"
+            style={{ display: "block" }}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={`${platform}-${view}-${theme}`}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                className="flex h-[520px] flex-col"
+                style={{
+                  background: "var(--tg-theme-bg-color)",
+                  color: "var(--tg-theme-text-color)",
+                }}
+              >
+                <StatusBar theme={theme} />
+
+                {view === "chat" ? (
+                  sim.available ? (
+                    <SimulatorChatView
+                      isTg={isTg}
+                      theme={theme}
+                      onToggleTheme={() => setTheme((m) => (m === "dark" ? "light" : "dark"))}
+                      onOpenMiniApp={handleOpen}
+                    />
+                  ) : (
+                    <EmptyCanvasHint theme={theme} />
+                  )
+                ) : (
+                  <MiniAppView opening={opening} tma={tma} theme={theme} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Dynamic Island — floats over the screen, not cut from bezel */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1.5 flex h-[22px] -translate-x-1/2 items-center gap-1 rounded-full px-3"
               style={{
-                background: "var(--tg-theme-bg-color)",
-                color: "var(--tg-theme-text-color)",
+                background: "oklch(0 0 0)",
+                boxShadow:
+                  "0 0 0 1px oklch(1 0 0 / 5%), 0 4px 10px -2px oklch(0 0 0 / 80%), inset 0 0 8px 0 oklch(0 0 0 / 90%)",
+                minWidth: "92px",
               }}
             >
-              <StatusBar theme={theme} />
+              <span
+                className="block h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: "oklch(0.55 0.04 230)",
+                  boxShadow: "0 0 4px 0 oklch(0.7 0.16 230 / 60%)",
+                }}
+              />
+              <span
+                className="ml-auto block h-1 w-1 rounded-full opacity-70"
+                style={{ background: "oklch(0.4 0.005 270)" }}
+              />
+            </div>
 
-              {view === "chat" ? (
-                sim.available ? (
-                  <SimulatorChatView
-                    isTg={isTg}
-                    theme={theme}
-                    onToggleTheme={() => setTheme((m) => (m === "dark" ? "light" : "dark"))}
-                    onOpenMiniApp={handleOpen}
-                  />
-                ) : (
-                  <EmptyCanvasHint theme={theme} />
-                )
-              ) : (
-                <MiniAppView opening={opening} tma={tma} theme={theme} />
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="absolute left-1/2 top-0 h-4 w-20 -translate-x-1/2 rounded-b-2xl bg-black" />
-        </AppRoot>
+            {/* Subtle top-edge specular highlight on the screen */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-6 top-0 h-px opacity-40"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, oklch(1 0 0 / 60%), transparent)",
+              }}
+            />
+          </AppRoot>
+        </div>
       </div>
 
-      <div className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      {/* Side hardware buttons — pure visual flourish */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-[3px] top-[110px] h-8 w-[3px] rounded-l-md"
+        style={{ background: "linear-gradient(90deg, oklch(0.05 0 0), oklch(0.18 0.004 270))" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-[3px] top-[160px] h-14 w-[3px] rounded-l-md"
+        style={{ background: "linear-gradient(90deg, oklch(0.05 0 0), oklch(0.18 0.004 270))" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-[3px] top-[140px] h-20 w-[3px] rounded-r-md"
+        style={{ background: "linear-gradient(270deg, oklch(0.05 0 0), oklch(0.18 0.004 270))" }}
+      />
+
+      {/* Status pill above */}
+      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface/90 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground backdrop-blur">
         {platform} · {view === "chat" ? "chat" : "mini app"}
       </div>
 
       {view === "miniapp" && (
         <button
           onClick={close}
-          className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface-elevated px-3 py-1 text-[9.5px] font-medium text-foreground/80 shadow-elevated hover:text-foreground"
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-hairline bg-surface-elevated px-3 py-1 text-[9.5px] font-medium text-foreground/80 shadow-elevated hover:text-foreground"
         >
           {t("vpn.back_to_chat")}
         </button>
@@ -188,11 +269,13 @@ function StatusBar({ theme }: { theme: ThemeMode }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 pt-2 text-[10px] font-medium",
+        "flex items-center justify-between px-6 pb-1 pt-2.5 text-[10px] font-medium",
         theme === "dark" ? "text-white/80" : "text-black/70",
       )}
     >
       <span>9:41</span>
+      {/* spacer for the Dynamic Island in the middle */}
+      <span className="w-[92px]" aria-hidden />
       <div className="flex items-center gap-1">
         <Signal className="h-2.5 w-2.5" />
         <Wifi className="h-2.5 w-2.5" />
