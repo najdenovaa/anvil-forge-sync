@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -9,86 +9,34 @@ import ReactFlow, {
   applyNodeChanges,
   useReactFlow,
   type Connection,
-  type Edge,
   type EdgeChange,
-  type Node,
   type NodeChange,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
 import { ForgeNode } from "./ForgeNode";
+import { PreviewPhone } from "./PreviewPhone";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { NODE_CATALOG } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
-import { PreviewPhone } from "./PreviewPhone";
-
-const initialNodes: Node[] = [
-  {
-    id: "1",
-    type: "anvl",
-    position: { x: 40, y: 120 },
-    data: {
-      kind: "trigger.command",
-      titleKey: "canvas.start.title",
-      previewKey: "canvas.start.preview",
-    },
-  },
-  {
-    id: "2",
-    type: "anvl",
-    position: { x: 320, y: 80 },
-    data: {
-      kind: "message.text",
-      titleKey: "canvas.welcome.title",
-      previewKey: "canvas.welcome.preview",
-    },
-  },
-  {
-    id: "3",
-    type: "anvl",
-    position: { x: 320, y: 240 },
-    data: {
-      kind: "keyboard.inline",
-      titleKey: "canvas.menu.title",
-      previewKey: "canvas.menu.preview",
-    },
-  },
-  {
-    id: "4",
-    type: "anvl",
-    position: { x: 620, y: 240 },
-    data: {
-      kind: "miniapp.screen",
-      titleKey: "canvas.dashboard.title",
-      previewKey: "canvas.dashboard.preview",
-    },
-  },
-];
-
-const initialEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", animated: true },
-  { id: "e1-3", source: "1", target: "3", animated: true },
-  { id: "e3-4", source: "3", target: "4", animated: true },
-];
 
 function CanvasInner() {
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
-  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const { nodes, edges, setNodes, setEdges } = useAnvlWorkspace();
 
   const nodeTypes = useMemo(() => ({ anvl: ForgeNode }), []);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
-    [],
+    [setNodes],
   );
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => setEdges((es) => applyEdgeChanges(changes, es)),
-    [],
+    [setEdges],
   );
   const onConnect = useCallback(
     (c: Connection) => setEdges((es) => addEdge({ ...c, animated: true }, es)),
-    [],
+    [setEdges],
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -113,11 +61,11 @@ function CanvasInner() {
         },
       ]);
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, setNodes],
   );
 
   return (
-    <div ref={wrapperRef} className="relative h-full w-full forge-grid">
+    <div className="relative h-full w-full forge-grid">
       <ReactFlow
         nodes={nodes}
         edges={edges}
