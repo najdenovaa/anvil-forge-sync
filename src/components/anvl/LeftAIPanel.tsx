@@ -39,12 +39,18 @@ const MODELS: ModelDef[] = [
   { id: "grok", labelKey: "ai.model.grok", short: "GROK", routed: true, accent: "oklch(0.72_0.18_30)" },
 ];
 
+interface ToolOp {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 interface Msg {
   role: "user" | "assistant";
   content: string;
   thoughts?: string;
   pending?: boolean;
   step?: number;
+  toolOps?: ToolOp[];
 }
 
 function extractTaggedBlock(source: string, tag: string) {
