@@ -129,7 +129,7 @@ const NODE_KINDS: NodeKind[] = [
   "action.api",
 ];
 
-const ACTIONS: PreviewAction[] = ["open_miniapp", "plans", "help", "profile", "locations"];
+const ACTIONS: BuiltInPreviewAction[] = ["open_miniapp", "plans", "help", "profile", "locations"];
 const PLANS: MiniAppPlan[] = ["free", "pro", "team"];
 const ACCENTS: MiniAppAccent[] = ["blue", "green", "orange", "violet", "pink", "red", "teal"];
 
@@ -137,7 +137,7 @@ function isNodeKind(value: unknown): value is NodeKind {
   return typeof value === "string" && NODE_KINDS.includes(value as NodeKind);
 }
 function isAction(value: unknown): value is PreviewAction {
-  return typeof value === "string" && ACTIONS.includes(value as PreviewAction);
+  return typeof value === "string" && (ACTIONS.includes(value as BuiltInPreviewAction) || value.startsWith("screen:"));
 }
 function isStr(v: unknown): v is string {
   return typeof v === "string" && v.length > 0;
@@ -206,6 +206,38 @@ function parseTabs(v: unknown): MiniAppTabSpec[] | undefined {
     .map((t) => ({ id: t.id, label: t.label, icon: isStr(t.icon) ? t.icon : undefined }))
     .slice(0, 4);
   return out.length >= 2 ? out : undefined;
+}
+
+function parsePreviewButtons(v: unknown): AnvlPreviewButton[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(
+      (button): button is AnvlPreviewButton =>
+        !!button && typeof button.label === "string" && isAction(button.action),
+    )
+    .slice(0, 4);
+  return out.length ? out : undefined;
+}
+
+function parsePreviewScreens(v: unknown): AnvlPreviewScreen[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(
+      (screen): screen is AnvlPreviewScreen =>
+        !!screen &&
+        typeof screen === "object" &&
+        isStr((screen as AnvlPreviewScreen).id) &&
+        Array.isArray((screen as AnvlPreviewScreen).botMessages),
+    )
+    .map((screen) => ({
+      id: screen.id,
+      userMessage: isStr(screen.userMessage) ? screen.userMessage : undefined,
+      botMessages: screen.botMessages.filter((item): item is string => typeof item === "string").slice(0, 4),
+      buttons: parsePreviewButtons(screen.buttons) ?? [],
+    }))
+    .filter((screen) => screen.botMessages.length > 0)
+    .slice(0, 8);
+  return out.length ? out : undefined;
 }
 
 export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
