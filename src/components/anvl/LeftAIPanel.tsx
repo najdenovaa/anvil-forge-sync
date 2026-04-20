@@ -39,12 +39,18 @@ const MODELS: ModelDef[] = [
   { id: "grok", labelKey: "ai.model.grok", short: "GROK", routed: true, accent: "oklch(0.72_0.18_30)" },
 ];
 
+interface ToolOp {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 interface Msg {
   role: "user" | "assistant";
   content: string;
   thoughts?: string;
   pending?: boolean;
   step?: number;
+  toolOps?: ToolOp[];
 }
 
 function extractTaggedBlock(source: string, tag: string) {
@@ -216,9 +222,11 @@ export function LeftAIPanel() {
       let codeApplied = false;
       // Tool-calling state: assemble streaming tool_calls by index
       const toolBuf: { name: string; args: string; done: boolean }[] = [];
+      const liveOps: ToolOp[] = [];
       const applyToolCall = (name: string, argsRaw: string) => {
         let args: any;
         try { args = JSON.parse(argsRaw); } catch { return; }
+        liveOps.push({ name, args: args ?? {} });
         try {
           if (name === "reset_canvas") resetAiCanvas();
           else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
@@ -252,6 +260,7 @@ export function LeftAIPanel() {
             ...last,
             thoughts,
             content: answer,
+            toolOps: liveOps.length ? [...liveOps] : last.toolOps,
             pending: phase !== 4 && answer.length === 0,
           };
           return copy;
@@ -419,7 +428,31 @@ export function LeftAIPanel() {
       const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
       const extractedCode = extractTaggedBlock(raw, "code").trim();
       const strippedAnswer = stripTaggedBlocks(raw).trim();
-      const finalAnswer = strippedAnswer || (usedTools ? t("ai.msg.tools_done") || "Готово." : (answer || raw).trim());
+
+      // Build a smart fallback summary from the tool ops when the model
+      // forgot to write its own (otherwise we'd just show "tools_done").
+      const buildSummaryFromOps = () => {
+        if (!liveOps.length) return "";
+        const added = liveOps.filter((o) => o.name === "add_node").length;
+        const linked = liveOps.filter((o) => o.name === "connect").length;
+        const previewTouched = liveOps.some((o) => o.name === "set_preview");
+        const miniTouched = liveOps.some((o) => o.name === "set_miniapp");
+        const titles = liveOps
+          .filter((o) => o.name === "add_node")
+          .map((o) => (o.args as any).title)
+          .filter(Boolean)
+          .slice(0, 4);
+        const parts: string[] = [];
+        if (added) parts.push(`Собрал ${added} ${added === 1 ? "блок" : "блоков"}`);
+        if (linked) parts.push(`${linked} ${linked === 1 ? "связь" : "связи"}`);
+        if (previewTouched) parts.push("обновил превью");
+        if (miniTouched) parts.push("настроил Mini App");
+        const head = parts.length ? parts.join(", ") + "." : t("ai.msg.tools_done");
+        const tail = titles.length ? ` Сценарии: ${titles.join(" → ")}.` : "";
+        return head + tail;
+      };
+
+      const finalAnswer = strippedAnswer || buildSummaryFromOps() || (usedTools ? t("ai.msg.tools_done") : (answer || raw).trim());
       // Only fall back to legacy blueprint when no tools were used.
       if (!usedTools) {
         const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
@@ -435,6 +468,7 @@ export function LeftAIPanel() {
             role: "assistant",
             content: finalAnswer,
             thoughts: extractedThoughts || thoughts.trim() || undefined,
+            toolOps: liveOps.length ? [...liveOps] : undefined,
           };
         }
         return copy;
@@ -562,9 +596,14 @@ function MessageBubble({ msg }: { msg: Msg }) {
   const isLive = !!msg.pending;
   const hasThoughts = !!msg.thoughts && msg.thoughts.trim().length > 0;
 
+  const hasOps = !!msg.toolOps && msg.toolOps.length > 0;
+
   return (
     <div className="max-w-[88%] space-y-1.5">
       {isLive && <ThinkingStepper step={msg.step ?? 0} liveThoughts={msg.thoughts ?? ""} />}
+
+      {/* Live tool ops feed — Rork/Lovable-style: shows what's happening RIGHT NOW */}
+      {isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} live />}
 
       {(msg.content.length > 0 || !isLive) && (
         <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-foreground/90">
@@ -594,6 +633,48 @@ function MessageBubble({ msg }: { msg: Msg }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Final tool ops list — collapsed under the bubble */}
+      {!isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} />}
+    </div>
+  );
+}
+
+function ToolOpsFeed({ ops, live = false }: { ops: ToolOp[]; live?: boolean }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(live);
+  const summarize = (op: ToolOp): string => {
+    const a = op.args as any;
+    switch (op.name) {
+      case "reset_canvas": return t("ai.tools.reset_canvas");
+      case "add_node": return `${t("ai.tools.add_node")}: ${a.title ?? a.kind ?? a.id ?? ""}`;
+      case "connect": return `${t("ai.tools.connect")} ${a.from ?? "?"} → ${a.to ?? "?"}`;
+      case "set_param": return `${t("ai.tools.set_param")} ${a.id ?? ""}.${a.key ?? ""} = ${String(a.value ?? "").slice(0, 30)}`;
+      case "set_preview": return t("ai.tools.set_preview");
+      case "set_miniapp": return t("ai.tools.set_miniapp");
+      default: return op.name;
+    }
+  };
+  return (
+    <div className={cn("rounded-xl border border-hairline bg-surface/60 px-3 py-2", live && "border-foreground/20")}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground transition hover:text-foreground"
+      >
+        {live ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-status-ok" />}
+        <span>{t("ai.tools.applied")} · {ops.length}</span>
+        <ChevronRight className={cn("ml-auto h-3 w-3 transition", open && "rotate-90")} />
+      </button>
+      {open && (
+        <ul className="mt-1.5 space-y-0.5 text-[11px] leading-relaxed text-foreground/80">
+          {ops.map((op, i) => (
+            <li key={i} className="flex items-start gap-1.5 font-mono">
+              <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-foreground/30" />
+              <span className="break-all">{summarize(op)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
