@@ -390,13 +390,26 @@ export function LeftAIPanel() {
         pending = "";
       }
 
+      // Apply any tool_calls that finished without an explicit finish_reason event.
+      for (const tc of toolBuf) {
+        if (tc && !tc.done && tc.name) {
+          applyToolCall(tc.name, tc.args || "{}");
+          tc.done = true;
+        }
+      }
+      const usedTools = toolBuf.some((tc) => tc?.done);
+
       const extractedThoughts = extractTaggedBlock(raw, "think").trim();
       const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
       const extractedCode = extractTaggedBlock(raw, "code").trim();
-      const finalAnswer = stripTaggedBlocks(raw).trim() || (answer || raw).trim();
-      const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
-      if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
-      setGeneratedCode(extractedCode);
+      const strippedAnswer = stripTaggedBlocks(raw).trim();
+      const finalAnswer = strippedAnswer || (usedTools ? t("ai.msg.tools_done") || "Готово." : (answer || raw).trim());
+      // Only fall back to legacy blueprint when no tools were used.
+      if (!usedTools) {
+        const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
+        if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
+      }
+      if (extractedCode) setGeneratedCode(extractedCode);
 
       setMessages((prev) => {
         const copy = prev.slice();
