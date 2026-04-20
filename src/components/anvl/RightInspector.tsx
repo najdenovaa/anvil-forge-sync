@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2 } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
@@ -34,8 +35,19 @@ export function RightInspector() {
           {t("inspector.code")}
         </TabBtn>
       </div>
-      <div className="flex-1 overflow-hidden">
-        {tab === "components" ? <ComponentsPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+      <div className="relative flex-1 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="absolute inset-0"
+          >
+            {tab === "components" ? <ComponentsPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </aside>
   );
