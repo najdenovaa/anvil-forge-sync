@@ -421,43 +421,6 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (!activeNodeId && entryId) setActiveNodeId(entryId);
   }, [activeNodeId, entryId]);
 
-  const value = useMemo<SimulatorCtx>(
-    () => ({
-      available,
-      activeNodeId,
-      history,
-      message,
-      effectiveKind,
-      lastBranch: lastBranch ?? (pendingBranch === "yes" ? null : "no"),
-      awaitingInput,
-      press,
-      submitInput,
-      setBranch,
-      back,
-      restart,
-      jumpTo,
-      cameraFollow,
-      setCameraFollow,
-    }),
-    [
-      available,
-      activeNodeId,
-      history,
-      message,
-      effectiveKind,
-      lastBranch,
-      pendingBranch,
-      awaitingInput,
-      press,
-      submitInput,
-      setBranch,
-      back,
-      restart,
-      jumpTo,
-      cameraFollow,
-    ],
-  );
-
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
