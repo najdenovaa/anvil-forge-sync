@@ -368,11 +368,8 @@ function SimulatorChatView({ isTg, onRestart }: { isTg: boolean; onRestart: () =
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns, typing]);
 
-  // Detect condition node: if active effective kind is logic.condition, show toggle.
-  const isCondition = useMemo(() => {
-    if (!sim.activeNodeId) return false;
-    return /condition/i.test(sim.message?.text ?? "");
-  }, [sim.activeNodeId, sim.message]);
+  // Detect condition node from sim state (kind-based, not text regex).
+  const isCondition = sim.effectiveKind === "logic.condition";
 
   const handlePress = (btn: SimButton) => {
     setUserInputs((prev) => ({ ...prev, [sim.activeNodeId!]: btn.label }));
