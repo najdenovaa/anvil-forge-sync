@@ -2,16 +2,19 @@ import { ChevronDown, Rocket, Sparkles, Send, AppWindow } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
 import { cn } from "@/lib/utils";
+import anvlLogo from "@/assets/anvl-logo.png";
 
 function AnvlMark() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="relative flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background">
-        <span className="font-mono text-[13px] font-bold leading-none">A</span>
-        <div className="absolute -inset-px rounded-md ring-1 ring-inset ring-foreground/10" />
-      </div>
+      <img
+        src={anvlLogo}
+        alt="Anvl"
+        className="h-7 w-7 rounded-md object-cover"
+        draggable={false}
+      />
       <div className="flex items-baseline gap-1.5">
-        <span className="text-[15px] font-semibold tracking-tight">Anvl</span>
+        <span className="text-[15px] font-semibold tracking-tight">ANVL</span>
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           AI
         </span>
