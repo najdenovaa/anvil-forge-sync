@@ -16,6 +16,7 @@ import {
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
+import { useAnvlShell } from "./AnvlAppShellContext";
 import { cn } from "@/lib/utils";
 import { safeParseAnvlBlueprint } from "@/lib/anvl-blueprint";
 
@@ -49,12 +50,15 @@ export function LeftAIPanel() {
   const { t } = useI18n();
   const { applyBlueprint } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
+  const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendRef = useRef<(text?: string) => void>(() => {});
+  const bootedRef = useRef(false);
 
   useEffect(() => {
     setMessages((prev) =>
@@ -68,12 +72,12 @@ export function LeftAIPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (override?: string) => {
+    const text = (override ?? input).trim();
     if (!text || isStreaming) return;
 
     setError(null);
-    setInput("");
+    if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
     const placeholder: Msg = { role: "assistant", content: "", pending: true, step: 0, thoughts: "" };
@@ -313,6 +317,20 @@ export function LeftAIPanel() {
     setError(null);
   };
 
+  // Keep a stable ref to send so the bootstrap effect can call it without re-running.
+  sendRef.current = send;
+
+  // Auto-fire the prompt the user typed on the landing page.
+  useEffect(() => {
+    if (bootedRef.current) return;
+    const initial = consumeInitialPrompt();
+    if (initial) {
+      bootedRef.current = true;
+      // Defer one tick so providers/state are settled.
+      setTimeout(() => sendRef.current?.(initial), 50);
+    }
+  }, [consumeInitialPrompt]);
+
   return (
     <aside className="flex w-[340px] shrink-0 flex-col border-r border-hairline bg-sidebar">
       <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
@@ -359,7 +377,7 @@ export function LeftAIPanel() {
             className="flex-1 resize-none bg-transparent text-[12.5px] outline-none placeholder:text-muted-foreground"
           />
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={!input.trim() || isStreaming}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition disabled:opacity-30"
           >
