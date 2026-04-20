@@ -8,6 +8,10 @@ import {
   ChevronDown,
   Check,
   Loader2,
+  Brain,
+  Cpu,
+  PencilLine,
+  ChevronRight,
 } from "lucide-react";
 import { useI18n } from "./I18nContext";
 import { cn } from "@/lib/utils";
@@ -32,6 +36,12 @@ const MODELS: ModelDef[] = [
 interface Msg {
   role: "user" | "assistant";
   content: string;
+  /** Captured reasoning from <think>...</think> block. Streamed live, frozen on completion. */
+  thoughts?: string;
+  /** While true, render the live "thinking" stepper instead of message body. */
+  pending?: boolean;
+  /** 0..2 — index of the active reasoning step shown in the live stepper. */
+  step?: number;
 }
 
 export function LeftAIPanel() {
@@ -65,41 +75,68 @@ export function LeftAIPanel() {
     setError(null);
     setInput("");
 
-    const next: Msg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+    const userMsg: Msg = { role: "user", content: text };
+    const placeholder: Msg = { role: "assistant", content: "", pending: true, step: 0, thoughts: "" };
+    const baseHistory: Msg[] = [...messages, userMsg];
+    setMessages([...baseHistory, placeholder]);
     setIsStreaming(true);
 
-    // Unsupported models — friendly fallback (no network call)
+    // Animate the "thinking" stepper while waiting for first content token
+    const stepTimer = setInterval(() => {
+      setMessages((prev) => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last?.pending && (last.step ?? 0) < 2) {
+          copy[copy.length - 1] = { ...last, step: (last.step ?? 0) + 1 };
+        }
+        return copy;
+      });
+    }, 700);
+
+    const stopStepper = () => clearInterval(stepTimer);
+
+    // Unsupported models — friendly fallback
     const def = MODELS.find((m) => m.id === model)!;
     if (!def.available) {
-      setMessages([...next, { role: "assistant", content: t("ai.unavailable") }]);
+      stopStepper();
+      setMessages([
+        ...baseHistory,
+        { role: "assistant", content: t("ai.unavailable") },
+      ]);
       setIsStreaming(false);
       return;
     }
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
+      // Send only clean role/content pairs to the model
+      const wireMessages = baseHistory.map((m) => ({ role: m.role, content: m.content }));
       const resp = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: next, model }),
+        body: JSON.stringify({ messages: wireMessages, model }),
       });
 
       if (resp.status === 429) {
+        stopStepper();
         setError(t("ai.rate_limit"));
+        setMessages(baseHistory);
         setIsStreaming(false);
         return;
       }
       if (resp.status === 402) {
+        stopStepper();
         setError(t("ai.payment"));
+        setMessages(baseHistory);
         setIsStreaming(false);
         return;
       }
       if (resp.status === 501) {
-        setMessages([...next, { role: "assistant", content: t("ai.unavailable") }]);
+        stopStepper();
+        setMessages([...baseHistory, { role: "assistant", content: t("ai.unavailable") }]);
         setIsStreaming(false);
         return;
       }
@@ -108,20 +145,80 @@ export function LeftAIPanel() {
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let assembled = "";
-      let assistantPushed = false;
+      let raw = ""; // full streamed text including <think> tags
+      let thoughts = "";
+      let answer = "";
+      // Streaming parser state for <think>...</think>
+      // 0 = before <think> (assume thinking by default), 1 = inside think, 2 = after think
+      let phase: 0 | 1 | 2 = 0;
+      let pending = ""; // tail buffer to detect tag boundaries
 
-      const pushOrUpdate = (chunk: string) => {
-        assembled += chunk;
+      const flush = () => {
         setMessages((prev) => {
-          if (!assistantPushed) {
-            assistantPushed = true;
-            return [...prev, { role: "assistant", content: assembled }];
-          }
           const copy = prev.slice();
-          copy[copy.length - 1] = { role: "assistant", content: assembled };
+          const last = copy[copy.length - 1];
+          if (!last || last.role !== "assistant") return prev;
+          copy[copy.length - 1] = {
+            ...last,
+            thoughts,
+            content: answer,
+            pending: phase !== 2 && answer.length === 0,
+          };
           return copy;
         });
+      };
+
+      const ingest = (chunk: string) => {
+        raw += chunk;
+        pending += chunk;
+
+        // Process pending while we can make decisions
+        // We keep up to 12 chars in pending to safely detect "<think>" / "</think>"
+        const SAFE_TAIL = 12;
+        while (pending.length > 0) {
+          if (phase === 0) {
+            const open = pending.indexOf("<think>");
+            if (open !== -1) {
+              // Anything before <think> is treated as answer (rare, but safe)
+              answer += pending.slice(0, open);
+              pending = pending.slice(open + "<think>".length);
+              phase = 1;
+              stopStepper();
+              continue;
+            }
+            // If no clear opener and we have enough buffer, but model didn't emit <think>,
+            // treat as direct answer.
+            if (pending.length > SAFE_TAIL) {
+              const safe = pending.slice(0, pending.length - SAFE_TAIL);
+              if (safe.length) {
+                answer += safe;
+                pending = pending.slice(safe.length);
+                stopStepper();
+              }
+            }
+            break;
+          }
+          if (phase === 1) {
+            const close = pending.indexOf("</think>");
+            if (close !== -1) {
+              thoughts += pending.slice(0, close);
+              pending = pending.slice(close + "</think>".length);
+              phase = 2;
+              continue;
+            }
+            if (pending.length > SAFE_TAIL) {
+              const safe = pending.slice(0, pending.length - SAFE_TAIL);
+              thoughts += safe;
+              pending = pending.slice(safe.length);
+            }
+            break;
+          }
+          // phase === 2 — straight to answer
+          answer += pending;
+          pending = "";
+          break;
+        }
+        flush();
       };
 
       let done = false;
@@ -145,17 +242,44 @@ export function LeftAIPanel() {
           try {
             const parsed = JSON.parse(json);
             const delta = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (delta) pushOrUpdate(delta);
+            if (delta) ingest(delta);
           } catch {
             buffer = line + "\n" + buffer;
             break;
           }
         }
       }
+      // Flush remaining buffered text
+      if (pending.length > 0) {
+        if (phase === 1) thoughts += pending;
+        else answer += pending;
+        pending = "";
+      }
+      // If model never emitted a closing tag but we got nothing in answer,
+      // promote thoughts to answer so user still sees something.
+      if (!answer.trim() && thoughts.trim()) {
+        answer = thoughts.trim();
+        thoughts = "";
+      }
+      // Mark assistant message as finalized
+      setMessages((prev) => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last?.role === "assistant") {
+          copy[copy.length - 1] = {
+            role: "assistant",
+            content: answer || raw, // raw fallback if parser failed entirely
+            thoughts: thoughts.trim() || undefined,
+          };
+        }
+        return copy;
+      });
     } catch (e) {
       console.error("architect-chat failed", e);
       setError(t("ai.error"));
+      setMessages(baseHistory);
     } finally {
+      stopStepper();
       setIsStreaming(false);
     }
   };
@@ -198,34 +322,8 @@ export function LeftAIPanel() {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={cn(
-              "max-w-[88%] rounded-xl px-3 py-2 text-[12.5px] leading-relaxed whitespace-pre-wrap",
-              m.role === "user"
-                ? "ml-auto border border-hairline bg-surface-elevated text-foreground"
-                : "border border-hairline bg-surface text-foreground/90",
-            )}
-          >
-            {m.role === "assistant" && (
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                <Sparkles className="h-3 w-3" /> {t("ai.label")}
-              </div>
-            )}
-            {m.content || (
-              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> {t("ai.thinking")}
-              </span>
-            )}
-          </div>
+          <MessageBubble key={i} msg={m} />
         ))}
-        {isStreaming && messages[messages.length - 1]?.role === "user" && (
-          <div className="max-w-[88%] rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Loader2 className="h-3 w-3 animate-spin" /> {t("ai.thinking")}
-            </span>
-          </div>
-        )}
         {error && (
           <div className="rounded-xl border border-status-err/40 bg-status-err/10 px-3 py-2 text-[11.5px] text-status-err">
             {error}
@@ -263,6 +361,120 @@ export function LeftAIPanel() {
         </div>
       </div>
     </aside>
+  );
+}
+
+function MessageBubble({ msg }: { msg: Msg }) {
+  const { t } = useI18n();
+  const [openThoughts, setOpenThoughts] = useState(false);
+
+  if (msg.role === "user") {
+    return (
+      <div className="ml-auto max-w-[88%] whitespace-pre-wrap rounded-xl border border-hairline bg-surface-elevated px-3 py-2 text-[12.5px] leading-relaxed text-foreground">
+        {msg.content}
+      </div>
+    );
+  }
+
+  const isLive = !!msg.pending;
+  const hasThoughts = !!msg.thoughts && msg.thoughts.trim().length > 0;
+
+  return (
+    <div className="max-w-[88%] space-y-1.5">
+      {/* Live "thinking" stepper while we wait for first content token */}
+      {isLive && <ThinkingStepper step={msg.step ?? 0} liveThoughts={msg.thoughts ?? ""} />}
+
+      {/* Final / streaming answer bubble */}
+      {(msg.content.length > 0 || !isLive) && (
+        <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-foreground/90">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <Sparkles className="h-3 w-3" /> {t("ai.label")}
+          </div>
+          {msg.content ? (
+            <div className="whitespace-pre-wrap">{msg.content}</div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> {t("ai.thinking")}
+            </span>
+          )}
+
+          {/* Collapsed reasoning trace, available after answer is in */}
+          {!isLive && hasThoughts && (
+            <div className="mt-2 border-t border-hairline pt-2">
+              <button
+                onClick={() => setOpenThoughts((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground transition hover:text-foreground"
+              >
+                <Brain className="h-3 w-3" />
+                <span>{t("ai.thoughts")}</span>
+                <ChevronRight className={cn("h-3 w-3 transition", openThoughts && "rotate-90")} />
+              </button>
+              {openThoughts && (
+                <div className="mt-1.5 whitespace-pre-wrap rounded-md bg-accent/40 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {msg.thoughts}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: string }) {
+  const { t } = useI18n();
+  const steps = [
+    { icon: Brain, key: "ai.step.analyze" },
+    { icon: Cpu, key: "ai.step.plan" },
+    { icon: PencilLine, key: "ai.step.compose" },
+  ];
+  return (
+    <div className="rounded-xl border border-hairline bg-surface px-3 py-2.5">
+      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+        <Sparkles className="h-3 w-3" /> {t("ai.label")} · {t("ai.thinking")}
+      </div>
+      <ol className="space-y-1">
+        {steps.map((s, i) => {
+          const Icon = s.icon;
+          const state = i < step ? "done" : i === step ? "active" : "pending";
+          return (
+            <li
+              key={s.key}
+              className={cn(
+                "flex items-center gap-2 text-[11.5px] transition",
+                state === "done" && "text-foreground/70",
+                state === "active" && "text-foreground",
+                state === "pending" && "text-muted-foreground/50",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-4 w-4 items-center justify-center rounded-full border",
+                  state === "done" && "border-foreground/40 bg-foreground/10",
+                  state === "active" && "border-foreground bg-foreground/15",
+                  state === "pending" && "border-hairline",
+                )}
+              >
+                {state === "done" ? (
+                  <Check className="h-2.5 w-2.5" />
+                ) : state === "active" ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : (
+                  <Icon className="h-2.5 w-2.5" />
+                )}
+              </span>
+              <span>{t(s.key)}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {liveThoughts.trim().length > 0 && (
+        <div className="mt-2 max-h-24 overflow-hidden whitespace-pre-wrap rounded-md bg-accent/40 px-2 py-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
+          {liveThoughts}
+        </div>
+      )}
+    </div>
   );
 }
 
