@@ -301,7 +301,7 @@ function ChatView({
         <UserBubble isTg={isTg}>{activeScreen?.userMessage ?? preview.userMessage ?? t("preview.user_msg")}</UserBubble>
         {botMessages.map((message, index) => (
           <BotBubble key={`${message}-${index}`} isTg={isTg}>
-            {index === botMessages.length - 1 ? (
+            {index === botMessages.length - 1 && !ephemeralReply ? (
               <div className="space-y-1">
                 <span>{message}</span>
                 <InlineKb isTg={isTg} opening={opening} items={buttons} onAction={onAction} />
@@ -311,6 +311,23 @@ function ChatView({
             )}
           </BotBubble>
         ))}
+        {ephemeralReply && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+            onAnimationComplete={() => {
+              window.setTimeout(onDismissEphemeral, 4000);
+            }}
+          >
+            <BotBubble isTg={isTg}>
+              <div className="space-y-1">
+                <span>{ephemeralReply}</span>
+                <InlineKb isTg={isTg} opening={opening} items={buttons} onAction={onAction} />
+              </div>
+            </BotBubble>
+          </motion.div>
+        )}
         {opening && (
           <div className="flex items-center justify-center gap-1.5 pt-1 text-[10px] opacity-60">
             <Loader2 className="h-3 w-3 animate-spin" />
