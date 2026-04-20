@@ -40,22 +40,11 @@ const initialNodes: Node[] = [
       previewKey: "canvas.menu.preview",
     },
   },
-  {
-    id: "4",
-    type: "anvl",
-    position: { x: 620, y: 240 },
-    data: {
-      kind: "miniapp.screen",
-      titleKey: "canvas.dashboard.title",
-      previewKey: "canvas.dashboard.preview",
-    },
-  },
 ];
 
 const initialEdges: Edge[] = [
   { id: "e1-2", source: "1", target: "2", animated: true },
   { id: "e1-3", source: "1", target: "3", animated: true },
-  { id: "e3-4", source: "3", target: "4", animated: true },
 ];
 
 interface WorkspaceCtx {
