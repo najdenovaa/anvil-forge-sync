@@ -687,12 +687,53 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
     { icon: Cpu, key: "ai.step.plan" },
     { icon: PencilLine, key: "ai.step.compose" },
   ];
+
+  // Typewriter: reveal the streamed thoughts char-by-char so it reads as if
+  // the model is literally typing its reasoning into the chat.
+  const [revealed, setRevealed] = useState(0);
+  useEffect(() => {
+    if (revealed >= liveThoughts.length) return;
+    const id = window.setTimeout(() => {
+      // Reveal in chunks to keep up with fast streams.
+      const chunk = Math.max(2, Math.ceil((liveThoughts.length - revealed) / 24));
+      setRevealed((r) => Math.min(liveThoughts.length, r + chunk));
+    }, 18);
+    return () => window.clearTimeout(id);
+  }, [liveThoughts, revealed]);
+
+  // Reset when a brand-new turn begins
+  useEffect(() => {
+    if (liveThoughts.length === 0) setRevealed(0);
+  }, [liveThoughts.length === 0]);
+
+  const visibleThoughts = liveThoughts.slice(0, revealed);
+  const stillTyping = revealed < liveThoughts.length;
+
   return (
-    <div className="rounded-xl border border-hairline bg-surface px-3 py-2.5">
-      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        <Sparkles className="h-3 w-3" /> {t("ai.label")} · {t("ai.thinking")}
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="reasoning-glass rounded-xl px-3 py-2.5"
+    >
+      <div className="mb-2 flex items-center gap-1.5">
+        <motion.div
+          animate={{ scale: [1, 1.12, 1], rotate: [0, -4, 4, 0] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground/10 text-[oklch(0.78_0.18_280)]"
+        >
+          <Brain className="h-3 w-3" />
+        </motion.div>
+        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          {t("ai.label")} · {t("ai.thinking")}
+        </span>
+        {stillTyping && (
+          <span className="ml-auto text-[9px] font-mono text-muted-foreground/70">
+            {revealed}/{liveThoughts.length}
+          </span>
+        )}
       </div>
-      <ol className="space-y-1">
+      <ol className="mb-2 space-y-1">
         {steps.map((s, i) => {
           const Icon = s.icon;
           const state = i < step ? "done" : i === step ? "active" : "pending";
@@ -700,26 +741,26 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
             <li
               key={s.key}
               className={cn(
-                "flex items-center gap-2 text-[11.5px] transition",
+                "flex items-center gap-2 text-[11px] transition",
                 state === "done" && "text-foreground/70",
                 state === "active" && "text-foreground",
-                state === "pending" && "text-muted-foreground/50",
+                state === "pending" && "text-muted-foreground/40",
               )}
             >
               <span
                 className={cn(
-                  "flex h-4 w-4 items-center justify-center rounded-full border",
+                  "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
                   state === "done" && "border-foreground/40 bg-foreground/10",
-                  state === "active" && "border-foreground bg-foreground/15",
+                  state === "active" && "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)]",
                   state === "pending" && "border-hairline",
                 )}
               >
                 {state === "done" ? (
-                  <Check className="h-2.5 w-2.5" />
+                  <Check className="h-2 w-2" />
                 ) : state === "active" ? (
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  <Loader2 className="h-2 w-2 animate-spin" />
                 ) : (
-                  <Icon className="h-2.5 w-2.5" />
+                  <Icon className="h-2 w-2" />
                 )}
               </span>
               <span>{t(s.key)}</span>
@@ -728,11 +769,13 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
         })}
       </ol>
       {liveThoughts.trim().length > 0 && (
-        <div className="mt-2 max-h-24 overflow-hidden whitespace-pre-wrap rounded-md bg-accent/40 px-2 py-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
-          {liveThoughts}
+        <div className="mt-2 max-h-32 overflow-hidden rounded-md border border-hairline bg-background/30 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
+          <span className={cn("whitespace-pre-wrap font-mono", stillTyping && "tw-caret")}>
+            {visibleThoughts}
+          </span>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
