@@ -358,6 +358,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       if (h.length === 0) return h;
       const prev = h[h.length - 1];
       setActiveNodeId(prev);
+      setActiveEdgeId(null);
       setLastBranch(null);
       return h.slice(0, -1);
     });
@@ -365,10 +366,55 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
 
   const restart = useCallback(() => {
     setActiveNodeId(entryId);
+    setActiveEdgeId(null);
     setHistory([]);
     setLastBranch(null);
     setPendingBranch("yes");
   }, [entryId]);
+
+  // Keep entry in sync when AI rebuilds the flow.
+  useMemo(() => {
+    if (!activeNodeId && entryId) setActiveNodeId(entryId);
+  }, [activeNodeId, entryId]);
+
+  const value = useMemo<SimulatorCtx>(
+    () => ({
+      available,
+      activeNodeId,
+      activeEdgeId,
+      history,
+      message,
+      effectiveKind,
+      lastBranch: lastBranch ?? (pendingBranch === "yes" ? null : "no"),
+      awaitingInput,
+      press,
+      submitInput,
+      setBranch,
+      back,
+      restart,
+      jumpTo,
+      cameraFollow,
+      setCameraFollow,
+    }),
+    [
+      available,
+      activeNodeId,
+      activeEdgeId,
+      history,
+      message,
+      effectiveKind,
+      lastBranch,
+      pendingBranch,
+      awaitingInput,
+      press,
+      submitInput,
+      setBranch,
+      back,
+      restart,
+      jumpTo,
+      cameraFollow,
+    ],
+  );
 
   // Keep entry in sync when AI rebuilds the flow.
   useMemo(() => {
