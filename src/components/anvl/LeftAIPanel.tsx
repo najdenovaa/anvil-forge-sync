@@ -18,7 +18,7 @@ import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
 import { useAnvlShell } from "./AnvlAppShellContext";
 import { cn } from "@/lib/utils";
-import { safeParseAnvlBlueprint, type AnvlBlueprint } from "@/lib/anvl-blueprint";
+import { safeParseAnvlBlueprint, type AnvlBlueprint, type AnvlBlueprintNode } from "@/lib/anvl-blueprint";
 
 type ModelId = "auto" | "gpt" | "gemini" | "grok" | "claude";
 
@@ -62,7 +62,7 @@ function sanitizeBlueprintForMode(blueprint: AnvlBlueprint, miniAppEnabled: bool
     buttons?.filter((button) => button.action !== "open_miniapp" && button.action !== "locations");
 
   const nextNodes = blueprint.nodes?.length
-    ? blueprint.nodes.reduce<AnvlBlueprint["nodes"]>((acc, node) => {
+    ? blueprint.nodes.reduce<AnvlBlueprintNode[]>((acc, node) => {
         if (node.kind !== "miniapp.screen") acc.push(node);
         return acc;
       }, [])
