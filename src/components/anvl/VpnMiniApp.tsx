@@ -116,9 +116,12 @@ export function VpnMiniApp() {
         >
           {t("vpn.back_to_chat")}
         </button>
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold">
-          <Shield className="h-3 w-3" />
-          {t("vpn.title")}
+        <div className="flex min-w-0 flex-col items-center text-center">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+            <Shield className="h-3 w-3" />
+            <span className="truncate">{brandTitle}</span>
+          </div>
+          <div className="truncate text-[9px] opacity-50">{brandSubtitle}</div>
         </div>
         <div className="w-12" />
       </div>
