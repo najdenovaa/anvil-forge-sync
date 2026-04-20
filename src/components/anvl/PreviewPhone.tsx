@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
@@ -27,7 +27,16 @@ export function PreviewPhone() {
   const isTg = platform === "telegram";
   const [opening, setOpening] = useState(false);
 
+  // If the user disables Mini App while it's shown — bounce back to chat.
+  useEffect(() => {
+    if (!miniAppEnabled && view === "miniapp") {
+      close();
+      setOpening(false);
+    }
+  }, [miniAppEnabled, view, close]);
+
   const handleOpen = (tab: MiniAppTab = "home") => {
+    if (!miniAppEnabled) return;
     setOpening(true);
     setTimeout(() => {
       setOpening(false);
@@ -36,6 +45,8 @@ export function PreviewPhone() {
   };
 
   const handleAction = (action: PreviewAction) => {
+    // Mini App is OFF — these actions don't exist in this build.
+    if (!miniAppEnabled && (action === "open_miniapp" || action === "locations")) return;
     if (action === "open_miniapp") return handleOpen("home");
     if (action === "plans") return handleOpen("plans");
     if (action === "locations") return handleOpen("locations");
