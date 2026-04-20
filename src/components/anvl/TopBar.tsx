@@ -14,8 +14,7 @@ function AnvlMark() {
       <img
         src={anvlLogo}
         alt="ANVL"
-        className="h-15 w-auto object-contain"
-        style={{ mixBlendMode: "lighten", background: "transparent" }}
+        className="h-16 w-auto object-contain"
         draggable={false}
       />
     </div>
@@ -27,7 +26,7 @@ export function TopBar() {
   const { t, lang, setLang } = useI18n();
 
   return (
-    <header className="glass relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-hairline px-4">
+    <header className="glass relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-hairline px-4">
       <div className="flex items-center gap-6">
         <AnvlMark />
         <div className="hidden h-5 w-px bg-hairline md:block" />
