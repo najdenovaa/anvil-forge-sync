@@ -222,9 +222,11 @@ export function LeftAIPanel() {
       let codeApplied = false;
       // Tool-calling state: assemble streaming tool_calls by index
       const toolBuf: { name: string; args: string; done: boolean }[] = [];
+      const liveOps: ToolOp[] = [];
       const applyToolCall = (name: string, argsRaw: string) => {
         let args: any;
         try { args = JSON.parse(argsRaw); } catch { return; }
+        liveOps.push({ name, args: args ?? {} });
         try {
           if (name === "reset_canvas") resetAiCanvas();
           else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
@@ -258,6 +260,7 @@ export function LeftAIPanel() {
             ...last,
             thoughts,
             content: answer,
+            toolOps: liveOps.length ? [...liveOps] : last.toolOps,
             pending: phase !== 4 && answer.length === 0,
           };
           return copy;
