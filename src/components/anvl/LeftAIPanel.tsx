@@ -428,7 +428,31 @@ export function LeftAIPanel() {
       const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
       const extractedCode = extractTaggedBlock(raw, "code").trim();
       const strippedAnswer = stripTaggedBlocks(raw).trim();
-      const finalAnswer = strippedAnswer || (usedTools ? t("ai.msg.tools_done") || "Готово." : (answer || raw).trim());
+
+      // Build a smart fallback summary from the tool ops when the model
+      // forgot to write its own (otherwise we'd just show "tools_done").
+      const buildSummaryFromOps = () => {
+        if (!liveOps.length) return "";
+        const added = liveOps.filter((o) => o.name === "add_node").length;
+        const linked = liveOps.filter((o) => o.name === "connect").length;
+        const previewTouched = liveOps.some((o) => o.name === "set_preview");
+        const miniTouched = liveOps.some((o) => o.name === "set_miniapp");
+        const titles = liveOps
+          .filter((o) => o.name === "add_node")
+          .map((o) => (o.args as any).title)
+          .filter(Boolean)
+          .slice(0, 4);
+        const parts: string[] = [];
+        if (added) parts.push(`Собрал ${added} ${added === 1 ? "блок" : "блоков"}`);
+        if (linked) parts.push(`${linked} ${linked === 1 ? "связь" : "связи"}`);
+        if (previewTouched) parts.push("обновил превью");
+        if (miniTouched) parts.push("настроил Mini App");
+        const head = parts.length ? parts.join(", ") + "." : t("ai.msg.tools_done");
+        const tail = titles.length ? ` Сценарии: ${titles.join(" → ")}.` : "";
+        return head + tail;
+      };
+
+      const finalAnswer = strippedAnswer || buildSummaryFromOps() || (usedTools ? t("ai.msg.tools_done") : (answer || raw).trim());
       // Only fall back to legacy blueprint when no tools were used.
       if (!usedTools) {
         const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
@@ -444,6 +468,7 @@ export function LeftAIPanel() {
             role: "assistant",
             content: finalAnswer,
             thoughts: extractedThoughts || thoughts.trim() || undefined,
+            toolOps: liveOps.length ? [...liveOps] : undefined,
           };
         }
         return copy;
