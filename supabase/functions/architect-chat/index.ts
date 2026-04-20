@@ -134,11 +134,11 @@ Keep flow names and copy in Russian by default for Max.`;
 
 const REAL_MODELS = {
   gpt: "openai/gpt-5",
-  gemini: "google/gemini-2.5-flash",
+  gemini: "google/gemini-3-flash-preview",
 } as const;
 
 const ALIASES: Record<string, keyof typeof REAL_MODELS> = {
-  auto: "gpt",
+  auto: "gemini",
   claude: "gpt",
   grok: "gemini",
 };
