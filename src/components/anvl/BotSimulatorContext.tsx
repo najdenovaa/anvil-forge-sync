@@ -141,7 +141,9 @@ function composeMessage(
     // If current node has multiple outgoing edges → treat it as an implicit
     // switch (synthesize buttons from targets) and stop here.
     const outAll = edges.filter((e) => e.source === cursor!.id);
-    if (outAll.length >= 2 && !KEYBOARD_KINDS.includes(k as NodeKind) && k !== "logic.condition") {
+    const isKb = !!k && KEYBOARD_KINDS.includes(k);
+    const isCond = k === "logic.condition";
+    if (outAll.length >= 2 && !isKb && !isCond) {
       buttonsNode = cursor;
       break;
     }
