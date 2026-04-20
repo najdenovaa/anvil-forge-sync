@@ -317,6 +317,20 @@ export function LeftAIPanel() {
     setError(null);
   };
 
+  // Keep a stable ref to send so the bootstrap effect can call it without re-running.
+  sendRef.current = send;
+
+  // Auto-fire the prompt the user typed on the landing page.
+  useEffect(() => {
+    if (bootedRef.current) return;
+    const initial = consumeInitialPrompt();
+    if (initial) {
+      bootedRef.current = true;
+      // Defer one tick so providers/state are settled.
+      setTimeout(() => sendRef.current?.(initial), 50);
+    }
+  }, [consumeInitialPrompt]);
+
   return (
     <aside className="flex w-[340px] shrink-0 flex-col border-r border-hairline bg-sidebar">
       <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
