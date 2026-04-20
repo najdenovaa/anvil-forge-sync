@@ -68,6 +68,15 @@
 
   --shadow-elevated: 0 1px 0 0 oklch(1 0 0 / 6%) inset, 0 8px 24px -12px oklch(0 0 0 / 60%);
   --shadow-glow: 0 0 0 1px oklch(1 0 0 / 8%), 0 0 40px -8px oklch(1 0 0 / 12%);
+  --shadow-node: 0 1px 0 0 oklch(1 0 0 / 8%) inset, 0 12px 32px -16px oklch(0 0 0 / 70%), 0 2px 6px -2px oklch(0 0 0 / 40%);
+  --shadow-node-selected: 0 0 0 1px oklch(1 0 0 / 25%), 0 1px 0 0 oklch(1 0 0 / 12%) inset, 0 16px 40px -16px oklch(0 0 0 / 80%), 0 0 32px -6px oklch(1 0 0 / 10%);
+
+  /* Group accent hues — used for node icon halos and edge gradients */
+  --accent-trigger: oklch(0.78 0.16 85);
+  --accent-message: oklch(0.74 0.14 220);
+  --accent-keyboard: oklch(0.74 0.16 290);
+  --accent-miniapp: oklch(0.76 0.16 165);
+  --accent-logic: oklch(0.78 0.18 35);
 }
 
 /* Default = dark monochrome (the only theme we ship) */
@@ -171,25 +180,80 @@
 }
 
 .glass {
-  background-color: oklch(0.2 0.004 270 / 70%);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  background-color: oklch(0.2 0.004 270 / 62%);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid oklch(1 0 0 / 8%);
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 8%) inset,
+    0 24px 60px -28px oklch(0 0 0 / 70%);
+}
+
+.glass-strong {
+  background-color: oklch(0.18 0.004 270 / 78%);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+
+/* Glow used for icon halos inside nodes */
+.node-halo {
+  position: relative;
+}
+.node-halo::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: radial-gradient(closest-side, var(--node-accent, oklch(1 0 0)) / 30%, transparent 70%);
+  filter: blur(10px);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* react-flow overrides */
 .react-flow__edge-path {
   stroke: oklch(1 0 0 / 35%);
-  stroke-width: 1.5;
+  stroke-width: 1.6;
+  transition: stroke 200ms ease, stroke-width 200ms ease;
+}
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: oklch(1 0 0 / 60%);
+  stroke-width: 2;
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:focus .react-flow__edge-path {
-  stroke: oklch(1 0 0 / 80%);
+  stroke: oklch(1 0 0 / 90%);
+  stroke-width: 2;
+}
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 6 6;
+  animation: anvl-dash 1.4s linear infinite;
+}
+@keyframes anvl-dash {
+  to { stroke-dashoffset: -24; }
+}
+.react-flow__connectionline path {
+  stroke: oklch(1 0 0 / 70%);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
 }
 .react-flow__handle {
   background: var(--foreground);
   border: 2px solid var(--background);
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.react-flow__handle:hover,
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto {
+  transform: scale(1.45);
+  box-shadow: 0 0 0 4px oklch(1 0 0 / 12%), 0 0 14px 0 oklch(1 0 0 / 40%);
+}
+.react-flow__node.selected .react-flow__handle {
+  background: oklch(1 0 0);
+  box-shadow: 0 0 0 3px oklch(1 0 0 / 16%);
 }
 .react-flow__controls {
   background: var(--surface-elevated);

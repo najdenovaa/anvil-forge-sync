@@ -13,6 +13,7 @@ import {
   PencilLine,
   ChevronRight,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
@@ -426,7 +427,14 @@ export function LeftAIPanel() {
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {messages.map((m, i) => (
-          <MessageBubble key={i} msg={m} />
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+          >
+            <MessageBubble msg={m} />
+          </motion.div>
         ))}
         {error && (
           <div className="rounded-xl border border-status-err/40 bg-status-err/10 px-3 py-2 text-[11.5px] text-status-err">
