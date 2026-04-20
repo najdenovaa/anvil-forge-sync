@@ -320,7 +320,7 @@ function ChatView({
   preview: ReturnType<typeof useAnvlWorkspace>["preview"];
   turns: Turn[];
   typing: boolean;
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   onRestart: () => void;
 }) {
   const { t } = useI18n();
