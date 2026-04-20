@@ -108,7 +108,7 @@ function CanvasInner() {
     <div className="relative h-full w-full forge-grid">
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={decoratedEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
