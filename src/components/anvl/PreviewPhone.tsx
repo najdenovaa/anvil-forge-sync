@@ -2,8 +2,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
-import { useMiniApp } from "./MiniAppContext";
+import { useMiniApp, type MiniAppTab } from "./MiniAppContext";
 import { VpnMiniApp } from "./VpnMiniApp";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import type { PreviewAction } from "@/lib/anvl-blueprint";
 import {
   Battery,
   Signal,
@@ -21,15 +23,23 @@ export function PreviewPhone() {
   const { platform } = usePlatform();
   const { t } = useI18n();
   const { view, open, close } = useMiniApp();
+  const { preview } = useAnvlWorkspace();
   const isTg = platform === "telegram";
   const [opening, setOpening] = useState(false);
 
-  const handleOpen = () => {
+  const handleOpen = (tab: MiniAppTab = "home") => {
     setOpening(true);
     setTimeout(() => {
       setOpening(false);
-      open();
+      open(tab);
     }, 600);
+  };
+
+  const handleAction = (action: PreviewAction) => {
+    if (action === "open_miniapp") return handleOpen("home");
+    if (action === "plans") return handleOpen("plans");
+    if (action === "locations") return handleOpen("locations");
+    return handleOpen("profile");
   };
 
   return (
@@ -47,7 +57,6 @@ export function PreviewPhone() {
               isTg ? "bg-[oklch(0.22_0.03_260)]" : "bg-[oklch(0.96_0_0)] text-[oklch(0.16_0_0)]",
             )}
           >
-            {/* Status bar */}
             <div
               className={cn(
                 "flex items-center justify-between px-4 pt-2 text-[10px] font-medium",
@@ -63,7 +72,7 @@ export function PreviewPhone() {
             </div>
 
             {view === "chat" ? (
-              <ChatView isTg={isTg} onOpen={handleOpen} opening={opening} />
+              <ChatView isTg={isTg} onAction={handleAction} opening={opening} preview={preview} />
             ) : (
               <div className="flex-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <VpnMiniApp />
@@ -79,7 +88,6 @@ export function PreviewPhone() {
         {platform} · {view === "chat" ? "chat" : "mini app"}
       </div>
 
-      {/* Floating chip to return when in mini app — also accessible from inside mini app */}
       {view === "miniapp" && (
         <button
           onClick={close}
@@ -94,14 +102,27 @@ export function PreviewPhone() {
 
 function ChatView({
   isTg,
-  onOpen,
+  onAction,
   opening,
+  preview,
 }: {
   isTg: boolean;
-  onOpen: () => void;
+  onAction: (action: PreviewAction) => void;
   opening: boolean;
+  preview: ReturnType<typeof useAnvlWorkspace>["preview"];
 }) {
   const { t } = useI18n();
+  const botMessages = preview.botMessages?.length
+    ? preview.botMessages
+    : [t("preview.bot_msg_1"), t("preview.bot_msg_2")];
+  const buttons = preview.buttons?.length
+    ? preview.buttons
+    : [
+        { label: t("preview.btn.open"), action: "open_miniapp" as const, primary: true },
+        { label: t("preview.btn.pricing"), action: "plans" as const },
+        { label: t("preview.btn.help"), action: "profile" as const },
+      ];
+
   return (
     <>
       <div
@@ -120,14 +141,9 @@ function ChatView({
           {isTg ? "TG" : "M"}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] font-semibold">{t("preview.bot_name")}</div>
-          <div
-            className={cn(
-              "truncate text-[10px]",
-              isTg ? "text-white/50" : "text-black/50",
-            )}
-          >
-            {t("preview.bot_status")}
+          <div className="truncate text-[12px] font-semibold">{preview.botName ?? t("preview.bot_name")}</div>
+          <div className={cn("truncate text-[10px]", isTg ? "text-white/50" : "text-black/50")}>
+            {preview.botStatus ?? t("preview.bot_status")}
           </div>
         </div>
         <MoreVertical className="h-4 w-4 opacity-70" />
@@ -141,14 +157,19 @@ function ChatView({
             : "bg-[oklch(0.97_0_0)]",
         )}
       >
-        <UserBubble isTg={isTg}>{t("preview.user_msg")}</UserBubble>
-        <BotBubble isTg={isTg}>{t("preview.bot_msg_1")}</BotBubble>
-        <BotBubble isTg={isTg}>
-          <div className="space-y-1">
-            <span>{t("preview.bot_msg_2")}</span>
-            <InlineKb isTg={isTg} onOpen={onOpen} opening={opening} />
-          </div>
-        </BotBubble>
+        <UserBubble isTg={isTg}>{preview.userMessage ?? t("preview.user_msg")}</UserBubble>
+        {botMessages.map((message, index) => (
+          <BotBubble key={`${message}-${index}`} isTg={isTg}>
+            {index === botMessages.length - 1 ? (
+              <div className="space-y-1">
+                <span>{message}</span>
+                <InlineKb isTg={isTg} opening={opening} items={buttons} onAction={onAction} />
+              </div>
+            ) : (
+              message
+            )}
+          </BotBubble>
+        ))}
         {opening && (
           <div className="flex items-center justify-center gap-1.5 pt-1 text-[10px] opacity-60">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -202,9 +223,7 @@ function BotBubble({ children, isTg }: { children: React.ReactNode; isTg: boolea
       <div
         className={cn(
           "max-w-[85%] rounded-2xl px-3 py-1.5 text-[11px] leading-snug",
-          isTg
-            ? "rounded-bl-sm bg-white/10 text-white"
-            : "rounded-bl-sm bg-white text-black shadow-sm",
+          isTg ? "rounded-bl-sm bg-white/10 text-white" : "rounded-bl-sm bg-white text-black shadow-sm",
         )}
       >
         {children}
@@ -215,25 +234,21 @@ function BotBubble({ children, isTg }: { children: React.ReactNode; isTg: boolea
 
 function InlineKb({
   isTg,
-  onOpen,
   opening,
+  items,
+  onAction,
 }: {
   isTg: boolean;
-  onOpen: () => void;
   opening: boolean;
+  items: { label: string; action: PreviewAction; primary?: boolean }[];
+  onAction: (action: PreviewAction) => void;
 }) {
-  const { t } = useI18n();
-  const items: { key: string; primary?: boolean; onClick?: () => void }[] = [
-    { key: "preview.btn.open", primary: true, onClick: onOpen },
-    { key: "preview.btn.pricing" },
-    { key: "preview.btn.help" },
-  ];
   return (
     <div className="mt-1.5 grid grid-cols-1 gap-1">
       {items.map((it) => (
         <button
-          key={it.key}
-          onClick={it.onClick}
+          key={`${it.action}-${it.label}`}
+          onClick={() => onAction(it.action)}
           disabled={opening && it.primary}
           className={cn(
             "rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition disabled:opacity-50",
@@ -246,7 +261,7 @@ function InlineKb({
                 : "bg-[oklch(0.97_0_0)] text-max hover:bg-[oklch(0.94_0_0)]",
           )}
         >
-          {t(it.key)}
+          {it.label}
         </button>
       ))}
     </div>

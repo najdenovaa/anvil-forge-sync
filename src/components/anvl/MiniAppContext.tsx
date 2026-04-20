@@ -1,19 +1,35 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-type View = "chat" | "miniapp";
+export type MiniAppView = "chat" | "miniapp";
+export type MiniAppTab = "home" | "locations" | "plans" | "profile";
 
 interface MiniAppCtx {
-  view: View;
-  open: () => void;
+  view: MiniAppView;
+  targetTab: MiniAppTab;
+  open: (tab?: MiniAppTab) => void;
   close: () => void;
+  setTab: (tab: MiniAppTab) => void;
 }
 
 const Ctx = createContext<MiniAppCtx | null>(null);
 
 export function MiniAppProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<View>("chat");
+  const [view, setView] = useState<MiniAppView>("chat");
+  const [targetTab, setTargetTab] = useState<MiniAppTab>("home");
+
   return (
-    <Ctx.Provider value={{ view, open: () => setView("miniapp"), close: () => setView("chat") }}>
+    <Ctx.Provider
+      value={{
+        view,
+        targetTab,
+        open: (tab = "home") => {
+          setTargetTab(tab);
+          setView("miniapp");
+        },
+        close: () => setView("chat"),
+        setTab: setTargetTab,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
