@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useMiniApp, type MiniAppTab } from "./MiniAppContext";
-import { VpnMiniApp } from "./VpnMiniApp";
+import { DynamicMiniApp } from "./DynamicMiniApp";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import type { PreviewAction } from "@/lib/anvl-blueprint";
 import {
@@ -81,7 +81,7 @@ export function PreviewPhone() {
               />
             ) : (
               <div className="flex-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <VpnMiniApp />
+                <DynamicMiniApp />
               </div>
             )}
           </motion.div>
