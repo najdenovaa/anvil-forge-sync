@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AppRoot, Button as TgButton } from "@telegram-apps/telegram-ui";
+import tgUiPkg from "@telegram-apps/telegram-ui";
 import "@telegram-apps/telegram-ui/dist/styles.css";
+const { AppRoot, Button: TgButton } = tgUiPkg as unknown as {
+  AppRoot: React.ComponentType<React.PropsWithChildren<{ appearance?: "light" | "dark"; platform?: "ios" | "base"; style?: React.CSSProperties }>>;
+  Button: React.ComponentType<React.PropsWithChildren<{ mode?: "filled" | "bezeled" | "plain" | "gray" | "outline" | "white"; size?: "s" | "m" | "l"; stretched?: boolean; onClick?: () => void }>>;
+};
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useMiniApp, type MiniAppTab } from "./MiniAppContext";
