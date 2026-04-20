@@ -130,6 +130,50 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
     if (snap.generatedCode) setGeneratedCode(snap.generatedCode);
   }, []);
 
+  const resetAiCanvas = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+  }, []);
+
+  const addAiNode = useCallback((id: string, kind: string, title: string, preview: string) => {
+    setNodes((prev) => {
+      if (prev.some((n) => n.id === id)) return prev;
+      const idx = prev.length;
+      return [
+        ...prev,
+        {
+          id,
+          type: "anvl",
+          position: { x: 40 + Math.floor(idx / 2) * 280, y: 90 + (idx % 2) * 170 },
+          data: { kind, title, preview, params: {} },
+        },
+      ];
+    });
+  }, []);
+
+  const connectAiNodes = useCallback((from: string, to: string) => {
+    const eid = `ai-${from}-${to}`;
+    setEdges((prev) => (prev.some((e) => e.id === eid) ? prev : [...prev, { id: eid, source: from, target: to, animated: true }]));
+  }, []);
+
+  const updateAiNodeParam = useCallback((id: string, key: string, value: string) => {
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === id
+          ? { ...n, data: { ...n.data, params: { ...(n.data?.params ?? {}), [key]: value } } }
+          : n,
+      ),
+    );
+  }, []);
+
+  const mergePreview = useCallback((patch: Partial<AnvlPreviewState>) => {
+    setPreview((cur) => ({ ...cur, ...patch }));
+  }, []);
+
+  const mergeMiniApp = useCallback((patch: Partial<AnvlMiniAppState>) => {
+    setMiniApp((cur) => ({ ...cur, ...patch }));
+  }, []);
+
   const { status: saveStatus, lastSavedAt, snapshotNow } = useFlowPersistence({
     slug: DEFAULT_FLOW_SLUG,
     nodes,
@@ -142,20 +186,14 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      nodes,
-      edges,
-      setNodes,
-      setEdges,
-      preview,
-      miniApp,
-      generatedCode,
-      setGeneratedCode,
+      nodes, edges, setNodes, setEdges,
+      preview, miniApp, generatedCode, setGeneratedCode,
       applyBlueprint,
-      saveStatus,
-      lastSavedAt,
-      snapshotNow,
+      addAiNode, connectAiNodes, updateAiNodeParam,
+      mergePreview, mergeMiniApp, resetAiCanvas,
+      saveStatus, lastSavedAt, snapshotNow,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, saveStatus, lastSavedAt, snapshotNow],
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, saveStatus, lastSavedAt, snapshotNow],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
