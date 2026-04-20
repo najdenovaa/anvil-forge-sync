@@ -97,17 +97,7 @@ export function LeftAIPanel() {
 
     const stopStepper = () => clearInterval(stepTimer);
 
-    // Unsupported models — friendly fallback
-    const def = MODELS.find((m) => m.id === model)!;
-    if (!def.available) {
-      stopStepper();
-      setMessages([
-        ...baseHistory,
-        { role: "assistant", content: t("ai.unavailable") },
-      ]);
-      setIsStreaming(false);
-      return;
-    }
+    // All models route through Anvl backend; no client-side fallback needed.
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
@@ -538,9 +528,9 @@ function ModelDropdown({
                 {m.short}
               </span>
               <span className="flex-1 font-medium">{t(m.labelKey)}</span>
-              {!m.available && (
+              {m.routed && (
                 <span className="rounded bg-accent px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("ai.model.soon")}
+                  {t("ai.model.routed")}
                 </span>
               )}
               {m.id === current && <Check className="h-3 w-3" />}
