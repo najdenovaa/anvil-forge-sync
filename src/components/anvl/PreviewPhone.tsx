@@ -16,6 +16,9 @@ import {
   Paperclip,
   Smile,
   Loader2,
+  Menu,
+  X,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
