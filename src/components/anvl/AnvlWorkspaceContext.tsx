@@ -65,6 +65,8 @@ interface WorkspaceCtx {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   preview: Partial<AnvlPreviewState>;
   miniApp: Partial<AnvlMiniAppState>;
+  generatedCode: string;
+  setGeneratedCode: React.Dispatch<React.SetStateAction<string>>;
   applyBlueprint: (blueprint: AnvlBlueprint) => void;
 }
 
@@ -75,6 +77,7 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [preview, setPreview] = useState<Partial<AnvlPreviewState>>({});
   const [miniApp, setMiniApp] = useState<Partial<AnvlMiniAppState>>({});
+  const [generatedCode, setGeneratedCode] = useState("");
 
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
     if (blueprint.nodes?.length) {
@@ -117,8 +120,18 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ nodes, edges, setNodes, setEdges, preview, miniApp, applyBlueprint }),
-    [nodes, edges, preview, miniApp, applyBlueprint],
+    () => ({
+      nodes,
+      edges,
+      setNodes,
+      setEdges,
+      preview,
+      miniApp,
+      generatedCode,
+      setGeneratedCode,
+      applyBlueprint,
+    }),
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

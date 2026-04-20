@@ -46,9 +46,18 @@ interface Msg {
   step?: number;
 }
 
+function extractTaggedBlock(source: string, tag: string) {
+  const match = source.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i"));
+  return match?.[1] ?? "";
+}
+
+function stripTaggedBlocks(source: string) {
+  return source.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<blueprint>[\s\S]*?<\/blueprint>/gi, "").replace(/<code>[\s\S]*?<\/code>/gi, "");
+}
+
 export function LeftAIPanel() {
   const { t } = useI18n();
-  const { applyBlueprint } = useAnvlWorkspace();
+  const { applyBlueprint, setGeneratedCode } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
@@ -279,9 +288,13 @@ export function LeftAIPanel() {
         pending = "";
       }
 
-      const finalAnswer = (answer || raw).trim();
-      const blueprint = safeParseAnvlBlueprint(blueprintRaw.trim());
+      const extractedThoughts = extractTaggedBlock(raw, "think").trim();
+      const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
+      const extractedCode = extractTaggedBlock(raw, "code").trim();
+      const finalAnswer = stripTaggedBlocks(raw).trim() || (answer || raw).trim();
+      const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
       if (blueprint) applyBlueprint(blueprint);
+      setGeneratedCode(extractedCode);
 
       setMessages((prev) => {
         const copy = prev.slice();
@@ -290,7 +303,7 @@ export function LeftAIPanel() {
           copy[copy.length - 1] = {
             role: "assistant",
             content: finalAnswer,
-            thoughts: thoughts.trim() || undefined,
+            thoughts: extractedThoughts || thoughts.trim() || undefined,
           };
         }
         return copy;
@@ -314,6 +327,7 @@ export function LeftAIPanel() {
 
   const newChat = () => {
     setMessages([{ role: "assistant", content: t("ai.msg.intro") }]);
+    setGeneratedCode("");
     setError(null);
   };
 
