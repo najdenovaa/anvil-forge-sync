@@ -30,13 +30,13 @@ function Shell() {
   );
 }
 
-export function AnvlApp() {
+export function AnvlApp({ slug }: { slug?: string } = {}) {
   return (
     <I18nProvider>
       <PlatformProvider>
         <MiniAppProvider>
           <TelegramWebAppProvider>
-            <AnvlWorkspaceProvider>
+            <AnvlWorkspaceProvider slug={slug}>
               <SelectionProvider>
                 <AnvlAppShellProvider>
                   <Shell />

@@ -41,12 +41,18 @@ export function useFlowPersistence({
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const hydratedRef = useRef(false);
+  const hydratedSlugRef = useRef<string | null>(null);
   const lastVersionAtRef = useRef<number>(0);
   const debounceRef = useRef<number | null>(null);
   const flowIdRef = useRef<string | null>(null);
 
   const queryKey = useMemo(() => ["anvl-flow", slug] as const, [slug]);
+
+  // Reset hydration tracking when slug changes so we re-hydrate from the new flow.
+  useEffect(() => {
+    hydratedSlugRef.current = null;
+    flowIdRef.current = null;
+  }, [slug]);
 
   // Initial load
   const { data: snapshot } = useQuery({
@@ -58,11 +64,12 @@ export function useFlowPersistence({
   });
 
   useEffect(() => {
-    if (!snapshot || hydratedRef.current) return;
+    if (!snapshot) return;
+    if (hydratedSlugRef.current === slug) return;
     flowIdRef.current = snapshot.id;
-    hydratedRef.current = true;
+    hydratedSlugRef.current = slug;
     onHydrate(snapshot);
-  }, [snapshot, onHydrate]);
+  }, [snapshot, slug, onHydrate]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -104,7 +111,7 @@ export function useFlowPersistence({
   // Debounced autosave whenever inputs change (after hydration)
   useEffect(() => {
     if (!enabled) return;
-    if (!hydratedRef.current && snapshot !== null) return;
+    if (hydratedSlugRef.current !== slug && snapshot !== null) return;
 
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);

@@ -46,6 +46,79 @@ function rowToSnapshot(row: Record<string, unknown>): FlowSnapshot {
   };
 }
 
+export interface FlowVersionRow {
+  id: string;
+  flowId: string;
+  version: number;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface FlowVersionFull extends FlowVersionRow {
+  nodes: Node[];
+  edges: Edge[];
+  preview: Partial<AnvlPreviewState>;
+  miniapp: Partial<AnvlMiniAppState>;
+  generatedCode: string;
+}
+
+/** List all flows ordered by recently updated. */
+export async function listFlows(): Promise<FlowSnapshot[]> {
+  const { data, error } = await (supabase as any)
+    .from("flows")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return ((data as Record<string, unknown>[]) ?? []).map(rowToSnapshot);
+}
+
+/** Delete a flow by id (cascade removes versions via FK). */
+export async function deleteFlow(id: string): Promise<void> {
+  const { error } = await (supabase as any).from("flows").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** List versions for a flow (lightweight: no payload). */
+export async function listFlowVersions(flowId: string): Promise<FlowVersionRow[]> {
+  const { data, error } = await (supabase as any)
+    .from("flow_versions")
+    .select("id, flow_id, version, note, created_at")
+    .eq("flow_id", flowId)
+    .order("version", { ascending: false });
+  if (error) throw error;
+  return ((data as Record<string, unknown>[]) ?? []).map((r) => ({
+    id: r.id as string,
+    flowId: r.flow_id as string,
+    version: r.version as number,
+    note: (r.note as string | null) ?? null,
+    createdAt: r.created_at as string,
+  }));
+}
+
+/** Fetch a single version with full payload for rollback. */
+export async function getFlowVersion(versionId: string): Promise<FlowVersionFull | null> {
+  const { data, error } = await (supabase as any)
+    .from("flow_versions")
+    .select("*")
+    .eq("id", versionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: r.id as string,
+    flowId: r.flow_id as string,
+    version: r.version as number,
+    note: (r.note as string | null) ?? null,
+    createdAt: r.created_at as string,
+    nodes: (r.nodes as Node[]) ?? [],
+    edges: (r.edges as Edge[]) ?? [],
+    preview: (r.preview as Partial<AnvlPreviewState>) ?? {},
+    miniapp: (r.miniapp as Partial<AnvlMiniAppState>) ?? {},
+    generatedCode: (r.generated_code as string) ?? "",
+  };
+}
+
 /** Load flow by slug, or return null if it doesn't exist yet. */
 export async function loadFlowBySlug(slug: string): Promise<FlowSnapshot | null> {
   const { data, error } = await (supabase as any)
