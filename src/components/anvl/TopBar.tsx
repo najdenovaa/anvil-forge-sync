@@ -142,14 +142,6 @@ function SaveIndicator() {
         )}
       />
       <span suppressHydrationWarning>{label}</span>
-      <button
-        type="button"
-        onClick={() => snapshotNow("manual")}
-        title="Save snapshot version"
-        className="-mr-1 ml-1 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
-      >
-        <History className="h-3 w-3" />
-      </button>
     </div>
   );
 }
