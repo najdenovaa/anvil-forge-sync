@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { NODE_CATALOG, type NodeGroup } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { useI18n } from "./I18nContext";
+import { useBotSimulator } from "./BotSimulatorContext";
 import { cn } from "@/lib/utils";
 
 interface AnvlNodeData {
@@ -42,11 +43,13 @@ const GROUP_ACCENT: Record<NodeGroup, string> = {
   Logic: "var(--accent-logic)",
 };
 
-export function ForgeNode({ data, selected }: NodeProps<AnvlNodeData>) {
+export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
   const meta = NODE_CATALOG[data.kind];
   const Icon = meta.icon;
   const isTrigger = meta.group === "Triggers";
   const { t } = useI18n();
+  const { activeNodeId } = useBotSimulator();
+  const isActive = activeNodeId === id;
   const accent = GROUP_ACCENT[meta.group];
 
   const title = data.titleKey ? t(data.titleKey) : (data.title ?? t(meta.labelKey));
@@ -61,11 +64,14 @@ export function ForgeNode({ data, selected }: NodeProps<AnvlNodeData>) {
       className={cn(
         "group relative min-w-[220px] overflow-hidden rounded-2xl text-foreground transition-shadow",
         "glass",
+        isActive && "sim-active",
       )}
       style={{
-        boxShadow: selected
-          ? "var(--shadow-node-selected)"
-          : "var(--shadow-node)",
+        boxShadow: isActive
+          ? undefined
+          : selected
+            ? "var(--shadow-node-selected)"
+            : "var(--shadow-node)",
         borderColor: selected ? "oklch(1 0 0 / 24%)" : undefined,
       }}
     >
