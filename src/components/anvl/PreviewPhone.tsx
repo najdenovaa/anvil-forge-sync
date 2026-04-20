@@ -28,6 +28,7 @@ export function PreviewPhone() {
   const [opening, setOpening] = useState(false);
 
   const handleOpen = (tab: MiniAppTab = "home") => {
+    if (!miniAppEnabled) return;
     setOpening(true);
     setTimeout(() => {
       setOpening(false);
@@ -36,6 +37,8 @@ export function PreviewPhone() {
   };
 
   const handleAction = (action: PreviewAction) => {
+    // Mini App is OFF — these actions don't exist in this build.
+    if (!miniAppEnabled && (action === "open_miniapp" || action === "locations")) return;
     if (action === "open_miniapp") return handleOpen("home");
     if (action === "plans") return handleOpen("plans");
     if (action === "locations") return handleOpen("locations");

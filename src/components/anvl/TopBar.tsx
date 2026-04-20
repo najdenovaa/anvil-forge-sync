@@ -1,8 +1,9 @@
-import { ChevronDown, Rocket, Sparkles, Send, AppWindow } from "lucide-react";
+import { ChevronDown, Rocket, Send, AppWindow } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
+import maxLogo from "@/assets/max-logo.png";
 
 function AnvlMark() {
   return (
@@ -45,7 +46,17 @@ export function TopBar() {
             active={platform === "max"}
             onClick={() => setPlatform("max")}
             label={t("platform.max")}
-            icon={<Sparkles className="h-3.5 w-3.5" />}
+            icon={
+              <img
+                src={maxLogo}
+                alt="Max"
+                className={cn(
+                  "h-3.5 w-3.5 object-contain transition",
+                  platform === "max" ? "invert brightness-0" : "opacity-60",
+                )}
+                draggable={false}
+              />
+            }
           />
         </div>
 
