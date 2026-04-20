@@ -266,8 +266,9 @@ export function LeftAIPanel() {
       }
 
       if (pending.length > 0) {
-        if (phase === 1) thoughts += pending;
-        else if (phase === 3) blueprintRaw += pending;
+        const phaseValue = phase as number;
+        if (phaseValue === 1) thoughts += pending;
+        else if (phaseValue === 3) blueprintRaw += pending;
         else answer += pending;
         pending = "";
       }
