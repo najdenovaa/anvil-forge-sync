@@ -144,8 +144,24 @@ export function LeftAIPanel() {
       let answer = "";
       let phase: 0 | 1 | 2 | 3 | 4 = 0;
       let pending = "";
+      let blueprintApplied = false;
+      let codeApplied = false;
 
       const flush = () => {
+        if (!blueprintApplied && blueprintRaw.includes("\"nodes\"") && blueprintRaw.includes("\"preview\"")) {
+          const liveBlueprint = safeParseAnvlBlueprint(blueprintRaw.trim());
+          if (liveBlueprint) {
+            applyBlueprint(liveBlueprint);
+            blueprintApplied = true;
+          }
+        }
+        if (!codeApplied) {
+          const liveCode = extractTaggedBlock(raw, "code").trim();
+          if (liveCode) {
+            setGeneratedCode(liveCode);
+            codeApplied = true;
+          }
+        }
         setMessages((prev) => {
           const copy = prev.slice();
           const last = copy[copy.length - 1];
