@@ -136,8 +136,46 @@ export function PreviewPhone() {
                 miniAppEnabled={miniAppEnabled}
               />
             ) : (
-              <div className="flex-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <DynamicMiniApp />
+              <div className="relative flex flex-1 flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                {/* BackButton — Telegram renders it in the top-left header bar */}
+                {tma.backButton.visible && (
+                  <button
+                    onClick={tma.pressBackButton}
+                    className="absolute left-2 top-2 z-20 flex h-7 items-center gap-1 rounded-md bg-black/40 px-2 text-[10px] font-medium text-white backdrop-blur"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Back
+                  </button>
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <DynamicMiniApp />
+                </div>
+                {/* MainButton — Telegram renders it pinned to the bottom of the WebView */}
+                <AnimatePresence>
+                  {tma.mainButton.visible && (
+                    <motion.button
+                      key="tma-main-button"
+                      initial={{ y: 40, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 40, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      onClick={tma.mainButton.active ? tma.pressMainButton : undefined}
+                      disabled={!tma.mainButton.active}
+                      style={{
+                        background: tma.mainButton.color,
+                        color: tma.mainButton.textColor,
+                      }}
+                      className={cn(
+                        "absolute inset-x-3 bottom-3 z-20 flex h-10 items-center justify-center gap-2 rounded-xl text-[12px] font-semibold uppercase tracking-[0.08em] shadow-[0_8px_24px_-8px_oklch(0_0_0/60%)] transition",
+                        !tma.mainButton.active && "opacity-50",
+                      )}
+                    >
+                      {tma.mainButton.progress && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      )}
+                      {tma.mainButton.text}
+                    </motion.button>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </motion.div>
