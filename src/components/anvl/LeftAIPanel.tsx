@@ -72,12 +72,12 @@ export function LeftAIPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (override?: string) => {
+    const text = (override ?? input).trim();
     if (!text || isStreaming) return;
 
     setError(null);
-    setInput("");
+    if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
     const placeholder: Msg = { role: "assistant", content: "", pending: true, step: 0, thoughts: "" };
