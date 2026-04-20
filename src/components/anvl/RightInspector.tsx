@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle } from "lucide-react";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2 } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "settings";
+type Tab = "components" | "settings" | "code";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
@@ -29,9 +30,12 @@ export function RightInspector() {
         >
           {t("inspector.settings")}
         </TabBtn>
+        <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />}>
+          {t("inspector.code")}
+        </TabBtn>
       </div>
       <div className="flex-1 overflow-hidden">
-        {tab === "components" ? <ComponentsPane /> : <SettingsPane />}
+        {tab === "components" ? <ComponentsPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
       </div>
     </aside>
   );
@@ -142,6 +146,25 @@ function SettingsPane() {
       <SectionHeader title={t("settings.miniapp")} className="mt-6" />
       <Field label={t("settings.webview_url")} value="https://app.anvl.ai/u/welcome-bot" />
       <Field label={t("settings.init_mode")} value="Telegram.WebApp · Max SDK" />
+    </div>
+  );
+}
+
+function CodePane() {
+  const { t } = useI18n();
+  const { generatedCode } = useAnvlWorkspace();
+
+  return (
+    <div className="h-full overflow-y-auto p-3">
+      <div className="hairline rounded-lg bg-surface p-3">
+        {generatedCode.trim() ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground/90">
+            <code>{generatedCode}</code>
+          </pre>
+        ) : (
+          <p className="text-[12px] leading-relaxed text-muted-foreground">{t("code.empty")}</p>
+        )}
+      </div>
     </div>
   );
 }

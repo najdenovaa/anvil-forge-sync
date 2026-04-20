@@ -50,6 +50,8 @@ const ru: Dict = {
   // Right inspector
   "inspector.components": "Компоненты",
   "inspector.settings": "Настройки",
+  "inspector.code": "Код",
+  "code.empty": "После генерации здесь появится код бота под выбранную платформу.",
 
   // Component groups
   "group.Triggers": "Триггеры",
@@ -217,6 +219,8 @@ const en: Dict = {
 
   "inspector.components": "Components",
   "inspector.settings": "Settings",
+  "inspector.code": "Code",
+  "code.empty": "Generated bot code for the selected platform will appear here after a run.",
 
   "group.Triggers": "Triggers",
   "group.Messages": "Messages",
