@@ -16,6 +16,7 @@ import {
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
+import { useAnvlShell } from "./AnvlAppShellContext";
 import { cn } from "@/lib/utils";
 import { safeParseAnvlBlueprint } from "@/lib/anvl-blueprint";
 
@@ -49,12 +50,15 @@ export function LeftAIPanel() {
   const { t } = useI18n();
   const { applyBlueprint } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
+  const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendRef = useRef<(text?: string) => void>(() => {});
+  const bootedRef = useRef(false);
 
   useEffect(() => {
     setMessages((prev) =>
