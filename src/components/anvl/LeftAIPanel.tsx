@@ -251,7 +251,7 @@ export function LeftAIPanel() {
       }
       // Flush remaining buffered text
       if (pending.length > 0) {
-        if (phase === 1) thoughts += pending;
+        if ((phase as number) === 1) thoughts += pending;
         else answer += pending;
         pending = "";
       }
