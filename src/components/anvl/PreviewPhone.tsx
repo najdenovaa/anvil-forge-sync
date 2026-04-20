@@ -6,6 +6,7 @@ import { useMiniApp, type MiniAppTab } from "./MiniAppContext";
 import { DynamicMiniApp } from "./DynamicMiniApp";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useTelegramWebApp } from "./TelegramWebAppContext";
+import { useBotSimulator, type SimButton } from "./BotSimulatorContext";
 import type { PreviewAction, AnvlPreviewButton, AnvlPreviewScreen } from "@/lib/anvl-blueprint";
 import {
   Battery,
@@ -200,7 +201,7 @@ export function PreviewPhone() {
             </div>
 
             {view === "chat" ? (
-              <ChatView
+              <ChatViewSwitch
                 isTg={isTg}
                 onAction={handleAction}
                 opening={opening}
