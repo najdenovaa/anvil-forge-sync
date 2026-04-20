@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -18,6 +18,7 @@ import { ForgeNode } from "./ForgeNode";
 import { PreviewPhone } from "./PreviewPhone";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
+import { useBotSimulator } from "./BotSimulatorContext";
 import { NODE_CATALOG } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 
