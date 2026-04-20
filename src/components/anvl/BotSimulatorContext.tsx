@@ -380,6 +380,8 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       back,
       restart,
       jumpTo,
+      cameraFollow,
+      setCameraFollow,
     }),
     [
       available,
@@ -396,6 +398,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       back,
       restart,
       jumpTo,
+      cameraFollow,
     ],
   );
 
