@@ -72,17 +72,31 @@ ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
   miniapp.screen, logic.condition, action.api.
 ALLOWED preview.buttons actions: open_miniapp, plans, help, profile, locations.
 
-Mini App is ENABLED. You MUST tailor the entire "miniapp" object to the user's actual domain
-(food delivery, hotel booking, fitness, language tutor, e-commerce, support, music, VPN, etc.).
-NEVER ship VPN content unless the user asked for VPN. NEVER reuse VPN copy as a default.
-- Pick "accent" that matches the brand mood (food=orange, fitness=red, edu=violet, vpn=blue, travel=teal).
-- "itemsLabel" must reflect the catalog (Menu, Cart, Servers, Courses, Restaurants, Photos, Lessons, etc.).
-- "hero.title", "hero.cta", "hero.icon" must match the domain (e.g. food → "Order food", "Place order", icon "food").
-- "items": 4-6 realistic domain entries with meta (price for shop, distance for delivery, ping for vpn, level for edu).
-- "stats": 2-4 KPIs that make sense for the domain (orders, calories, speed, balance, points...).
-- "plans": 2-3 cards with prices that fit the domain (or omit if irrelevant — but include the field empty array []).
-- "tabs": 3-4 entries; first is "home", include "items" with the catalog id matching itemsLabel sense.
-- Include exactly ONE "miniapp.screen" node and a primary chat button with action "open_miniapp" labelled in the bot's language ("Открыть приложение"/"Open app" or domain-specific like "Открыть меню").
+Mini App is ENABLED. You MUST design a COMPLETE, production-grade mini-app
+that maps 1:1 to the user's domain (food delivery, hotel booking, fitness,
+language tutor, e-commerce, support, music, VPN, repair shop, etc.).
+HARD RULES:
+- NEVER reuse VPN/server/ping copy unless the user explicitly asked for VPN.
+- "accent" picks the brand mood: food=orange, fitness=red, edu=violet, vpn=blue,
+  travel=teal, beauty=pink, finance=green, repair=orange, dating=pink.
+- "itemsLabel" reflects the catalog ("Меню", "Корзина", "Услуги", "Курсы",
+  "Туры", "Записи", "Тренировки"...).
+- "hero.title" / "hero.cta" / "hero.icon" must match the domain
+  (food → "Закажите за 30 мин", "Оформить заказ", icon "food";
+   fitness → "Начать тренировку", "Старт", icon "fitness";
+   repair → "Заявка на ремонт", "Оставить заявку", icon "work").
+- "items": 4-6 REAL domain entries with believable subtitle + meta
+  (price ₽/$ for shop, distance for delivery, ping for vpn, level for edu,
+   duration for fitness, time slot for booking).
+- "stats": 2-4 KPIs that fit the domain (orders, calories burned, lessons left,
+  open tickets, balance, points). NOT "speed/ip/protected".
+- "plans": 2-3 pricing cards that fit the domain. If pricing is irrelevant
+  (e.g. internal support bot), still return [] (empty array) — never invent VPN tariffs.
+- "tabs": 3-4 entries; first is always "home", include one "items" tab whose
+  label matches itemsLabel.
+- Exactly ONE "miniapp.screen" node and a primary chat button with action
+  "open_miniapp" labelled in the bot's language and domain
+  ("Открыть меню", "Записаться", "Open shop"...).
 Keep 4-6 nodes max.`;
 
 const RULES_OFF = `
@@ -92,8 +106,26 @@ ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
   keyboard.inline, keyboard.reply,
   logic.condition, action.api.
 ALLOWED actions: plans, help, profile (NEVER open_miniapp, NEVER locations).
-Mini App is DISABLED. Do NOT include "miniapp.screen" nodes. Do NOT add "miniapp" to JSON. Do NOT suggest a Mini App.
-Keep 3-5 nodes max focused on chat-only flow.`;
+Mini App is DISABLED — the user did NOT check the Mini App option.
+HARD RULES:
+- Do NOT include any "miniapp.screen" node.
+- Do NOT add a "miniapp" field to JSON.
+- Do NOT mention Mini App, WebView or in-app screen anywhere.
+- Do NOT include buttons with action "open_miniapp" or "locations".
+- Build a pure chat-only flow: commands, text replies, inline keyboards,
+  data collection, API calls. The whole UX lives inside the chat.
+Keep 3-5 nodes max.`;
+
+const PLATFORM_TG = `\n\nTarget platform: **Telegram Bot API**.
+Use Telegram concepts: BotFather token, /commands, inline keyboards
+(callback_data), reply keyboards, sendMessage, parse_mode HTML/Markdown,
+webhooks or long polling. Buttons live under messages as InlineKeyboardMarkup.`;
+
+const PLATFORM_MAX = `\n\nTarget platform: **Max Messenger Bot API** (VK Max, ru).
+Use Max concepts: Max Developer Console token, /commands, inline buttons
+(payload), keyboard with rows, sendMessage via Max Bot API, long polling.
+Do NOT mention Telegram-only features (BotFather, parse_mode HTML).
+Keep flow names and copy in Russian by default for Max.`;
 
 const REAL_MODELS = {
   gpt: "openai/gpt-5",
@@ -116,7 +148,7 @@ function resolveModel(input?: string): string {
 function buildPrompt(miniAppEnabled: boolean, platform: string): string {
   const schema = miniAppEnabled ? MINIAPP_ON : "";
   const rules = miniAppEnabled ? RULES_ON : RULES_OFF;
-  const platformLine = `\n\nTarget platform: ${platform === "max" ? "Max Messenger" : "Telegram"}.`;
+  const platformLine = platform === "max" ? PLATFORM_MAX : PLATFORM_TG;
   return BASE_PROMPT.replace("<MINIAPP_SCHEMA>", schema) + rules + platformLine;
 }
 
