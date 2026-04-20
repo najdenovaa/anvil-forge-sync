@@ -1,6 +1,7 @@
 import type { NodeKind } from "./anvl-types";
 
-export type PreviewAction = "open_miniapp" | "plans" | "help" | "profile" | "locations";
+export type BuiltInPreviewAction = "open_miniapp" | "plans" | "help" | "profile" | "locations";
+export type PreviewAction = BuiltInPreviewAction | `screen:${string}`;
 export type MiniAppPlan = "free" | "pro" | "team";
 
 export interface AnvlBlueprintNode {
@@ -20,12 +21,21 @@ export interface AnvlPreviewButton {
   primary?: boolean;
 }
 
+export interface AnvlPreviewScreen {
+  id: string;
+  userMessage?: string;
+  botMessages: string[];
+  buttons: AnvlPreviewButton[];
+}
+
 export interface AnvlPreviewState {
   botName: string;
   botStatus: string;
   userMessage: string;
   botMessages: string[];
   buttons: AnvlPreviewButton[];
+  initialScreen?: string;
+  screens?: AnvlPreviewScreen[];
 }
 
 export type MiniAppAccent = "blue" | "green" | "orange" | "violet" | "pink" | "red" | "teal";
@@ -119,7 +129,7 @@ const NODE_KINDS: NodeKind[] = [
   "action.api",
 ];
 
-const ACTIONS: PreviewAction[] = ["open_miniapp", "plans", "help", "profile", "locations"];
+const ACTIONS: BuiltInPreviewAction[] = ["open_miniapp", "plans", "help", "profile", "locations"];
 const PLANS: MiniAppPlan[] = ["free", "pro", "team"];
 const ACCENTS: MiniAppAccent[] = ["blue", "green", "orange", "violet", "pink", "red", "teal"];
 
@@ -127,7 +137,7 @@ function isNodeKind(value: unknown): value is NodeKind {
   return typeof value === "string" && NODE_KINDS.includes(value as NodeKind);
 }
 function isAction(value: unknown): value is PreviewAction {
-  return typeof value === "string" && ACTIONS.includes(value as PreviewAction);
+  return typeof value === "string" && (ACTIONS.includes(value as BuiltInPreviewAction) || value.startsWith("screen:"));
 }
 function isStr(v: unknown): v is string {
   return typeof v === "string" && v.length > 0;
@@ -198,6 +208,38 @@ function parseTabs(v: unknown): MiniAppTabSpec[] | undefined {
   return out.length >= 2 ? out : undefined;
 }
 
+function parsePreviewButtons(v: unknown): AnvlPreviewButton[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(
+      (button): button is AnvlPreviewButton =>
+        !!button && typeof button.label === "string" && isAction(button.action),
+    )
+    .slice(0, 4);
+  return out.length ? out : undefined;
+}
+
+function parsePreviewScreens(v: unknown): AnvlPreviewScreen[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(
+      (screen): screen is AnvlPreviewScreen =>
+        !!screen &&
+        typeof screen === "object" &&
+        isStr((screen as AnvlPreviewScreen).id) &&
+        Array.isArray((screen as AnvlPreviewScreen).botMessages),
+    )
+    .map((screen) => ({
+      id: screen.id,
+      userMessage: isStr(screen.userMessage) ? screen.userMessage : undefined,
+      botMessages: screen.botMessages.filter((item): item is string => typeof item === "string").slice(0, 4),
+      buttons: parsePreviewButtons(screen.buttons) ?? [],
+    }))
+    .filter((screen) => screen.botMessages.length > 0)
+    .slice(0, 8);
+  return out.length ? out : undefined;
+}
+
 export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
   if (!raw.trim()) return null;
 
@@ -237,14 +279,9 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
         botMessages: Array.isArray(preview.botMessages)
           ? preview.botMessages.filter((item): item is string => typeof item === "string").slice(0, 3)
           : undefined,
-        buttons: Array.isArray(preview.buttons)
-          ? preview.buttons
-              .filter(
-                (button): button is AnvlPreviewButton =>
-                  !!button && typeof button.label === "string" && isAction(button.action),
-              )
-              .slice(0, 3)
-          : undefined,
+        buttons: parsePreviewButtons(preview.buttons),
+        initialScreen: isStr(preview.initialScreen) ? preview.initialScreen : undefined,
+        screens: parsePreviewScreens(preview.screens),
       };
     }
 

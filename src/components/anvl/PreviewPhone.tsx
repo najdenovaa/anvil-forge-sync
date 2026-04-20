@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
@@ -26,6 +26,12 @@ export function PreviewPhone() {
   const { preview } = useAnvlWorkspace();
   const isTg = platform === "telegram";
   const [opening, setOpening] = useState(false);
+  const [chatScreenId, setChatScreenId] = useState<string | null>(null);
+  const screens = preview.screens ?? [];
+  const activeScreen = useMemo(
+    () => (chatScreenId ? screens.find((screen) => screen.id === chatScreenId) : undefined),
+    [chatScreenId, screens],
+  );
 
   // If the user disables Mini App while it's shown — bounce back to chat.
   useEffect(() => {
@@ -34,6 +40,20 @@ export function PreviewPhone() {
       setOpening(false);
     }
   }, [miniAppEnabled, view, close]);
+
+  useEffect(() => {
+    if (screens.length === 0) {
+      setChatScreenId(null);
+      return;
+    }
+
+    const initialScreenId =
+      (preview.initialScreen && screens.some((screen) => screen.id === preview.initialScreen)
+        ? preview.initialScreen
+        : screens[0]?.id) ?? null;
+
+    setChatScreenId(initialScreenId);
+  }, [preview.initialScreen, preview.screens]);
 
   const handleOpen = (tab: MiniAppTab = "home") => {
     if (!miniAppEnabled) return;
@@ -45,8 +65,22 @@ export function PreviewPhone() {
   };
 
   const handleAction = (action: PreviewAction) => {
-    // Mini App is OFF — these actions don't exist in this build.
-    if (!miniAppEnabled && (action === "open_miniapp" || action === "locations")) return;
+    if (action.startsWith("screen:")) {
+      const targetId = action.slice(7);
+      if (screens.some((screen) => screen.id === targetId)) {
+        setChatScreenId(targetId);
+      }
+      return;
+    }
+
+    if (!miniAppEnabled) {
+      const fallbackScreen = screens.find((screen) => screen.id === action);
+      if (fallbackScreen) {
+        setChatScreenId(fallbackScreen.id);
+      }
+      return;
+    }
+
     if (action === "open_miniapp") return handleOpen("home");
     if (action === "plans") return handleOpen("plans");
     if (action === "locations") return handleOpen("locations");
@@ -87,6 +121,7 @@ export function PreviewPhone() {
                 isTg={isTg}
                 onAction={handleAction}
                 opening={opening}
+                activeScreen={activeScreen}
                 preview={preview}
                 miniAppEnabled={miniAppEnabled}
               />
@@ -121,22 +156,28 @@ function ChatView({
   isTg,
   onAction,
   opening,
+  activeScreen,
   preview,
   miniAppEnabled,
 }: {
   isTg: boolean;
   onAction: (action: PreviewAction) => void;
   opening: boolean;
+  activeScreen?: NonNullable<ReturnType<typeof useAnvlWorkspace>["preview"]["screens"]>[number];
   preview: ReturnType<typeof useAnvlWorkspace>["preview"];
   miniAppEnabled: boolean;
 }) {
   const { t } = useI18n();
-  const botMessages = preview.botMessages?.length
-    ? preview.botMessages
+  const botMessages = activeScreen?.botMessages?.length
+    ? activeScreen.botMessages
+    : preview.botMessages?.length
+      ? preview.botMessages
     : [t("preview.bot_msg_1"), t("preview.bot_msg_2")];
 
-  const rawButtons = preview.buttons?.length
-    ? preview.buttons
+  const rawButtons = activeScreen
+    ? activeScreen.buttons
+    : preview.buttons?.length
+      ? preview.buttons
     : [
         { label: t("preview.btn.open"), action: "open_miniapp" as const, primary: true },
         { label: t("preview.btn.pricing"), action: "plans" as const },
@@ -181,7 +222,7 @@ function ChatView({
             : "bg-[oklch(0.97_0_0)]",
         )}
       >
-        <UserBubble isTg={isTg}>{preview.userMessage ?? t("preview.user_msg")}</UserBubble>
+        <UserBubble isTg={isTg}>{activeScreen?.userMessage ?? preview.userMessage ?? t("preview.user_msg")}</UserBubble>
         {botMessages.map((message, index) => (
           <BotBubble key={`${message}-${index}`} isTg={isTg}>
             {index === botMessages.length - 1 ? (

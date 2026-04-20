@@ -18,7 +18,7 @@ import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { usePlatform } from "./PlatformContext";
 import { useAnvlShell } from "./AnvlAppShellContext";
 import { cn } from "@/lib/utils";
-import { safeParseAnvlBlueprint } from "@/lib/anvl-blueprint";
+import { safeParseAnvlBlueprint, type AnvlBlueprint, type AnvlBlueprintNode } from "@/lib/anvl-blueprint";
 
 type ModelId = "auto" | "gpt" | "gemini" | "grok" | "claude";
 
@@ -53,6 +53,48 @@ function extractTaggedBlock(source: string, tag: string) {
 
 function stripTaggedBlocks(source: string) {
   return source.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<blueprint>[\s\S]*?<\/blueprint>/gi, "").replace(/<code>[\s\S]*?<\/code>/gi, "");
+}
+
+function sanitizeBlueprintForMode(blueprint: AnvlBlueprint, miniAppEnabled: boolean): AnvlBlueprint {
+  if (miniAppEnabled) return blueprint;
+
+  const cleanButtons = <T extends { action: string }>(buttons?: T[]) =>
+    buttons?.filter((button) => button.action !== "open_miniapp" && button.action !== "locations");
+
+  const nextNodes = blueprint.nodes?.length
+    ? blueprint.nodes.reduce<AnvlBlueprintNode[]>((acc, node) => {
+        if (node.kind !== "miniapp.screen") acc.push(node);
+        return acc;
+      }, [])
+    : blueprint.nodes;
+
+  const indexMap = new Map<number, number>();
+  blueprint.nodes?.forEach((node, index) => {
+    if (node.kind !== "miniapp.screen") indexMap.set(index, indexMap.size);
+  });
+
+  const nextEdges = blueprint.edges?.flatMap((edge) => {
+    const from = indexMap.get(edge.from);
+    const to = indexMap.get(edge.to);
+    return from === undefined || to === undefined ? [] : [{ from, to }];
+  });
+
+  return {
+    ...blueprint,
+    nodes: nextNodes,
+    edges: nextEdges,
+    miniapp: undefined,
+    preview: blueprint.preview
+      ? {
+          ...blueprint.preview,
+          buttons: cleanButtons(blueprint.preview.buttons),
+          screens: blueprint.preview.screens?.map((screen) => ({
+            ...screen,
+            buttons: cleanButtons(screen.buttons) ?? [],
+          })),
+        }
+      : blueprint.preview,
+  };
 }
 
 export function LeftAIPanel() {
@@ -151,7 +193,7 @@ export function LeftAIPanel() {
         if (!blueprintApplied && blueprintRaw.includes("\"nodes\"") && blueprintRaw.includes("\"preview\"")) {
           const liveBlueprint = safeParseAnvlBlueprint(blueprintRaw.trim());
           if (liveBlueprint) {
-            applyBlueprint(liveBlueprint);
+            applyBlueprint(sanitizeBlueprintForMode(liveBlueprint, miniAppEnabled));
             blueprintApplied = true;
           }
         }
@@ -309,7 +351,7 @@ export function LeftAIPanel() {
       const extractedCode = extractTaggedBlock(raw, "code").trim();
       const finalAnswer = stripTaggedBlocks(raw).trim() || (answer || raw).trim();
       const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
-      if (blueprint) applyBlueprint(blueprint);
+      if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
       setGeneratedCode(extractedCode);
 
       setMessages((prev) => {

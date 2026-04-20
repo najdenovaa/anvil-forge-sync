@@ -26,6 +26,18 @@ OUTPUT FORMAT — STRICTLY 4 BLOCKS, IN THIS ORDER. Every block is REQUIRED.
     "buttons": [
       { "label": "...", "action": "MAIN_ACTION", "primary": true },
       { "label": "...", "action": "help" }
+    ],
+    "initialScreen": "main",
+    "screens": [
+      {
+        "id": "main",
+        "userMessage": "...",
+        "botMessages": ["..."],
+        "buttons": [
+          { "label": "...", "action": "screen:booking", "primary": true },
+          { "label": "...", "action": "screen:pricing" }
+        ]
+      }
     ]
   }<MINIAPP_SCHEMA>
 }
@@ -110,7 +122,7 @@ ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
   message.text, message.photo, message.document,
   keyboard.inline, keyboard.reply,
   logic.condition, action.api.
-ALLOWED actions: plans, help, profile (NEVER open_miniapp, NEVER locations).
+ALLOWED actions: plans, help, profile, screen:<id> (NEVER open_miniapp, NEVER locations).
 Mini App is DISABLED — the user did NOT check the Mini App option.
 HARD RULES:
 - Do NOT include any "miniapp.screen" node.
@@ -119,6 +131,11 @@ HARD RULES:
 - Do NOT include buttons with action "open_miniapp" or "locations".
 - Build a pure chat-only flow: commands, text replies, inline keyboards,
   data collection, API calls. The whole UX lives inside the chat.
+- If the user asks for steps like "press button → next level / next screen / next menu",
+  you MUST express this in preview.screens with 2-5 linked chat screens and
+  buttons using action "screen:<id>".
+- preview.botMessages/buttons represent the first visible state, while
+  preview.screens defines the full clickable chat simulation.
 Keep 3-5 nodes max.`;
 
 const PLATFORM_TG = `\n\nTarget platform: **Telegram Bot API**.
@@ -196,6 +213,7 @@ Deno.serve(async (req: Request) => {
           ...messages.slice(-12),
         ],
         stream: true,
+        max_tokens: 4096,
       }),
     });
 
