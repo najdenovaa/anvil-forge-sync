@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function PreviewPhone() {
-  const { platform } = usePlatform();
+  const { platform, miniAppEnabled } = usePlatform();
   const { t } = useI18n();
   const { view, open, close } = useMiniApp();
   const { preview } = useAnvlWorkspace();
@@ -72,7 +72,13 @@ export function PreviewPhone() {
             </div>
 
             {view === "chat" ? (
-              <ChatView isTg={isTg} onAction={handleAction} opening={opening} preview={preview} />
+              <ChatView
+                isTg={isTg}
+                onAction={handleAction}
+                opening={opening}
+                preview={preview}
+                miniAppEnabled={miniAppEnabled}
+              />
             ) : (
               <div className="flex-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <VpnMiniApp />
@@ -105,23 +111,30 @@ function ChatView({
   onAction,
   opening,
   preview,
+  miniAppEnabled,
 }: {
   isTg: boolean;
   onAction: (action: PreviewAction) => void;
   opening: boolean;
   preview: ReturnType<typeof useAnvlWorkspace>["preview"];
+  miniAppEnabled: boolean;
 }) {
   const { t } = useI18n();
   const botMessages = preview.botMessages?.length
     ? preview.botMessages
     : [t("preview.bot_msg_1"), t("preview.bot_msg_2")];
-  const buttons = preview.buttons?.length
+
+  const rawButtons = preview.buttons?.length
     ? preview.buttons
     : [
         { label: t("preview.btn.open"), action: "open_miniapp" as const, primary: true },
         { label: t("preview.btn.pricing"), action: "plans" as const },
         { label: t("preview.btn.help"), action: "profile" as const },
       ];
+  // Strip Mini App buttons when feature is disabled
+  const buttons = miniAppEnabled
+    ? rawButtons
+    : rawButtons.filter((b) => b.action !== "open_miniapp" && b.action !== "locations");
 
   return (
     <>

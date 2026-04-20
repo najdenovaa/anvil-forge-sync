@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import { usePlatform } from "./PlatformContext";
 import { cn } from "@/lib/utils";
 import { safeParseAnvlBlueprint } from "@/lib/anvl-blueprint";
 
@@ -47,6 +48,7 @@ interface Msg {
 export function LeftAIPanel() {
   const { t } = useI18n();
   const { applyBlueprint } = useAnvlWorkspace();
+  const { platform, miniAppEnabled } = usePlatform();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
@@ -101,7 +103,7 @@ export function LeftAIPanel() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: wireMessages, model }),
+        body: JSON.stringify({ messages: wireMessages, model, miniApp: miniAppEnabled, platform }),
       });
 
       if (resp.status === 429) {
