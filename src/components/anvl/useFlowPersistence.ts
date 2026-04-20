@@ -108,15 +108,23 @@ export function useFlowPersistence({
     },
   });
 
+  // Track the last serialized payload we saved, so we don't re-save identical state.
+  const lastSavedHashRef = useRef<string | null>(null);
+
   // Debounced autosave whenever inputs change (after hydration)
   useEffect(() => {
     if (!enabled) return;
-    if (hydratedSlugRef.current !== slug && snapshot !== null) return;
+    // Wait until initial hydration completes (or we know there's no row to hydrate)
+    if (hydratedSlugRef.current !== slug && snapshot !== undefined && snapshot !== null) return;
+
+    const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode });
+    if (hash === lastSavedHashRef.current) return;
 
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
     }
     debounceRef.current = window.setTimeout(() => {
+      lastSavedHashRef.current = hash;
       saveMutation.mutate({
         slug,
         nodes,
@@ -133,7 +141,7 @@ export function useFlowPersistence({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, slug, nodes, edges, preview, miniapp, generatedCode, snapshot]);
+  }, [enabled, slug, nodes, edges, preview, miniapp, generatedCode]);
 
   return {
     status,
