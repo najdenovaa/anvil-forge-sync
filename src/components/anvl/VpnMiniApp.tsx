@@ -20,6 +20,7 @@ import {
 import { useI18n } from "./I18nContext";
 import { useMiniApp } from "./MiniAppContext";
 import { usePlatform } from "./PlatformContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { cn } from "@/lib/utils";
 
 type Tab = "home" | "locations" | "plans" | "profile";
@@ -46,13 +47,27 @@ const SERVERS: Server[] = [
 
 export function VpnMiniApp() {
   const { t } = useI18n();
-  const { close } = useMiniApp();
+  const { view, targetTab, close } = useMiniApp();
   const { platform } = usePlatform();
+  const { miniApp } = useAnvlWorkspace();
   const isTg = platform === "telegram";
-  const [tab, setTab] = useState<Tab>("home");
+  const [tab, setTab] = useState<Tab>(targetTab);
   const [status, setStatus] = useState<Status>("off");
   const [server, setServer] = useState<Server>(SERVERS[0]);
-  const [plan, setPlan] = useState<"free" | "pro" | "team">("free");
+  const [plan, setPlan] = useState<"free" | "pro" | "team">(miniApp.plan ?? "free");
+
+  // Sync tab when user opens mini app to a specific section from chat
+  useEffect(() => {
+    if (view === "miniapp") setTab(targetTab);
+  }, [view, targetTab]);
+
+  // Sync plan when AI updates it
+  useEffect(() => {
+    if (miniApp.plan) setPlan(miniApp.plan);
+  }, [miniApp.plan]);
+
+  const brandTitle = miniApp.title?.trim() || t("vpn.title");
+  const brandSubtitle = miniApp.subtitle?.trim() || t("vpn.subtitle");
 
   // Simulate connect lifecycle
   useEffect(() => {
