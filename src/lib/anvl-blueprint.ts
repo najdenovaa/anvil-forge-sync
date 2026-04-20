@@ -1,6 +1,7 @@
 import type { NodeKind } from "./anvl-types";
 
-export type PreviewAction = "open_miniapp" | "plans" | "help" | "profile" | "locations";
+export type BuiltInPreviewAction = "open_miniapp" | "plans" | "help" | "profile" | "locations";
+export type PreviewAction = BuiltInPreviewAction | `screen:${string}`;
 export type MiniAppPlan = "free" | "pro" | "team";
 
 export interface AnvlBlueprintNode {
@@ -20,12 +21,21 @@ export interface AnvlPreviewButton {
   primary?: boolean;
 }
 
+export interface AnvlPreviewScreen {
+  id: string;
+  userMessage?: string;
+  botMessages: string[];
+  buttons: AnvlPreviewButton[];
+}
+
 export interface AnvlPreviewState {
   botName: string;
   botStatus: string;
   userMessage: string;
   botMessages: string[];
   buttons: AnvlPreviewButton[];
+  initialScreen?: string;
+  screens?: AnvlPreviewScreen[];
 }
 
 export type MiniAppAccent = "blue" | "green" | "orange" | "violet" | "pink" | "red" | "teal";
