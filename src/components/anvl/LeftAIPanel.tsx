@@ -109,6 +109,8 @@ export function LeftAIPanel() {
     mergePreview,
     mergeMiniApp,
     resetAiCanvas,
+    nodes,
+    edges,
   } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
