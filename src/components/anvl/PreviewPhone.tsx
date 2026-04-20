@@ -5,6 +5,7 @@ import { useI18n } from "./I18nContext";
 import { useMiniApp, type MiniAppTab } from "./MiniAppContext";
 import { DynamicMiniApp } from "./DynamicMiniApp";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
+import { useTelegramWebApp } from "./TelegramWebAppContext";
 import type { PreviewAction } from "@/lib/anvl-blueprint";
 import {
   Battery,
