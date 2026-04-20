@@ -32,6 +32,7 @@ export function PreviewPhone() {
   const isTg = platform === "telegram";
   const [opening, setOpening] = useState(false);
   const [chatScreenId, setChatScreenId] = useState<string | null>(null);
+  const [ephemeralReply, setEphemeralReply] = useState<string | null>(null);
   const screens = preview.screens ?? [];
   const activeScreen = useMemo(
     () => (chatScreenId ? screens.find((screen) => screen.id === chatScreenId) : undefined),
@@ -75,6 +76,9 @@ export function PreviewPhone() {
   };
 
   const handleAction = (action: PreviewAction) => {
+    setEphemeralReply(null);
+
+    // 1) Explicit screen switch: action="screen:welcome"
     if (action.startsWith("screen:")) {
       const targetId = action.slice(7);
       if (screens.some((screen) => screen.id === targetId)) {
@@ -83,18 +87,30 @@ export function PreviewPhone() {
       return;
     }
 
-    if (!miniAppEnabled) {
-      const fallbackScreen = screens.find((screen) => screen.id === action);
-      if (fallbackScreen) {
-        setChatScreenId(fallbackScreen.id);
-      }
+    // 2) Bare action that matches a screen id (chat-only flows often use this)
+    const matchingScreen = screens.find((screen) => screen.id === action);
+    if (matchingScreen) {
+      setChatScreenId(matchingScreen.id);
       return;
     }
 
-    if (action === "open_miniapp") return handleOpen("home");
-    if (action === "plans") return handleOpen("plans");
-    if (action === "locations") return handleOpen("locations");
-    return handleOpen("profile");
+    // 3) Mini App routing — only when enabled
+    if (miniAppEnabled) {
+      if (action === "open_miniapp") return handleOpen("home");
+      if (action === "plans") return handleOpen("plans");
+      if (action === "locations") return handleOpen("locations");
+      return handleOpen("profile");
+    }
+
+    // 4) Chat-only fallback — show a transient bot reply so clicks feel alive.
+    const labelMap: Record<string, string> = {
+      plans: "Тарифы: Базовый — бесплатно, Pro — 299₽/мес.",
+      help: "Чем помочь? Напишите ваш вопрос.",
+      profile: "Ваш профиль: гость. Авторизуйтесь, чтобы продолжить.",
+      open_miniapp: "Mini App отключён в этом флоу.",
+      locations: "Список локаций пока не настроен.",
+    };
+    setEphemeralReply(labelMap[action] ?? `→ ${action}`);
   };
 
   return (
