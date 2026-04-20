@@ -12,6 +12,8 @@ const ru: Dict = {
   "topbar.deploy": "Опубликовать",
   "platform.telegram": "Telegram",
   "platform.max": "Max",
+  "platform.miniapp": "Mini App",
+  "platform.miniapp.hint": "Если включено — Anvl построит и Mini App",
   "lang.ru": "RU",
   "lang.en": "EN",
 
@@ -179,6 +181,8 @@ const en: Dict = {
   "topbar.deploy": "Deploy",
   "platform.telegram": "Telegram",
   "platform.max": "Max",
+  "platform.miniapp": "Mini App",
+  "platform.miniapp.hint": "When on — Anvl also builds a Mini App",
   "lang.ru": "RU",
   "lang.en": "EN",
 
