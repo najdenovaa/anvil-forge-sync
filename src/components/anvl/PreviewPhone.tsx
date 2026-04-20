@@ -305,6 +305,423 @@ function buildOpeningTurns(
   return turns;
 }
 
+type ChatViewProps = {
+  isTg: boolean;
+  onAction: (btn: AnvlPreviewButton) => void;
+  opening: boolean;
+  preview: ReturnType<typeof useAnvlWorkspace>["preview"];
+  turns: Turn[];
+  typing: boolean;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onRestart: () => void;
+};
+
+/**
+ * Picks the right chat view: live canvas-driven simulator when the canvas
+ * defines a navigable flow (triggers + buttons), otherwise the legacy
+ * preview.screens turn-renderer.
+ */
+function ChatViewSwitch(props: ChatViewProps) {
+  const sim = useBotSimulator();
+  if (sim.available) {
+    return <SimulatorChatView isTg={props.isTg} onRestart={props.onRestart} />;
+  }
+  return <ChatView {...props} />;
+}
+
+function SimulatorChatView({ isTg, onRestart }: { isTg: boolean; onRestart: () => void }) {
+  const { t } = useI18n();
+  const { preview } = useAnvlWorkspace();
+  const sim = useBotSimulator();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [typing, setTyping] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // History of rendered turns. Rebuild from sim.history + active node each change.
+  type SimTurn =
+    | { kind: "user"; text: string }
+    | { kind: "bot"; text: string; imageUrl?: string; buttons: SimButton[]; isLast: boolean };
+  const [userInputs, setUserInputs] = useState<Record<string, string>>({});
+
+  const turns = useMemo<SimTurn[]>(() => {
+    const out: SimTurn[] = [];
+    // Replay each historical hop as user-bubble + bot-bubble
+    sim.history.forEach((nid) => {
+      const echo = userInputs[nid];
+      if (echo) out.push({ kind: "user", text: echo });
+    });
+    if (sim.message) {
+      out.push({
+        kind: "bot",
+        text: sim.message.text,
+        imageUrl: sim.message.imageUrl,
+        buttons: sim.message.buttons,
+        isLast: true,
+      });
+    }
+    return out;
+  }, [sim.history, sim.message, userInputs]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [turns, typing]);
+
+  // Detect condition node: if active effective kind is logic.condition, show toggle.
+  const isCondition = useMemo(() => {
+    if (!sim.activeNodeId) return false;
+    return /condition/i.test(sim.message?.text ?? "");
+  }, [sim.activeNodeId, sim.message]);
+
+  const handlePress = (btn: SimButton) => {
+    setUserInputs((prev) => ({ ...prev, [sim.activeNodeId!]: btn.label }));
+    setTyping(true);
+    window.setTimeout(() => {
+      setTyping(false);
+      sim.press(btn);
+    }, 380);
+  };
+
+  const handleSubmit = () => {
+    if (!inputValue.trim()) return;
+    const text = inputValue.trim();
+    setUserInputs((prev) => ({ ...prev, [sim.activeNodeId!]: text }));
+    setInputValue("");
+    setTyping(true);
+    window.setTimeout(() => {
+      setTyping(false);
+      sim.submitInput(text);
+    }, 380);
+  };
+
+  const handleBranch = (b: "yes" | "no") => {
+    setUserInputs((prev) => ({
+      ...prev,
+      [sim.activeNodeId!]: b === "yes" ? "✓ Simulate Success" : "✕ Simulate Fail",
+    }));
+    setTyping(true);
+    window.setTimeout(() => {
+      setTyping(false);
+      sim.setBranch(b);
+    }, 380);
+  };
+
+  const handleRestart = () => {
+    setUserInputs({});
+    sim.restart();
+    onRestart();
+  };
+
+  const handleBack = () => {
+    sim.back();
+  };
+
+  const liveButtons = turns.length > 0 && turns[turns.length - 1].kind === "bot"
+    ? (turns[turns.length - 1] as Extract<SimTurn, { kind: "bot" }>).buttons
+    : [];
+
+  return (
+    <>
+      <div
+        className={cn(
+          "flex items-center gap-2 border-b px-3 py-2",
+          isTg ? "border-white/5 bg-[oklch(0.27_0.04_260)]" : "border-black/5 bg-white",
+        )}
+      >
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={sim.history.length === 0}
+          className={cn(
+            "flex h-6 w-6 items-center justify-center rounded-full transition disabled:opacity-30",
+            isTg ? "text-white/70 hover:bg-white/10" : "text-black/60 hover:bg-black/5",
+          )}
+          aria-label="back"
+          title="Назад"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+        </button>
+        <div
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold",
+            isTg ? "bg-tg text-white" : "bg-max text-white",
+          )}
+        >
+          {isTg ? "TG" : "M"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-semibold">
+            {preview.botName ?? t("preview.bot_name")}
+          </div>
+          <div className={cn("truncate text-[10px]", isTg ? "text-white/50" : "text-black/50")}>
+            {typing ? "печатает…" : "online · live flow"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleRestart}
+          className={cn(
+            "flex h-6 w-6 items-center justify-center rounded-full transition",
+            isTg ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-black/50 hover:bg-black/5 hover:text-black",
+          )}
+          aria-label="restart"
+          title="Перезапустить"
+        >
+          <RotateCcw className="h-3 w-3" />
+        </button>
+        <MoreVertical className="h-4 w-4 opacity-70" />
+      </div>
+
+      <div
+        ref={scrollRef}
+        className={cn(
+          "relative flex-1 space-y-2 overflow-y-auto px-3 py-3",
+          isTg
+            ? "bg-[radial-gradient(circle_at_30%_20%,oklch(0.3_0.05_260)_0%,oklch(0.18_0.03_260)_70%)]"
+            : "bg-[oklch(0.97_0_0)]",
+        )}
+      >
+        {turns.map((turn, idx) => {
+          if (turn.kind === "user") {
+            return (
+              <UserBubble key={`u-${idx}`} isTg={isTg}>
+                {turn.text}
+              </UserBubble>
+            );
+          }
+          return (
+            <motion.div
+              key={`b-${idx}`}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <BotBubble isTg={isTg}>
+                <div className="space-y-1.5">
+                  {turn.imageUrl && (
+                    <img
+                      src={turn.imageUrl}
+                      alt=""
+                      className="max-h-32 w-full rounded-lg object-cover"
+                      onError={(e) => ((e.currentTarget.style.display = "none"))}
+                    />
+                  )}
+                  <span className="whitespace-pre-wrap">{turn.text}</span>
+                  {turn.isLast && isCondition && (
+                    <ConditionToggle isTg={isTg} onChoose={handleBranch} />
+                  )}
+                  {turn.isLast && turn.buttons.length > 0 && (
+                    <SimInlineKb isTg={isTg} items={turn.buttons} onAction={handlePress} />
+                  )}
+                </div>
+              </BotBubble>
+            </motion.div>
+          );
+        })}
+
+        {typing && (
+          <BotBubble isTg={isTg}>
+            <span className="inline-flex items-center gap-1">
+              <Dot delay={0} isTg={isTg} />
+              <Dot delay={0.15} isTg={isTg} />
+              <Dot delay={0.3} isTg={isTg} />
+            </span>
+          </BotBubble>
+        )}
+
+        <AnimatePresence>
+          {menuOpen && liveButtons.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(
+                "absolute bottom-2 left-2 right-2 z-10 overflow-hidden rounded-2xl border shadow-2xl backdrop-blur",
+                isTg ? "border-white/10 bg-[oklch(0.24_0.03_260)/0.96]" : "border-black/10 bg-white/95",
+              )}
+            >
+              <div
+                className={cn(
+                  "px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider",
+                  isTg ? "text-white/40" : "text-black/40",
+                )}
+              >
+                {isTg ? "Bot Menu" : "Меню"}
+              </div>
+              <div className={cn("divide-y", isTg ? "divide-white/5" : "divide-black/5")}>
+                {liveButtons.map((it) => (
+                  <button
+                    key={`menu-${it.id}-${it.label}`}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handlePress(it);
+                    }}
+                    className={cn(
+                      "block w-full px-3 py-2 text-left text-[11px] font-medium transition",
+                      isTg ? "text-white hover:bg-white/5" : "text-black hover:bg-black/5",
+                    )}
+                  >
+                    <span className={cn("mr-1.5 text-[10px]", isTg ? "text-tg" : "text-max")}>/</span>
+                    {it.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div
+        className={cn(
+          "flex items-center gap-2 border-t px-2 py-2",
+          isTg ? "border-white/5 bg-[oklch(0.24_0.03_260)]" : "border-black/5 bg-white",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition",
+            menuOpen
+              ? isTg ? "bg-tg text-white" : "bg-max text-white"
+              : isTg ? "bg-white/5 text-white/70 hover:bg-white/10" : "bg-black/5 text-black/60 hover:bg-black/10",
+          )}
+          aria-label="menu"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={menuOpen ? "x" : "menu"}
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex"
+            >
+              {menuOpen ? <X className="h-3.5 w-3.5" /> : <Menu className="h-3.5 w-3.5" />}
+            </motion.span>
+          </AnimatePresence>
+        </button>
+        <div
+          className={cn(
+            "flex flex-1 items-center gap-1.5 rounded-full px-2.5 py-1.5",
+            isTg ? "bg-white/5" : "bg-black/5",
+          )}
+        >
+          <Smile className={cn("h-3.5 w-3.5 shrink-0", isTg ? "text-white/40" : "text-black/35")} />
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder={sim.awaitingInput ? "Введите ответ…" : t("preview.composer")}
+            className={cn(
+              "flex-1 bg-transparent text-[11px] outline-none",
+              isTg ? "text-white placeholder:text-white/40" : "text-black placeholder:text-black/40",
+            )}
+          />
+          <Paperclip className={cn("h-3.5 w-3.5 shrink-0", isTg ? "text-white/40" : "text-black/35")} />
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!inputValue.trim()}
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition disabled:opacity-40",
+            isTg ? "bg-tg text-white" : "bg-max text-white",
+          )}
+          aria-label="send"
+        >
+          {inputValue.trim() ? <Send className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function SimInlineKb({
+  isTg,
+  items,
+  onAction,
+}: {
+  isTg: boolean;
+  items: SimButton[];
+  onAction: (btn: SimButton) => void;
+}) {
+  return (
+    <div className="mt-1.5 grid grid-cols-1 gap-1">
+      {items.map((it) => (
+        <button
+          key={it.id}
+          type="button"
+          onClick={() => onAction(it)}
+          className={cn(
+            "rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition active:scale-[0.97]",
+            it.primary
+              ? isTg
+                ? "bg-tg text-white hover:opacity-90"
+                : "bg-max text-white hover:opacity-90"
+              : isTg
+                ? "bg-white/5 text-tg hover:bg-white/10"
+                : "bg-[oklch(0.97_0_0)] text-max hover:bg-[oklch(0.94_0_0)]",
+          )}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ConditionToggle({
+  isTg,
+  onChoose,
+}: {
+  isTg: boolean;
+  onChoose: (b: "yes" | "no") => void;
+}) {
+  return (
+    <div className="mt-1.5 space-y-1">
+      <div
+        className={cn(
+          "text-[9px] font-semibold uppercase tracking-wider",
+          isTg ? "text-white/40" : "text-black/40",
+        )}
+      >
+        Simulate condition
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <button
+          type="button"
+          onClick={() => onChoose("yes")}
+          className={cn(
+            "rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition active:scale-[0.97]",
+            "bg-[oklch(0.65_0.18_145)] text-white hover:opacity-90",
+          )}
+        >
+          ✓ Success
+        </button>
+        <button
+          type="button"
+          onClick={() => onChoose("no")}
+          className={cn(
+            "rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition active:scale-[0.97]",
+            "bg-[oklch(0.65_0.18_30)] text-white hover:opacity-90",
+          )}
+        >
+          ✕ Fail
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ChatView({
   isTg,
   onAction,
