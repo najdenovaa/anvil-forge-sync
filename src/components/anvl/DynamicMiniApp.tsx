@@ -121,6 +121,40 @@ export function DynamicMiniApp() {
   const accent = miniApp.accent ?? "blue";
   const accentColor = ACCENT_HEX[accent];
 
+  // Real Telegram WebApp SDK wiring — works because TelegramWebAppProvider
+  // installs window.Telegram.WebApp app-wide. This is the same code that would
+  // run inside Telegram, no special-casing for the preview.
+  useEffect(() => {
+    const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+    if (!tg) return;
+    tg.ready();
+    tg.expand();
+    tg.BackButton.show();
+    const onBack = () => close();
+    tg.BackButton.onClick(onBack);
+
+    tg.MainButton.setParams({
+      text: (miniApp.hero?.cta ?? t("vpn.connect")).toUpperCase(),
+      color: accentColor.startsWith("#") ? accentColor : "#3390EC",
+      text_color: "#FFFFFF",
+      is_visible: true,
+      is_active: true,
+    });
+    const onMain = () => {
+      tg.HapticFeedback.notificationOccurred("success");
+      tg.CloudStorage.setItem("anvl.last_cta_at", new Date().toISOString());
+      tg.showAlert(`${miniApp.hero?.cta ?? t("vpn.connect")} ✓`);
+    };
+    tg.MainButton.onClick(onMain);
+
+    return () => {
+      tg.MainButton.offClick(onMain);
+      tg.BackButton.offClick(onBack);
+      tg.MainButton.hide();
+      tg.BackButton.hide();
+    };
+  }, [miniApp.hero?.cta, accentColor, close, t]);
+
   const tabs: MiniAppTabSpec[] = miniApp.tabs?.length
     ? miniApp.tabs
     : [
