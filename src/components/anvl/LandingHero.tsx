@@ -104,11 +104,8 @@ export function LandingHero() {
 
       {/* Hero */}
       <main className="relative z-10 mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center px-6 pb-16">
-        <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface/70 px-3 py-1 text-[11px] font-medium text-muted-foreground backdrop-blur">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-ok opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-status-ok" />
-          </span>
+        <div className="mb-6 inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-foreground">
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
           {lang === "ru" ? "Anvl · визуальная IDE для ботов" : "Anvl · visual IDE for bots"}
         </div>
 
