@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 export type Lang = "ru" | "en";
 
@@ -21,14 +21,20 @@ const ru: Dict = {
   "ai.new": "Новый чат",
   "ai.placeholder": "Опишите вашего бота…",
   "ai.send_hint": "⌘↵ — отправить",
-  "ai.model": "gpt-5 · архитектор",
+  "ai.model": "архитектор",
   "ai.msg.intro":
     "Я ваш ИИ Архитектор. Опишите бота, который вы хотите, и я выложу флоу на канвас.",
-  "ai.msg.user_example":
-    "Добавь команду /pricing, которая отправляет инлайн-клавиатуру с тремя тарифами.",
-  "ai.msg.assistant_example":
-    "Готово — добавил триггер «Команда», текстовое сообщение и инлайн-клавиатуру с Basic / Pro / Team. Соединил их на канвасе.",
   "ai.label": "Архитектор",
+  "ai.thinking": "Думаю…",
+  "ai.error": "Не удалось получить ответ. Попробуйте ещё раз.",
+  "ai.rate_limit": "Слишком много запросов. Подождите немного.",
+  "ai.payment": "Закончились кредиты Lovable AI. Пополните баланс в Settings → Workspace → Usage.",
+  "ai.unavailable": "Эта модель пока недоступна в Lovable AI Gateway. Используйте GPT-5 или Gemini.",
+  "ai.model.gpt": "GPT-5",
+  "ai.model.gemini": "Gemini 2.5",
+  "ai.model.grok": "Grok",
+  "ai.model.claude": "Claude",
+  "ai.model.soon": "скоро",
 
   // Right inspector
   "inspector.components": "Компоненты",
@@ -89,22 +95,72 @@ const ru: Dict = {
   "canvas.start.title": "/start",
   "canvas.start.preview": "Когда пользователь отправляет /start",
   "canvas.welcome.title": "Приветствие",
-  "canvas.welcome.preview": "Привет, {{user.first_name}} — добро пожаловать в Anvl.",
+  "canvas.welcome.preview": "Привет! Готовы запустить VPN?",
   "canvas.menu.title": "Главное меню",
-  "canvas.menu.preview": "Открыть приложение · Тарифы · Помощь",
-  "canvas.dashboard.title": "Дашборд",
-  "canvas.dashboard.preview": "WebView · /app/home",
+  "canvas.menu.preview": "Открыть VPN · Тарифы · Помощь",
+  "canvas.dashboard.title": "VPN Mini App",
+  "canvas.dashboard.preview": "WebView · /app/vpn",
 
-  // Preview phone
-  "preview.bot_name": "Welcome Bot",
+  // Preview phone — VPN bot
+  "preview.bot_name": "Anvl VPN",
   "preview.bot_status": "бот · в сети",
   "preview.composer": "Сообщение",
   "preview.user_msg": "/start",
-  "preview.bot_msg_1": "Привет, Саша — добро пожаловать в Anvl. Помогу запустить ботов и mini-app за минуты.",
-  "preview.bot_msg_2": "Выберите вариант:",
-  "preview.btn.open": "Открыть приложение",
+  "preview.bot_msg_1":
+    "Привет, Саша 👋 Anvl VPN — быстрый и безопасный доступ к интернету. 12 стран, без логов.",
+  "preview.bot_msg_2": "Готовы подключиться?",
+  "preview.btn.open": "🚀 Открыть VPN",
   "preview.btn.pricing": "Тарифы",
   "preview.btn.help": "Помощь",
+  "preview.opening": "Открываю Mini App…",
+
+  // Mini App — VPN
+  "vpn.title": "Anvl VPN",
+  "vpn.subtitle": "Быстрый. Без логов.",
+  "vpn.tab.home": "Главная",
+  "vpn.tab.locations": "Серверы",
+  "vpn.tab.plans": "Тарифы",
+  "vpn.tab.profile": "Профиль",
+  "vpn.status.disconnected": "Отключено",
+  "vpn.status.connecting": "Подключение…",
+  "vpn.status.connected": "Защищено",
+  "vpn.connect": "Подключить",
+  "vpn.disconnect": "Отключить",
+  "vpn.connecting": "Подключение…",
+  "vpn.current_server": "Текущий сервер",
+  "vpn.your_ip": "Ваш IP",
+  "vpn.protected_ip": "Защищённый IP",
+  "vpn.speed_down": "Загрузка",
+  "vpn.speed_up": "Отдача",
+  "vpn.choose_location": "Выбрать локацию",
+  "vpn.ping": "пинг",
+  "vpn.load": "загрузка",
+  "vpn.free": "Free",
+  "vpn.pro": "Pro",
+  "vpn.team": "Team",
+  "vpn.plan.free.desc": "3 локации · 1 устройство",
+  "vpn.plan.pro.desc": "Все локации · 5 устройств · без рекламы",
+  "vpn.plan.team.desc": "До 10 устройств · приоритет",
+  "vpn.plan.current": "Текущий",
+  "vpn.plan.upgrade": "Перейти",
+  "vpn.month": "/мес",
+  "vpn.profile.devices": "Устройства",
+  "vpn.profile.referral": "Пригласи друга",
+  "vpn.profile.support": "Поддержка",
+  "vpn.profile.signout": "Выйти",
+  "vpn.back_to_chat": "← Назад к чату",
+  "vpn.country.nl": "Нидерланды",
+  "vpn.country.de": "Германия",
+  "vpn.country.us": "США",
+  "vpn.country.jp": "Япония",
+  "vpn.country.sg": "Сингапур",
+  "vpn.country.ae": "ОАЭ",
+  "vpn.city.ams": "Амстердам",
+  "vpn.city.fra": "Франкфурт",
+  "vpn.city.nyc": "Нью-Йорк",
+  "vpn.city.tok": "Токио",
+  "vpn.city.sgp": "Сингапур",
+  "vpn.city.dxb": "Дубай",
 };
 
 const en: Dict = {
@@ -122,14 +178,20 @@ const en: Dict = {
   "ai.new": "New chat",
   "ai.placeholder": "Describe your bot…",
   "ai.send_hint": "⌘↵ to send",
-  "ai.model": "gpt-5 · architect",
+  "ai.model": "architect",
   "ai.msg.intro":
     "I'm your AI Architect. Describe the bot you want and I'll lay out the flow on the canvas.",
-  "ai.msg.user_example":
-    "Add a /pricing command that sends an inline keyboard with three plans.",
-  "ai.msg.assistant_example":
-    "Done — I added a Command trigger, a Text message, and an Inline keyboard with Basic / Pro / Team. Connected them on the canvas.",
   "ai.label": "Architect",
+  "ai.thinking": "Thinking…",
+  "ai.error": "Couldn't get a response. Try again.",
+  "ai.rate_limit": "Too many requests. Please wait a moment.",
+  "ai.payment": "Out of Lovable AI credits. Top up at Settings → Workspace → Usage.",
+  "ai.unavailable": "This model is not yet available in Lovable AI Gateway. Use GPT-5 or Gemini.",
+  "ai.model.gpt": "GPT-5",
+  "ai.model.gemini": "Gemini 2.5",
+  "ai.model.grok": "Grok",
+  "ai.model.claude": "Claude",
+  "ai.model.soon": "soon",
 
   "inspector.components": "Components",
   "inspector.settings": "Settings",
@@ -185,22 +247,70 @@ const en: Dict = {
   "canvas.start.title": "/start",
   "canvas.start.preview": "When user sends /start",
   "canvas.welcome.title": "Welcome",
-  "canvas.welcome.preview": "Hi {{user.first_name}} — welcome to Anvl.",
+  "canvas.welcome.preview": "Hi! Ready to launch VPN?",
   "canvas.menu.title": "Main menu",
-  "canvas.menu.preview": "Open app · Pricing · Help",
-  "canvas.dashboard.title": "Dashboard",
-  "canvas.dashboard.preview": "WebView · /app/home",
+  "canvas.menu.preview": "Open VPN · Pricing · Help",
+  "canvas.dashboard.title": "VPN Mini App",
+  "canvas.dashboard.preview": "WebView · /app/vpn",
 
-  "preview.bot_name": "Welcome Bot",
+  "preview.bot_name": "Anvl VPN",
   "preview.bot_status": "bot · online",
   "preview.composer": "Message",
   "preview.user_msg": "/start",
   "preview.bot_msg_1":
-    "Hi Sasha — welcome to Anvl. I help you ship bots & mini-apps in minutes.",
-  "preview.bot_msg_2": "Pick an option:",
-  "preview.btn.open": "Open app",
-  "preview.btn.pricing": "Pricing",
+    "Hi Sasha 👋 Anvl VPN — fast and secure internet. 12 countries, no logs.",
+  "preview.bot_msg_2": "Ready to connect?",
+  "preview.btn.open": "🚀 Open VPN",
+  "preview.btn.pricing": "Plans",
   "preview.btn.help": "Help",
+  "preview.opening": "Opening Mini App…",
+
+  "vpn.title": "Anvl VPN",
+  "vpn.subtitle": "Fast. No logs.",
+  "vpn.tab.home": "Home",
+  "vpn.tab.locations": "Servers",
+  "vpn.tab.plans": "Plans",
+  "vpn.tab.profile": "Profile",
+  "vpn.status.disconnected": "Disconnected",
+  "vpn.status.connecting": "Connecting…",
+  "vpn.status.connected": "Protected",
+  "vpn.connect": "Connect",
+  "vpn.disconnect": "Disconnect",
+  "vpn.connecting": "Connecting…",
+  "vpn.current_server": "Current server",
+  "vpn.your_ip": "Your IP",
+  "vpn.protected_ip": "Protected IP",
+  "vpn.speed_down": "Download",
+  "vpn.speed_up": "Upload",
+  "vpn.choose_location": "Choose location",
+  "vpn.ping": "ping",
+  "vpn.load": "load",
+  "vpn.free": "Free",
+  "vpn.pro": "Pro",
+  "vpn.team": "Team",
+  "vpn.plan.free.desc": "3 locations · 1 device",
+  "vpn.plan.pro.desc": "All locations · 5 devices · ad-free",
+  "vpn.plan.team.desc": "Up to 10 devices · priority",
+  "vpn.plan.current": "Current",
+  "vpn.plan.upgrade": "Upgrade",
+  "vpn.month": "/mo",
+  "vpn.profile.devices": "Devices",
+  "vpn.profile.referral": "Invite a friend",
+  "vpn.profile.support": "Support",
+  "vpn.profile.signout": "Sign out",
+  "vpn.back_to_chat": "← Back to chat",
+  "vpn.country.nl": "Netherlands",
+  "vpn.country.de": "Germany",
+  "vpn.country.us": "USA",
+  "vpn.country.jp": "Japan",
+  "vpn.country.sg": "Singapore",
+  "vpn.country.ae": "UAE",
+  "vpn.city.ams": "Amsterdam",
+  "vpn.city.fra": "Frankfurt",
+  "vpn.city.nyc": "New York",
+  "vpn.city.tok": "Tokyo",
+  "vpn.city.sgp": "Singapore",
+  "vpn.city.dxb": "Dubai",
 };
 
 const dicts: Record<Lang, Dict> = { ru, en };
@@ -215,20 +325,31 @@ const Ctx = createContext<I18nCtx | null>(null);
 
 const STORAGE_KEY = "anvl.lang";
 
-function getInitialLang(): Lang {
-  if (typeof window === "undefined") return "ru";
-  const saved = window.localStorage.getItem(STORAGE_KEY);
-  if (saved === "ru" || saved === "en") return saved;
-  return "ru";
-}
-
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(getInitialLang);
+  // Always start with "ru" on both server and client to avoid hydration mismatch.
+  const [lang, setLangState] = useState<Lang>("ru");
+
+  // After mount, restore from localStorage if user previously chose another language.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved === "en" || saved === "ru") {
+        setLangState(saved);
+        document.documentElement.setAttribute("lang", saved);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, l);
+      try {
+        window.localStorage.setItem(STORAGE_KEY, l);
+      } catch {
+        /* ignore */
+      }
       document.documentElement.setAttribute("lang", l);
     }
   }, []);
