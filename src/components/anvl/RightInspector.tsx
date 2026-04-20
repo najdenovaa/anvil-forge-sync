@@ -99,12 +99,17 @@ function ComponentsPane() {
               {t(`group.${group}`)}
             </div>
             <div className="space-y-1">
-              {items.map((item) => (
-                <div
+              {items.map((item, idx) => (
+                <motion.div
                   key={item.kind}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.02, type: "spring", stiffness: 300, damping: 24 }}
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
                   draggable
-                  onDragStart={(e) => onDragStart(e, item.kind)}
-                  className="group flex cursor-grab items-center gap-2.5 rounded-md border border-transparent bg-transparent px-2 py-1.5 transition hover:border-hairline hover:bg-accent active:cursor-grabbing"
+                  onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, item.kind)}
+                  className="group flex cursor-grab items-center gap-2.5 rounded-lg border border-transparent bg-transparent px-2 py-1.5 transition hover:border-hairline hover:bg-accent active:cursor-grabbing"
                 >
                   <div className="flex h-7 w-7 items-center justify-center rounded-md border border-hairline bg-surface-elevated text-foreground/80 transition group-hover:text-foreground">
                     <item.icon className="h-3.5 w-3.5" />
@@ -117,7 +122,7 @@ function ComponentsPane() {
                       {t(item.descKey)}
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
