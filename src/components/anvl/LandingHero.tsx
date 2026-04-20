@@ -72,11 +72,14 @@ export function LandingHero() {
 
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
-            <Sparkles className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-[14px] font-semibold tracking-tight">Anvl</span>
+        <div className="flex items-center gap-2.5">
+          <img
+            src={anvlLogo}
+            alt="Anvl"
+            className="h-8 w-8 rounded-lg object-cover"
+            draggable={false}
+          />
+          <span className="text-[14px] font-semibold tracking-[0.18em]">ANVL</span>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface/60 p-0.5 text-[11px] font-medium backdrop-blur">
           <button
