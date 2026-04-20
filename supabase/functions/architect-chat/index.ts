@@ -266,6 +266,33 @@ function buildTools(miniAppEnabled: boolean) {
   return tools;
 }
 
+interface FlowSnapshotIn {
+  nodes?: { id: string; kind: string; title?: string; params?: Record<string, string> }[];
+  edges?: { from: string; to: string }[];
+}
+
+function describeSnapshot(snap?: FlowSnapshotIn): string {
+  if (!snap || !snap.nodes?.length) return "";
+  const lines: string[] = [];
+  lines.push("\n\n=== CURRENT CANVAS (use these EXACT params when generating code) ===");
+  for (const n of snap.nodes) {
+    const params = n.params && Object.keys(n.params).length
+      ? Object.entries(n.params)
+          .map(([k, v]) => `${k}=${JSON.stringify((v ?? "").toString().slice(0, 200))}`)
+          .join(" ")
+      : "(no params)";
+    lines.push(`• [${n.id}] ${n.kind} "${n.title ?? ""}" ${params}`);
+  }
+  if (snap.edges?.length) {
+    lines.push("Edges: " + snap.edges.map((e) => `${e.from}→${e.to}`).join(", "));
+  }
+  lines.push(
+    "When you emit a <code> block, the bot MUST use these literal values " +
+      "(commands, texts, URLs, conditions). Do NOT invent generic placeholders.",
+  );
+  return lines.join("\n");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -278,8 +305,16 @@ Deno.serve(async (req: Request) => {
       miniApp?: boolean;
       platform?: string;
       tools?: boolean;
+      flowSnapshot?: FlowSnapshotIn;
     };
-    const { messages, model, miniApp = false, platform = "telegram", tools: enableTools = true } = body;
+    const {
+      messages,
+      model,
+      miniApp = false,
+      platform = "telegram",
+      tools: enableTools = true,
+      flowSnapshot,
+    } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return json({ error: "messages array required" }, 400);
@@ -291,7 +326,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "LOVABLE_API_KEY is not configured" }, 500);
     }
 
-    const systemPrompt = buildPrompt(miniApp, platform);
+    const systemPrompt = buildPrompt(miniApp, platform) + describeSnapshot(flowSnapshot);
 
     const toolDefs = enableTools ? buildTools(miniApp) : undefined;
 
