@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -18,13 +18,30 @@ import { ForgeNode } from "./ForgeNode";
 import { PreviewPhone } from "./PreviewPhone";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
+import { useBotSimulator } from "./BotSimulatorContext";
 import { NODE_CATALOG } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 
 function CanvasInner() {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const { nodes, edges, setNodes, setEdges } = useAnvlWorkspace();
   const { setSelectedId } = useSelection();
+  const { activeNodeId, cameraFollow } = useBotSimulator();
+
+  // Camera follow: when toggle is on, smoothly center the canvas on the
+  // currently active simulator node (only if it exists on the graph).
+  useEffect(() => {
+    if (!cameraFollow || !activeNodeId) return;
+    if (!nodes.some((n) => n.id === activeNodeId)) return;
+    const t = window.setTimeout(() => {
+      try {
+        fitView({ nodes: [{ id: activeNodeId }], duration: 600, padding: 0.4, maxZoom: 1.2 });
+      } catch {
+        /* node may have just unmounted */
+      }
+    }, 30);
+    return () => window.clearTimeout(t);
+  }, [cameraFollow, activeNodeId, nodes, fitView]);
 
   const nodeTypes = useMemo(() => ({ anvl: ForgeNode }), []);
 

@@ -55,6 +55,9 @@ interface SimulatorCtx {
   restart: () => void;
   /** Manually jump (used by canvas click-to-simulate). */
   jumpTo: (nodeId: string) => void;
+  /** Camera follow toggle: canvas centers on activeNodeId when true. */
+  cameraFollow: boolean;
+  setCameraFollow: (v: boolean) => void;
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
@@ -243,6 +246,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<string[]>([]);
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
+  const [cameraFollow, setCameraFollow] = useState(false);
 
   // Re-pin when the canvas changes (e.g. AI applies a new flow).
   const lastEntryRef = useMemo(() => ({ id: entryId }), [entryId]);
@@ -376,6 +380,8 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       back,
       restart,
       jumpTo,
+      cameraFollow,
+      setCameraFollow,
     }),
     [
       available,
@@ -392,6 +398,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       back,
       restart,
       jumpTo,
+      cameraFollow,
     ],
   );
 
