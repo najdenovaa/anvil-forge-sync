@@ -3,13 +3,14 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Edge, Node } from "reactflow";
 import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
-import type { FlowSnapshot } from "@/lib/anvl-flow-storage";
+import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
 
 const DEFAULT_FLOW_SLUG = "default";
 
@@ -71,16 +72,26 @@ interface WorkspaceCtx {
   saveStatus: SaveStatus;
   lastSavedAt: Date | null;
   snapshotNow: (note?: string) => Promise<void>;
+  flowId: string | null;
+  slug: string;
+  rollbackToVersion: (version: FlowVersionFull) => void;
 }
 
 const Ctx = createContext<WorkspaceCtx | null>(null);
 
-export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
+export function AnvlWorkspaceProvider({
+  children,
+  slug = DEFAULT_FLOW_SLUG,
+}: {
+  children: ReactNode;
+  slug?: string;
+}) {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [preview, setPreview] = useState<Partial<AnvlPreviewState>>({});
   const [miniApp, setMiniApp] = useState<Partial<AnvlMiniAppState>>({});
   const [generatedCode, setGeneratedCode] = useState("");
+  const hydratedSlugRef = useRef<string | null>(null);
 
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
     if (blueprint.nodes?.length) {
@@ -123,11 +134,20 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hydrate = useCallback((snap: FlowSnapshot) => {
-    if (snap.nodes?.length) setNodes(snap.nodes);
-    if (snap.edges?.length) setEdges(snap.edges);
-    if (snap.preview) setPreview(snap.preview);
-    if (snap.miniapp) setMiniApp(snap.miniapp);
-    if (snap.generatedCode) setGeneratedCode(snap.generatedCode);
+    hydratedSlugRef.current = snap.slug;
+    setNodes(snap.nodes?.length ? snap.nodes : initialNodes);
+    setEdges(snap.edges?.length ? snap.edges : initialEdges);
+    setPreview(snap.preview ?? {});
+    setMiniApp(snap.miniapp ?? {});
+    setGeneratedCode(snap.generatedCode ?? "");
+  }, []);
+
+  const rollbackToVersion = useCallback((version: FlowVersionFull) => {
+    setNodes(version.nodes ?? []);
+    setEdges(version.edges ?? []);
+    setPreview(version.preview ?? {});
+    setMiniApp(version.miniapp ?? {});
+    setGeneratedCode(version.generatedCode ?? "");
   }, []);
 
   const resetAiCanvas = useCallback(() => {
@@ -174,8 +194,8 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
     setMiniApp((cur) => ({ ...cur, ...patch }));
   }, []);
 
-  const { status: saveStatus, lastSavedAt, snapshotNow } = useFlowPersistence({
-    slug: DEFAULT_FLOW_SLUG,
+  const { status: saveStatus, lastSavedAt, snapshotNow, flowId } = useFlowPersistence({
+    slug,
     nodes,
     edges,
     preview,
@@ -192,8 +212,9 @@ export function AnvlWorkspaceProvider({ children }: { children: ReactNode }) {
       addAiNode, connectAiNodes, updateAiNodeParam,
       mergePreview, mergeMiniApp, resetAiCanvas,
       saveStatus, lastSavedAt, snapshotNow,
+      flowId, slug, rollbackToVersion,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, saveStatus, lastSavedAt, snapshotNow],
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
