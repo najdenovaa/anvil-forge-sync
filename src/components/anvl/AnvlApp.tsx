@@ -5,6 +5,7 @@ import { AnvlWorkspaceProvider } from "./AnvlWorkspaceContext";
 import { AnvlAppShellProvider, useAnvlShell } from "./AnvlAppShellContext";
 import { TelegramWebAppProvider } from "./TelegramWebAppContext";
 import { SelectionProvider } from "./SelectionContext";
+import { BotSimulatorProvider } from "./BotSimulatorContext";
 import { TopBar } from "./TopBar";
 import { LeftAIPanel } from "./LeftAIPanel";
 import { ForgeCanvas } from "./ForgeCanvas";
@@ -38,9 +39,11 @@ export function AnvlApp({ slug, persist = true }: { slug?: string; persist?: boo
           <TelegramWebAppProvider>
             <AnvlWorkspaceProvider slug={slug} persist={persist}>
               <SelectionProvider>
-                <AnvlAppShellProvider>
-                  <Shell />
-                </AnvlAppShellProvider>
+                <BotSimulatorProvider>
+                  <AnvlAppShellProvider>
+                    <Shell />
+                  </AnvlAppShellProvider>
+                </BotSimulatorProvider>
               </SelectionProvider>
             </AnvlWorkspaceProvider>
           </TelegramWebAppProvider>
