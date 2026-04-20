@@ -150,6 +150,8 @@ export function PreviewPhone() {
                 activeScreen={activeScreen}
                 preview={preview}
                 miniAppEnabled={miniAppEnabled}
+                ephemeralReply={ephemeralReply}
+                onDismissEphemeral={() => setEphemeralReply(null)}
               />
             ) : (
               <div className="relative flex flex-1 flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -223,6 +225,8 @@ function ChatView({
   activeScreen,
   preview,
   miniAppEnabled,
+  ephemeralReply,
+  onDismissEphemeral,
 }: {
   isTg: boolean;
   onAction: (action: PreviewAction) => void;
@@ -230,6 +234,8 @@ function ChatView({
   activeScreen?: NonNullable<ReturnType<typeof useAnvlWorkspace>["preview"]["screens"]>[number];
   preview: ReturnType<typeof useAnvlWorkspace>["preview"];
   miniAppEnabled: boolean;
+  ephemeralReply: string | null;
+  onDismissEphemeral: () => void;
 }) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
