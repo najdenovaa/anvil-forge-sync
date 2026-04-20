@@ -28,6 +28,7 @@ export function PreviewPhone() {
   const { t } = useI18n();
   const { view, open, close } = useMiniApp();
   const { preview } = useAnvlWorkspace();
+  const tma = useTelegramWebApp();
   const isTg = platform === "telegram";
   const [opening, setOpening] = useState(false);
   const [chatScreenId, setChatScreenId] = useState<string | null>(null);
@@ -44,6 +45,11 @@ export function PreviewPhone() {
       setOpening(false);
     }
   }, [miniAppEnabled, view, close]);
+
+  // Reset Telegram WebApp button state on view changes / mini-app close
+  useEffect(() => {
+    if (view === "chat") tma.reset();
+  }, [view, tma]);
 
   useEffect(() => {
     if (screens.length === 0) {
