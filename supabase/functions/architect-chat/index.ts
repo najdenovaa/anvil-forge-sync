@@ -18,16 +18,20 @@ every tool call as a live "thinking" step in the chat AND mutates the canvas /
 preview / mini-app in real time. The user SEES you build the bot.
 
 == HARD RULES ==
-1. ALWAYS start with reset_canvas() before adding new nodes (fresh blueprint).
-2. Then call add_node(...) for EVERY block (4-7 nodes typical, 3 minimum).
-3. Then call connect(from, to) for every edge in the flow.
-4. Then call set_param(id, key, value) to fill node texts, button labels,
+1. FIRST output tool calls. Do not write prose before the canvas is built.
+2. ALWAYS start with reset_canvas() before adding new nodes (fresh blueprint).
+3. Then call add_node(...) for EVERY block (4-7 nodes typical, 3 minimum).
+4. Then call connect(from, to) for every edge in the flow.
+5. Then call set_param(id, key, value) to fill node texts, button labels,
    commands, URLs, conditions. Concrete values from the user's domain — never
    placeholders like "Your text here".
-5. Then call set_preview(...) so the phone simulator shows a believable first
+6. Then call set_preview(...) so the phone simulator shows a believable first
    screen (botName, botMessages, buttons with labels in the user's language).
-6. (Mini App only) call set_miniapp(...) once with the full domain spec.
-7. AFTER all tool calls, write a short SUMMARY (2-4 sentences, in the user's
+7. Then call set_code(language, filename, content) with a realistic runnable
+   implementation using the exact commands, messages, buttons, URLs and rules
+   you just placed on the canvas. No placeholders. No TODO-only stubs.
+8. (Mini App only) call set_miniapp(...) once with the full domain spec.
+9. AFTER all tool calls, write a short SUMMARY (2-4 sentences, in the user's
    language) describing what you built — concrete commands, button labels,
    screens. NO generic "Готово" / "Done". This text appears as your chat reply.
 
@@ -36,7 +40,7 @@ calls to explain your plan. It is shown as your live reasoning. Optional but
 recommended.
 
 You may put a <code>...</code> block AFTER tool calls with one runnable file
-(40-120 lines) targeting the chosen platform. Optional.
+  (40-120 lines) targeting the chosen platform. Optional; set_code is required.
 
 == STYLE ==
 - Reply in the user's language (Russian by default for Russian inputs).
@@ -216,6 +220,23 @@ function buildTools(miniAppEnabled: boolean) {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "set_code",
+        description: "Store the runnable bot source code generated from the current canvas. Required after set_preview.",
+        parameters: {
+          type: "object",
+          properties: {
+            language: { type: "string", enum: ["typescript", "javascript", "python"] },
+            filename: { type: "string" },
+            content: { type: "string", description: "Runnable source code with real texts/buttons from the flow." },
+          },
+          required: ["language", "filename", "content"],
+          additionalProperties: false,
+        },
+      },
+    },
   ];
 
   if (miniAppEnabled) {
@@ -335,7 +356,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         // Bigger budget so the model can finish all tool calls + write the
         // summary in one go without truncation.
         max_tokens: summaryOnly ? 700 : 8192,
-        ...(toolDefs ? { tools: toolDefs, tool_choice: "auto" } : {}),
+        ...(toolDefs ? { tools: toolDefs, tool_choice: "required" } : {}),
       }),
     });
 

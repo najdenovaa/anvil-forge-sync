@@ -437,18 +437,24 @@ function SimulatorChatView({
 
   const isCondition = sim.effectiveKind === "logic.condition";
 
-  const triggerMiniAppIfNeeded = (label: string) => {
+  const triggerMiniAppIfNeeded = (btn: SimButton) => {
     if (!miniOn) return;
-    const lower = label.toLowerCase();
-    if (lower.includes("mini") || lower.includes("приложение") || lower.includes("открыть")) {
+    const signal = `${btn.label} ${btn.action}`.toLowerCase();
+    if (signal.includes("open_miniapp") || signal.includes("mini") || signal.includes("приложение") || signal.includes("открыть")) {
       onOpenMiniApp("home");
+    } else if (signal.includes("plans")) {
+      onOpenMiniApp("plans");
+    } else if (signal.includes("locations") || signal.includes("items")) {
+      onOpenMiniApp("locations");
+    } else if (signal.includes("profile")) {
+      onOpenMiniApp("profile");
     }
   };
 
   const handlePress = (btn: SimButton) => {
     setUserInputs((prev) => ({ ...prev, [sim.activeNodeId!]: btn.label }));
     setTyping(true);
-    triggerMiniAppIfNeeded(btn.label);
+    triggerMiniAppIfNeeded(btn);
     window.setTimeout(() => {
       setTyping(false);
       sim.press(btn);
