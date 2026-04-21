@@ -190,23 +190,33 @@ export function LeftAIPanel() {
     if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
-    const placeholder: Msg = { role: "assistant", content: "", pending: true, step: 0, thoughts: "" };
+    const placeholder: Msg = {
+      role: "assistant",
+      content: "",
+      pending: true,
+      step: 0,
+      thoughts: "",
+      liveSteps: [],
+    };
     const baseHistory: Msg[] = [...messages, userMsg];
     setMessages([...baseHistory, placeholder]);
     setIsStreaming(true);
 
-    const stepTimer = setInterval(() => {
+    // Soft auto-stepper that nudges Architect Logic forward while we wait for
+    // the first signal from the model. Cancelled the moment any real chunk
+    // arrives (content OR tool_calls).
+    const stepTimer = window.setInterval(() => {
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
-        if (last?.pending && (last.step ?? 0) < 2) {
+        if (last?.pending && (last.step ?? 0) < 1) {
           copy[copy.length - 1] = { ...last, step: (last.step ?? 0) + 1 };
         }
         return copy;
       });
     }, 700);
 
-    const stopStepper = () => clearInterval(stepTimer);
+    const stopStepper = () => window.clearInterval(stepTimer);
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
