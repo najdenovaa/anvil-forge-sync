@@ -541,6 +541,14 @@ export function LeftAIPanel() {
       }
       if (extractedCode) setGeneratedCode(extractedCode);
 
+      // Build the final "thoughts" payload that the user can re-open under the
+      // bubble. Prefer the model's own <think> block; otherwise fall back to
+      // the synthesised step-by-step plan derived from real tool calls.
+      const finalThoughts =
+        extractedThoughts ||
+        thoughts.trim() ||
+        (liveSteps.length ? liveSteps.map((s) => "• " + s).join("\n") : "");
+
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
@@ -548,8 +556,9 @@ export function LeftAIPanel() {
           copy[copy.length - 1] = {
             role: "assistant",
             content: finalAnswer,
-            thoughts: extractedThoughts || thoughts.trim() || undefined,
+            thoughts: finalThoughts || undefined,
             toolOps: liveOps.length ? [...liveOps] : undefined,
+            liveSteps: liveSteps.length ? [...liveSteps] : undefined,
           };
         }
         return copy;
