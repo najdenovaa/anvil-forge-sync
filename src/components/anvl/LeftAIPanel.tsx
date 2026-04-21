@@ -445,15 +445,31 @@ export function LeftAIPanel() {
             const choice = parsed.choices?.[0];
             const delta = choice?.delta?.content as string | undefined;
             if (delta) ingest(delta);
-            // Tool calls — assemble streaming function calls and apply on completion
+            // Tool calls — assemble streaming function calls and apply EAGERLY
+            // as soon as each call's args become valid JSON. This drives the
+            // Architect Logic stepper and the live ops feed in real time
+            // (Gemini ships tool_calls without any text content).
             const tcDelta = choice?.delta?.tool_calls as Array<any> | undefined;
             if (tcDelta) {
+              stopStepper(); // we have a real signal, stop the soft auto-stepper
               for (const tc of tcDelta) {
                 const idx = tc.index ?? 0;
                 if (!toolBuf[idx]) toolBuf[idx] = { name: "", args: "", done: false };
                 if (tc.function?.name) toolBuf[idx].name = tc.function.name;
                 if (tc.function?.arguments) toolBuf[idx].args += tc.function.arguments;
+                // Try eager apply — many providers send the full args in one chunk.
+                const buf = toolBuf[idx];
+                if (!buf.done && buf.name && buf.args.trim().length) {
+                  try {
+                    JSON.parse(buf.args);
+                    applyToolCall(buf.name, buf.args);
+                    buf.done = true;
+                  } catch {
+                    /* args still streaming — wait for next chunk */
+                  }
+                }
               }
+              flush();
             }
             const finishReason = choice?.finish_reason;
             if (finishReason === "tool_calls" || finishReason === "stop") {
@@ -463,6 +479,7 @@ export function LeftAIPanel() {
                   tc.done = true;
                 }
               }
+              flush();
             }
           } catch {
             buffer = line + "\n" + buffer;
