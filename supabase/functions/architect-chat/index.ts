@@ -356,7 +356,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         // Bigger budget so the model can finish all tool calls + write the
         // summary in one go without truncation.
         max_tokens: summaryOnly ? 700 : 8192,
-        ...(toolDefs ? { tools: toolDefs, tool_choice: "auto" } : {}),
+        ...(toolDefs ? { tools: toolDefs, tool_choice: "required" } : {}),
       }),
     });
 
