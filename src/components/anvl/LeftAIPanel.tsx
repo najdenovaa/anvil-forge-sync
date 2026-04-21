@@ -51,6 +51,47 @@ interface Msg {
   pending?: boolean;
   step?: number;
   toolOps?: ToolOp[];
+  /** Synthesised "what AI is doing right now" lines — drives Architect Logic when the model
+   *  emits only tool_calls and no <think> block. */
+  liveSteps?: string[];
+}
+
+/** Turn a tool call into a short human-readable plan line. */
+function describeToolStep(name: string, args: Record<string, any>): string {
+  switch (name) {
+    case "reset_canvas":
+      return "Очищаю холст для новой схемы";
+    case "add_node": {
+      const kind = args.kind ?? "block";
+      const title = args.title ?? args.id ?? "";
+      const kindLabel: Record<string, string> = {
+        "trigger.command": "команда",
+        "trigger.message": "входящее сообщение",
+        "trigger.callback": "callback",
+        "message.text": "текстовое сообщение",
+        "message.photo": "фото",
+        "message.document": "документ",
+        "keyboard.inline": "inline-клавиатура",
+        "keyboard.reply": "reply-клавиатура",
+        "miniapp.screen": "экран Mini App",
+        "logic.condition": "условие",
+        "action.api": "API-вызов",
+      };
+      return `Добавляю ${kindLabel[kind] ?? kind}: «${title}»`;
+    }
+    case "connect":
+      return `Соединяю ${args.from} → ${args.to}`;
+    case "set_param": {
+      const v = String(args.value ?? "").trim().slice(0, 40);
+      return `Параметр ${args.id}.${args.key} = ${v}${v.length === 40 ? "…" : ""}`;
+    }
+    case "set_preview":
+      return "Настраиваю превью бота";
+    case "set_miniapp":
+      return "Настраиваю Mini App";
+    default:
+      return name;
+  }
 }
 
 function extractTaggedBlock(source: string, tag: string) {
@@ -149,23 +190,33 @@ export function LeftAIPanel() {
     if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
-    const placeholder: Msg = { role: "assistant", content: "", pending: true, step: 0, thoughts: "" };
+    const placeholder: Msg = {
+      role: "assistant",
+      content: "",
+      pending: true,
+      step: 0,
+      thoughts: "",
+      liveSteps: [],
+    };
     const baseHistory: Msg[] = [...messages, userMsg];
     setMessages([...baseHistory, placeholder]);
     setIsStreaming(true);
 
-    const stepTimer = setInterval(() => {
+    // Soft auto-stepper that nudges Architect Logic forward while we wait for
+    // the first signal from the model. Cancelled the moment any real chunk
+    // arrives (content OR tool_calls).
+    const stepTimer = window.setInterval(() => {
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
-        if (last?.pending && (last.step ?? 0) < 2) {
+        if (last?.pending && (last.step ?? 0) < 1) {
           copy[copy.length - 1] = { ...last, step: (last.step ?? 0) + 1 };
         }
         return copy;
       });
     }, 700);
 
-    const stopStepper = () => clearInterval(stepTimer);
+    const stopStepper = () => window.clearInterval(stepTimer);
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
@@ -223,10 +274,19 @@ export function LeftAIPanel() {
       // Tool-calling state: assemble streaming tool_calls by index
       const toolBuf: { name: string; args: string; done: boolean }[] = [];
       const liveOps: ToolOp[] = [];
+      const liveSteps: string[] = [];
+      let liveStep: 0 | 1 | 2 | 3 = 0;
       const applyToolCall = (name: string, argsRaw: string) => {
         let args: any;
         try { args = JSON.parse(argsRaw); } catch { return; }
         liveOps.push({ name, args: args ?? {} });
+        liveSteps.push(describeToolStep(name, args ?? {}));
+        // Drive the Architect Logic stepper from real tool activity:
+        // reset → step 1 (planning), add_node/connect → step 2 (composing),
+        // set_preview/set_miniapp → step 3 (finalising).
+        if (name === "reset_canvas" && liveStep < 1) liveStep = 1;
+        else if ((name === "add_node" || name === "connect") && liveStep < 2) liveStep = 2;
+        else if ((name === "set_preview" || name === "set_miniapp" || name === "set_param") && liveStep < 3) liveStep = 3;
         try {
           if (name === "reset_canvas") resetAiCanvas();
           else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
@@ -256,11 +316,15 @@ export function LeftAIPanel() {
           const copy = prev.slice();
           const last = copy[copy.length - 1];
           if (!last || last.role !== "assistant") return prev;
+          // Keep step monotonically growing — never roll backwards.
+          const nextStep = Math.max(last.step ?? 0, liveStep);
           copy[copy.length - 1] = {
             ...last,
             thoughts,
             content: answer,
             toolOps: liveOps.length ? [...liveOps] : last.toolOps,
+            liveSteps: liveSteps.length ? [...liveSteps] : last.liveSteps,
+            step: nextStep,
             pending: phase !== 4 && answer.length === 0,
           };
           return copy;
@@ -381,15 +445,31 @@ export function LeftAIPanel() {
             const choice = parsed.choices?.[0];
             const delta = choice?.delta?.content as string | undefined;
             if (delta) ingest(delta);
-            // Tool calls — assemble streaming function calls and apply on completion
+            // Tool calls — assemble streaming function calls and apply EAGERLY
+            // as soon as each call's args become valid JSON. This drives the
+            // Architect Logic stepper and the live ops feed in real time
+            // (Gemini ships tool_calls without any text content).
             const tcDelta = choice?.delta?.tool_calls as Array<any> | undefined;
             if (tcDelta) {
+              stopStepper(); // we have a real signal, stop the soft auto-stepper
               for (const tc of tcDelta) {
                 const idx = tc.index ?? 0;
                 if (!toolBuf[idx]) toolBuf[idx] = { name: "", args: "", done: false };
                 if (tc.function?.name) toolBuf[idx].name = tc.function.name;
                 if (tc.function?.arguments) toolBuf[idx].args += tc.function.arguments;
+                // Try eager apply — many providers send the full args in one chunk.
+                const buf = toolBuf[idx];
+                if (!buf.done && buf.name && buf.args.trim().length) {
+                  try {
+                    JSON.parse(buf.args);
+                    applyToolCall(buf.name, buf.args);
+                    buf.done = true;
+                  } catch {
+                    /* args still streaming — wait for next chunk */
+                  }
+                }
               }
+              flush();
             }
             const finishReason = choice?.finish_reason;
             if (finishReason === "tool_calls" || finishReason === "stop") {
@@ -399,6 +479,7 @@ export function LeftAIPanel() {
                   tc.done = true;
                 }
               }
+              flush();
             }
           } catch {
             buffer = line + "\n" + buffer;
@@ -460,6 +541,14 @@ export function LeftAIPanel() {
       }
       if (extractedCode) setGeneratedCode(extractedCode);
 
+      // Build the final "thoughts" payload that the user can re-open under the
+      // bubble. Prefer the model's own <think> block; otherwise fall back to
+      // the synthesised step-by-step plan derived from real tool calls.
+      const finalThoughts =
+        extractedThoughts ||
+        thoughts.trim() ||
+        (liveSteps.length ? liveSteps.map((s) => "• " + s).join("\n") : "");
+
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
@@ -467,8 +556,9 @@ export function LeftAIPanel() {
           copy[copy.length - 1] = {
             role: "assistant",
             content: finalAnswer,
-            thoughts: extractedThoughts || thoughts.trim() || undefined,
+            thoughts: finalThoughts || undefined,
             toolOps: liveOps.length ? [...liveOps] : undefined,
+            liveSteps: liveSteps.length ? [...liveSteps] : undefined,
           };
         }
         return copy;
@@ -600,7 +690,13 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
   return (
     <div className="max-w-[88%] space-y-1.5">
-      {isLive && <ThinkingStepper step={msg.step ?? 0} liveThoughts={msg.thoughts ?? ""} />}
+      {isLive && (
+        <ThinkingStepper
+          step={msg.step ?? 0}
+          liveThoughts={msg.thoughts ?? ""}
+          liveSteps={msg.liveSteps ?? []}
+        />
+      )}
 
       {/* Live tool ops feed — Rork/Lovable-style: shows what's happening RIGHT NOW */}
       {isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} live />}
@@ -680,7 +776,15 @@ function ToolOpsFeed({ ops, live = false }: { ops: ToolOp[]; live?: boolean }) {
   );
 }
 
-function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: string }) {
+function ThinkingStepper({
+  step,
+  liveThoughts,
+  liveSteps,
+}: {
+  step: number;
+  liveThoughts: string;
+  liveSteps: string[];
+}) {
   const { t } = useI18n();
   const steps = [
     { icon: Brain, key: "ai.step.analyze" },
@@ -707,6 +811,8 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
 
   const visibleThoughts = liveThoughts.slice(0, revealed);
   const stillTyping = revealed < liveThoughts.length;
+  const hasLiveSteps = liveSteps.length > 0;
+  const hasThoughtsStream = liveThoughts.trim().length > 0;
 
   return (
     <motion.div
@@ -738,7 +844,6 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           className="relative flex h-5 w-5 items-center justify-center rounded-md bg-foreground/10 text-[oklch(0.78_0.18_280)]"
         >
-          {/* Soft glow halo behind brain */}
           <span
             aria-hidden
             className="pointer-events-none absolute inset-[-4px] rounded-lg blur-md"
@@ -750,7 +855,12 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
           Architect Logic
         </span>
         <span className="text-[10px] text-muted-foreground">· {t("ai.thinking")}</span>
-        {stillTyping && (
+        {hasLiveSteps && (
+          <span className="ml-auto rounded-full bg-foreground/10 px-1.5 py-px font-mono text-[9px] text-foreground/80">
+            {liveSteps.length}
+          </span>
+        )}
+        {!hasLiveSteps && stillTyping && (
           <span className="ml-auto font-mono text-[9px] text-muted-foreground/70">
             {revealed}/{liveThoughts.length}
           </span>
@@ -775,7 +885,8 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
                 className={cn(
                   "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
                   state === "done" && "border-foreground/40 bg-foreground/10",
-                  state === "active" && "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
+                  state === "active" &&
+                    "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
                   state === "pending" && "border-hairline",
                 )}
               >
@@ -793,8 +904,39 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
         })}
       </motion.ol>
 
+      {/* Live action feed: synthesised plan derived from real tool calls.
+       *  Each line slides in as the AI applies it to the canvas. */}
       <AnimatePresence initial={false}>
-        {liveThoughts.trim().length > 0 && (
+        {hasLiveSteps && (
+          <motion.ul
+            key="live-steps"
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-1 max-h-44 space-y-1 overflow-y-auto rounded-md border border-hairline bg-background/40 px-2 py-1.5"
+          >
+            <AnimatePresence initial={false}>
+              {liveSteps.map((line, i) => (
+                <motion.li
+                  key={`${i}-${line}`}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground/85"
+                >
+                  <Check className="mt-[2px] h-2.5 w-2.5 shrink-0 text-status-ok" />
+                  <span className="break-words">{line}</span>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </motion.ul>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {hasThoughtsStream && (
           <motion.div
             key="thoughts-stream"
             layout
