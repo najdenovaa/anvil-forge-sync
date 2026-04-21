@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -251,17 +252,20 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
   const [cameraFollow, setCameraFollow] = useState(false);
 
-  // Re-pin when the canvas changes (e.g. AI applies a new flow).
-  const lastEntryRef = useMemo(() => ({ id: entryId }), [entryId]);
-  if (
-    activeNodeId &&
-    !nodes.some((n) => n.id === activeNodeId) &&
-    lastEntryRef.id !== activeNodeId
-  ) {
-    // Active node was removed — reset to entry.
-    setActiveNodeId(entryId);
-    setHistory([]);
-  }
+  useEffect(() => {
+    if (!entryId) {
+      setActiveNodeId(null);
+      setActiveEdgeId(null);
+      setHistory([]);
+      return;
+    }
+
+    if (!activeNodeId || !nodes.some((n) => n.id === activeNodeId)) {
+      setActiveNodeId(entryId);
+      setActiveEdgeId(null);
+      setHistory([]);
+    }
+  }, [activeNodeId, entryId, nodes]);
 
   const activeNode = useMemo(
     () => (activeNodeId ? nodes.find((n) => n.id === activeNodeId) : null),
@@ -372,11 +376,6 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     setPendingBranch("yes");
   }, [entryId]);
 
-  // Keep entry in sync when AI rebuilds the flow.
-  useMemo(() => {
-    if (!activeNodeId && entryId) setActiveNodeId(entryId);
-  }, [activeNodeId, entryId]);
-
   const value = useMemo<SimulatorCtx>(
     () => ({
       available,
@@ -415,11 +414,6 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       cameraFollow,
     ],
   );
-
-  // Keep entry in sync when AI rebuilds the flow.
-  useMemo(() => {
-    if (!activeNodeId && entryId) setActiveNodeId(entryId);
-  }, [activeNodeId, entryId]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
