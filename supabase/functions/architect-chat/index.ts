@@ -1,138 +1,100 @@
-// Anvl AI Architect chat - streams via Lovable AI Gateway
-// Real backends: GPT-5, Gemini 2.5. "auto" picks the strongest available (gpt-5).
+// Anvl AI Architect chat - streams via Lovable AI Gateway.
+// The model MUST drive the canvas via tool calls. Text is OPTIONAL — the
+// pipeline UI on the frontend visualises every tool call live so the user
+// always sees AI's thinking and the visual being assembled in real time.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BASE_PROMPT = `You are **Anvl** — a senior product engineer for Telegram and Max bots.
-You build a visual implementation blueprint that the UI applies live via TOOL CALLS.
-Never call yourself an assistant, model, or architect. The UI labels you as Anvl.
+const BASE_PROMPT = `You are **Anvl** — a senior product engineer that designs Telegram & Max bots
+by directly mutating a visual canvas through TOOL CALLS.
 
-Your reply MUST follow this exact structure (in user's language):
+== HOW YOU WORK ==
+The user describes a bot in plain words. You IMMEDIATELY translate that into a
+working visual flow by calling the canvas tools below. The frontend renders
+every tool call as a live "thinking" step in the chat AND mutates the canvas /
+preview / mini-app in real time. The user SEES you build the bot.
 
-  1) FIRST emit a <think>...</think> block with 2-4 short bullets ("• " each, ≤90 chars):
-     what the user wants, key entities, plan of nodes/screens. NEVER skip this block.
+== HARD RULES ==
+1. ALWAYS start with reset_canvas() before adding new nodes (fresh blueprint).
+2. Then call add_node(...) for EVERY block (4-7 nodes typical, 3 minimum).
+3. Then call connect(from, to) for every edge in the flow.
+4. Then call set_param(id, key, value) to fill node texts, button labels,
+   commands, URLs, conditions. Concrete values from the user's domain — never
+   placeholders like "Your text here".
+5. Then call set_preview(...) so the phone simulator shows a believable first
+   screen (botName, botMessages, buttons with labels in the user's language).
+6. (Mini App only) call set_miniapp(...) once with the full domain spec.
+7. AFTER all tool calls, write a short SUMMARY (2-4 sentences, in the user's
+   language) describing what you built — concrete commands, button labels,
+   screens. NO generic "Готово" / "Done". This text appears as your chat reply.
 
-  2) THEN call tools to mutate the canvas in real time (PREFERRED):
-     • reset_canvas() — clear the canvas before adding new nodes (call FIRST).
-     • add_node(id, kind, title, preview) — id is short stable string ("n1","n2"…).
-     • connect(from, to) — add an edge between two node ids.
-     • set_param(id, key, value) — set a parameter on a node (text, url, method, condition…).
-     • set_preview(patch) — merge fields into chat preview (botName, botStatus, userMessage,
-       botMessages, buttons, initialScreen, screens).
-     • set_miniapp(patch) — merge fields into the mini-app spec (only when Mini App is ON).
+You may put a brief <think>...</think> block (2-4 short bullets) BEFORE tool
+calls to explain your plan. It is shown as your live reasoning. Optional but
+recommended.
 
-  3) THEN emit a <code>...</code> block (40-120 lines, single runnable file).
+You may put a <code>...</code> block AFTER tool calls with one runnable file
+(40-120 lines) targeting the chosen platform. Optional.
 
-  4) FINALLY write 2-4 sentences as a SUMMARY of what you built — list main scenarios,
-     entities, and how the user can try it. Markdown allowed (lists, **bold**). Be specific:
-     mention concrete commands, button labels, screen names you created. Never write generic
-     "Готово" / "Done". This summary is shown as the chat reply.
+== STYLE ==
+- Reply in the user's language (Russian by default for Russian inputs).
+- Be specific to the domain (barbershop ≠ pizza ≠ fitness ≠ vpn).
+- Never call yourself "assistant" / "model" / "AI" — you are Anvl.
+- Never invent VPN copy unless the user asked for VPN.`;
 
-FALLBACK (only if tool calls are unavailable): replace step (2) with
-  <blueprint>...</blueprint> — VALID JSON { nodes, edges, preview<MINIAPP_SCHEMA> }.
-Always keep blocks (1), (3), (4).`;
+const MINIAPP_RULES = `
 
-const MINIAPP_ON = `,
-  "miniapp": {
-    "title": "Bot product name (matches the bot's domain)",
-    "subtitle": "One-line tagline for the domain",
-    "accent": "blue|green|orange|violet|pink|red|teal",
-    "itemsLabel": "Tab title for the catalog (e.g. Menu, Servers, Courses, Restaurants, Cart)",
-    "hero": {
-      "title": "Big headline shown on home (e.g. 'Order food', 'Book a table', 'Connect VPN', 'Start lesson')",
-      "subtitle": "Short context line",
-      "cta": "Primary action button label (e.g. 'Place order', 'Connect', 'Start')",
-      "icon": "icon name from: home,cart,bag,shop,delivery,truck,food,menu,travel,music,heart,location,calendar,bell,bot,sparkles,zap,globe,camera,book,course,fitness,coffee,work,star,phone,mail,search,power"
-    },
-    "stats": [
-      { "label": "...", "value": "...", "unit": "..." },
-      { "label": "...", "value": "...", "unit": "..." }
-    ],
-    "items": [
-      { "title": "Domain item (dish, server, product, course...)", "subtitle": "...", "meta": "price/ping/distance", "emoji": "🍕", "badge": "PRO" }
-    ],
-    "plans": [
-      { "id": "basic", "name": "Basic", "price": "0", "unit": "/mo", "description": "...", "features": ["...", "..."] },
-      { "id": "pro",   "name": "Pro",   "price": "299₽", "unit": "/mo", "description": "...", "highlight": true, "features": ["...", "..."] }
-    ],
-    "tabs": [
-      { "id": "home",   "label": "Home",    "icon": "home" },
-      { "id": "items",  "label": "Catalog", "icon": "list" },
-      { "id": "plans",  "label": "Plans",   "icon": "plans" },
-      { "id": "profile","label": "Profile", "icon": "profile" }
-    ]
-  }`;
+== ALLOWED NODE KINDS ==
+trigger.command, trigger.message, trigger.callback,
+message.text, message.photo, message.document,
+keyboard.inline, keyboard.reply,
+miniapp.screen, logic.condition, action.api.
 
-const RULES_ON = `
-
-ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
-  message.text, message.photo, message.document,
-  keyboard.inline, keyboard.reply,
-  miniapp.screen, logic.condition, action.api.
-ALLOWED preview.buttons actions: open_miniapp, plans, help, profile, locations.
-
-Mini App is ENABLED. You MUST design a COMPLETE, production-grade mini-app
-that maps 1:1 to the user's domain (food delivery, hotel booking, fitness,
-language tutor, e-commerce, support, music, VPN, repair shop, etc.).
-HARD RULES:
-- NEVER reuse VPN/server/ping copy unless the user explicitly asked for VPN.
-- "accent" picks the brand mood: food=orange, fitness=red, edu=violet, vpn=blue,
-  travel=teal, beauty=pink, finance=green, repair=orange, dating=pink.
-- "itemsLabel" reflects the catalog ("Меню", "Корзина", "Услуги", "Курсы",
-  "Туры", "Записи", "Тренировки"...).
-- "hero.title" / "hero.cta" / "hero.icon" must match the domain
-  (food → "Закажите за 30 мин", "Оформить заказ", icon "food";
-   fitness → "Начать тренировку", "Старт", icon "fitness";
-   repair → "Заявка на ремонт", "Оставить заявку", icon "work").
-- "items": 4-6 REAL domain entries with believable subtitle + meta
-  (price ₽/$ for shop, distance for delivery, ping for vpn, level for edu,
-   duration for fitness, time slot for booking).
-- "stats": 2-4 KPIs that fit the domain (orders, calories burned, lessons left,
-  open tickets, balance, points). NOT "speed/ip/protected".
-- "plans": 2-3 pricing cards that fit the domain. If pricing is irrelevant
-  (e.g. internal support bot), still return [] (empty array) — never invent VPN tariffs.
-- "tabs": 3-4 entries; first is always "home", include one "items" tab whose
-  label matches itemsLabel.
-- Exactly ONE "miniapp.screen" node and a primary chat button with action
-  "open_miniapp" labelled in the bot's language and domain
-  ("Открыть меню", "Записаться", "Open shop"...).
+== MINI APP IS ENABLED ==
+Design a complete mini-app that maps 1:1 to the user's domain.
+- accent: food=orange, fitness=red, edu=violet, vpn=blue, travel=teal,
+  beauty=pink, finance=green, repair=orange, dating=pink.
+- itemsLabel reflects the catalog ("Меню", "Корзина", "Услуги", "Курсы"...).
+- hero.title / hero.cta / hero.icon must match the domain.
+- items: 4-6 REAL domain entries with believable subtitle + meta.
+- stats: 2-4 KPIs that fit the domain (NOT speed/ip/protected).
+- plans: 2-3 pricing cards or [] if irrelevant.
+- tabs: 3-4 entries; first is "home", include one tab whose label = itemsLabel.
+- Add EXACTLY ONE miniapp.screen node and a primary chat button with action
+  "open_miniapp" labelled in the user's language ("Открыть меню", "Open shop").
 Keep 4-6 nodes max.`;
 
-const RULES_OFF = `
+const NO_MINIAPP_RULES = `
 
-ALLOWED node kinds: trigger.command, trigger.message, trigger.callback,
-  message.text, message.photo, message.document,
-  keyboard.inline, keyboard.reply,
-  logic.condition, action.api.
-ALLOWED actions: plans, help, profile, screen:<id> (NEVER open_miniapp, NEVER locations).
-Mini App is DISABLED — the user did NOT check the Mini App option.
-HARD RULES:
-- Do NOT include any "miniapp.screen" node.
-- Do NOT add a "miniapp" field to JSON.
-- Do NOT mention Mini App, WebView or in-app screen anywhere.
-- Do NOT include buttons with action "open_miniapp" or "locations".
-- Build a pure chat-only flow: commands, text replies, inline keyboards,
-  data collection, API calls. The whole UX lives inside the chat.
-- If the user asks for steps like "press button → next level / next screen / next menu",
-  you MUST express this in preview.screens with 2-5 linked chat screens and
-  buttons using action "screen:<id>".
-- preview.botMessages/buttons represent the first visible state, while
-  preview.screens defines the full clickable chat simulation.
-Keep 3-5 nodes max.`;
+== ALLOWED NODE KINDS ==
+trigger.command, trigger.message, trigger.callback,
+message.text, message.photo, message.document,
+keyboard.inline, keyboard.reply,
+logic.condition, action.api.
 
-const PLATFORM_TG = `\n\nTarget platform: **Telegram Bot API**.
+== MINI APP IS DISABLED ==
+Build a pure chat-only flow. Forbidden: miniapp.screen nodes, "miniapp" field,
+buttons with action "open_miniapp" or "locations". Allowed button actions:
+plans, help, profile, screen:<id>.
+
+If the user describes step-by-step navigation ("press button → next screen"),
+encode it as preview.screens with 2-5 linked chat screens and buttons using
+action "screen:<id>".
+Keep 3-6 nodes max.`;
+
+const PLATFORM_TG = `
+
+== PLATFORM: Telegram Bot API ==
 Use Telegram concepts: BotFather token, /commands, inline keyboards
-(callback_data), reply keyboards, sendMessage, parse_mode HTML/Markdown,
-webhooks or long polling. Buttons live under messages as InlineKeyboardMarkup.`;
+(callback_data), reply keyboards, sendMessage, parse_mode HTML/Markdown.`;
 
-const PLATFORM_MAX = `\n\nTarget platform: **Max Messenger Bot API** (VK Max, ru).
+const PLATFORM_MAX = `
+
+== PLATFORM: Max Messenger Bot API (VK Max, ru) ==
 Use Max concepts: Max Developer Console token, /commands, inline buttons
-(payload), keyboard with rows, sendMessage via Max Bot API, long polling.
-Do NOT mention Telegram-only features (BotFather, parse_mode HTML).
-Keep flow names and copy in Russian by default for Max.`;
+(payload), keyboard with rows. Do NOT mention Telegram-only features.`;
 
 const REAL_MODELS = {
   gpt: "openai/gpt-5",
@@ -149,14 +111,13 @@ function resolveModel(input?: string): string {
   const key = (input ?? "auto").toLowerCase();
   if (key in REAL_MODELS) return REAL_MODELS[key as keyof typeof REAL_MODELS];
   if (key in ALIASES) return REAL_MODELS[ALIASES[key]];
-  return REAL_MODELS.gpt;
+  return REAL_MODELS.gemini;
 }
 
 function buildPrompt(miniAppEnabled: boolean, platform: string): string {
-  const schema = miniAppEnabled ? MINIAPP_ON : "";
-  const rules = miniAppEnabled ? RULES_ON : RULES_OFF;
+  const rules = miniAppEnabled ? MINIAPP_RULES : NO_MINIAPP_RULES;
   const platformLine = platform === "max" ? PLATFORM_MAX : PLATFORM_TG;
-  return BASE_PROMPT.replace("<MINIAPP_SCHEMA>", schema) + rules + platformLine;
+  return BASE_PROMPT + rules + platformLine;
 }
 
 function buildTools(miniAppEnabled: boolean) {
@@ -279,7 +240,7 @@ interface FlowSnapshotIn {
 function describeSnapshot(snap?: FlowSnapshotIn): string {
   if (!snap || !snap.nodes?.length) return "";
   const lines: string[] = [];
-  lines.push("\n\n=== CURRENT CANVAS (use these EXACT params when generating code) ===");
+  lines.push("\n\n== CURRENT CANVAS (use these EXACT params when generating code) ==");
   for (const n of snap.nodes) {
     const params = n.params && Object.keys(n.params).length
       ? Object.entries(n.params)
@@ -311,6 +272,11 @@ Deno.serve(async (req: Request) => {
       platform?: string;
       tools?: boolean;
       flowSnapshot?: FlowSnapshotIn;
+      /** When true, skip tool definitions and ask for a short text-only summary
+       *  of what was just built. Used for the auto follow-up call. */
+      summaryOnly?: boolean;
+      /** Lines describing what tools were just executed (for summaryOnly). */
+      executedSteps?: string[];
     };
     const {
       messages,
@@ -319,6 +285,8 @@ Deno.serve(async (req: Request) => {
       platform = "telegram",
       tools: enableTools = true,
       flowSnapshot,
+      summaryOnly = false,
+      executedSteps = [],
     } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -331,9 +299,25 @@ Deno.serve(async (req: Request) => {
       return json({ error: "LOVABLE_API_KEY is not configured" }, 500);
     }
 
-    const systemPrompt = buildPrompt(miniApp, platform) + describeSnapshot(flowSnapshot);
+    let systemPrompt: string;
+    let toolDefs: any[] | undefined;
 
-    const toolDefs = enableTools ? buildTools(miniApp) : undefined;
+    if (summaryOnly) {
+      // Second-round call: just turn the executed steps into a short, friendly
+      // human-readable summary that the user sees as the assistant's reply.
+      systemPrompt = `You are **Anvl**. You JUST built a bot for the user by calling these tools:
+
+${executedSteps.map((s) => "• " + s).join("\n")}
+
+Now write a SHORT summary (2-4 sentences, in the user's language, markdown ok)
+explaining what you built. Mention concrete commands, button labels, and how
+the user can try it. Be specific to the domain. Do NOT call any tools.
+Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
+      toolDefs = undefined;
+    } else {
+      systemPrompt = buildPrompt(miniApp, platform) + describeSnapshot(flowSnapshot);
+      toolDefs = enableTools ? buildTools(miniApp) : undefined;
+    }
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -348,7 +332,9 @@ Deno.serve(async (req: Request) => {
           ...messages.slice(-12),
         ],
         stream: true,
-        max_tokens: 4096,
+        // Bigger budget so the model can finish all tool calls + write the
+        // summary in one go without truncation.
+        max_tokens: summaryOnly ? 700 : 8192,
         ...(toolDefs ? { tools: toolDefs, tool_choice: "auto" } : {}),
       }),
     });
