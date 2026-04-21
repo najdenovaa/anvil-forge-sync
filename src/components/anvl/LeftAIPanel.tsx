@@ -690,7 +690,13 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
   return (
     <div className="max-w-[88%] space-y-1.5">
-      {isLive && <ThinkingStepper step={msg.step ?? 0} liveThoughts={msg.thoughts ?? ""} />}
+      {isLive && (
+        <ThinkingStepper
+          step={msg.step ?? 0}
+          liveThoughts={msg.thoughts ?? ""}
+          liveSteps={msg.liveSteps ?? []}
+        />
+      )}
 
       {/* Live tool ops feed — Rork/Lovable-style: shows what's happening RIGHT NOW */}
       {isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} live />}
