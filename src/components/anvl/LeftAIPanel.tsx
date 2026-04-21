@@ -518,357 +518,45 @@ export function LeftAIPanel() {
     setIsStreaming(true);
 
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/architect-chat`;
-      const wireMessages = baseHistory.map((m) => ({ role: m.role, content: m.content }));
+      // Round 1 — model uses tools to mutate the canvas.
+      const { liveSteps, usedTools, finalAnswer } = await runRound(baseHistory);
 
-      // Snapshot current canvas so the AI generates code that reflects the
-      // user's actual params (text values, URLs, conditions...) rather than
-      // re-inventing them from scratch.
-      const flowSnapshot = {
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          kind: (n.data?.kind as string) ?? "message.text",
-          title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
-          params: (n.data?.params as Record<string, string>) ?? {},
-        })),
-        edges: edges.map((e) => ({ from: e.source, to: e.target })),
-      };
-
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: wireMessages, model, miniApp: miniAppEnabled, platform, flowSnapshot }),
-      });
-
-      if (resp.status === 429) {
-        stopStepper();
-        setError(t("ai.rate_limit"));
-        setMessages(baseHistory);
-        setIsStreaming(false);
-        return;
-      }
-      if (resp.status === 402) {
-        stopStepper();
-        setError(t("ai.payment"));
-        setMessages(baseHistory);
-        setIsStreaming(false);
-        return;
-      }
-      if (!resp.ok || !resp.body) throw new Error("network");
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let raw = "";
-      let thoughts = "";
-      let blueprintRaw = "";
-      let answer = "";
-      let phase: 0 | 1 | 2 | 3 | 4 = 0;
-      let pending = "";
-      let blueprintApplied = false;
-      let codeApplied = false;
-      // Tool-calling state: assemble streaming tool_calls by index
-      const toolBuf: { name: string; args: string; done: boolean }[] = [];
-      const liveOps: ToolOp[] = [];
-      const liveSteps: string[] = [];
-      let liveStep: 0 | 1 | 2 | 3 = 0;
-      const applyToolCall = (name: string, argsRaw: string) => {
-        let args: any;
-        try { args = JSON.parse(argsRaw); } catch { return; }
-        liveOps.push({ name, args: args ?? {} });
-        liveSteps.push(describeToolStep(name, args ?? {}));
-        // Drive the Architect Logic stepper from real tool activity:
-        // reset → step 1 (planning), add_node/connect → step 2 (composing),
-        // set_preview/set_miniapp → step 3 (finalising).
-        if (name === "reset_canvas" && liveStep < 1) liveStep = 1;
-        else if ((name === "add_node" || name === "connect") && liveStep < 2) liveStep = 2;
-        else if ((name === "set_preview" || name === "set_miniapp" || name === "set_param") && liveStep < 3) liveStep = 3;
-        try {
-          if (name === "reset_canvas") resetAiCanvas();
-          else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
-          else if (name === "connect") connectAiNodes(args.from, args.to);
-          else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
-          else if (name === "set_preview") mergePreview(args);
-          else if (name === "set_miniapp") mergeMiniApp(args);
-        } catch (err) { console.warn("tool apply failed", name, err); }
-      };
-
-      const flush = () => {
-        if (!blueprintApplied && blueprintRaw.includes("\"nodes\"") && blueprintRaw.includes("\"preview\"")) {
-          const liveBlueprint = safeParseAnvlBlueprint(blueprintRaw.trim());
-          if (liveBlueprint) {
-            applyBlueprint(sanitizeBlueprintForMode(liveBlueprint, miniAppEnabled));
-            blueprintApplied = true;
-          }
-        }
-        if (!codeApplied) {
-          const liveCode = extractTaggedBlock(raw, "code").trim();
-          if (liveCode) {
-            setGeneratedCode(liveCode);
-            codeApplied = true;
-          }
-        }
-        setMessages((prev) => {
-          const copy = prev.slice();
-          const last = copy[copy.length - 1];
-          if (!last || last.role !== "assistant") return prev;
-          // Keep step monotonically growing — never roll backwards.
-          const nextStep = Math.max(last.step ?? 0, liveStep);
-          copy[copy.length - 1] = {
-            ...last,
-            thoughts,
-            content: answer,
-            toolOps: liveOps.length ? [...liveOps] : last.toolOps,
-            liveSteps: liveSteps.length ? [...liveSteps] : last.liveSteps,
-            step: nextStep,
-            pending: phase !== 4 && answer.length === 0,
-          };
-          return copy;
+      // If the model only emitted tool_calls without a textual reply, run a
+      // follow-up round asking for a short summary in the user's language.
+      // This guarantees the chat ALWAYS has a real assistant message.
+      if (usedTools && !finalAnswer.trim()) {
+        // The placeholder message stays the same; just stream new text into
+        // its `content` field via runRound's flush() updates.
+        await runRound(baseHistory, {
+          summaryOnly: true,
+          executedSteps: liveSteps,
         });
-      };
-
-      const THINK_OPEN = "<think>";
-      const THINK_CLOSE = "</think>";
-      const BLUEPRINT_OPEN = "<blueprint>";
-      const BLUEPRINT_CLOSE = "</blueprint>";
-      const SAFE_TAIL = 16;
-
-      const ingest = (chunk: string) => {
-        raw += chunk;
-        pending += chunk;
-
-        while (pending.length > 0) {
-          if (phase === 0) {
-            const open = pending.indexOf(THINK_OPEN);
-            if (open !== -1) {
-              answer += pending.slice(0, open);
-              pending = pending.slice(open + THINK_OPEN.length);
-              phase = 1;
-              stopStepper();
-              continue;
-            }
-            if (pending.length > SAFE_TAIL) {
-              const safe = pending.slice(0, pending.length - SAFE_TAIL);
-              if (safe.length) {
-                answer += safe;
-                pending = pending.slice(safe.length);
-                phase = 4;
-                stopStepper();
-              }
-            }
-            break;
-          }
-
-          if (phase === 1) {
-            const close = pending.indexOf(THINK_CLOSE);
-            if (close !== -1) {
-              thoughts += pending.slice(0, close);
-              pending = pending.slice(close + THINK_CLOSE.length);
-              phase = 2;
-              continue;
-            }
-            if (pending.length > SAFE_TAIL) {
-              const safe = pending.slice(0, pending.length - SAFE_TAIL);
-              thoughts += safe;
-              pending = pending.slice(safe.length);
-            }
-            break;
-          }
-
-          if (phase === 2) {
-            const open = pending.indexOf(BLUEPRINT_OPEN);
-            if (open !== -1) {
-              answer += pending.slice(0, open);
-              pending = pending.slice(open + BLUEPRINT_OPEN.length);
-              phase = 3;
-              continue;
-            }
-            if (pending.length > SAFE_TAIL) {
-              const safe = pending.slice(0, pending.length - SAFE_TAIL);
-              if (safe.length) {
-                answer += safe;
-                pending = pending.slice(safe.length);
-                phase = 4;
-              }
-            }
-            break;
-          }
-
-          if (phase === 3) {
-            const close = pending.indexOf(BLUEPRINT_CLOSE);
-            if (close !== -1) {
-              blueprintRaw += pending.slice(0, close);
-              pending = pending.slice(close + BLUEPRINT_CLOSE.length);
-              phase = 4;
-              continue;
-            }
-            if (pending.length > SAFE_TAIL) {
-              const safe = pending.slice(0, pending.length - SAFE_TAIL);
-              blueprintRaw += safe;
-              pending = pending.slice(safe.length);
-            }
-            break;
-          }
-
-          answer += pending;
-          pending = "";
-          break;
+      }
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "";
+      if (reason !== "rate_limit" && reason !== "payment") {
+        console.error("architect-chat failed", e);
+        setError(t("ai.error"));
+      }
+      // Roll back the placeholder if nothing was applied.
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && !last.content.trim() && !(last.toolOps?.length)) {
+          return prev.slice(0, -1);
         }
-
-        flush();
-      };
-
-      let done = false;
-      while (!done) {
-        const { value, done: d } = await reader.read();
-        if (d) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let nl: number;
-        while ((nl = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, nl);
-          buffer = buffer.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line || line.startsWith(":")) continue;
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") {
-            done = true;
-            break;
-          }
-          try {
-            const parsed = JSON.parse(json);
-            const choice = parsed.choices?.[0];
-            const delta = choice?.delta?.content as string | undefined;
-            if (delta) ingest(delta);
-            // Tool calls — assemble streaming function calls and apply EAGERLY
-            // as soon as each call's args become valid JSON. This drives the
-            // Architect Logic stepper and the live ops feed in real time
-            // (Gemini ships tool_calls without any text content).
-            const tcDelta = choice?.delta?.tool_calls as Array<any> | undefined;
-            if (tcDelta) {
-              stopStepper(); // we have a real signal, stop the soft auto-stepper
-              for (const tc of tcDelta) {
-                const idx = tc.index ?? 0;
-                if (!toolBuf[idx]) toolBuf[idx] = { name: "", args: "", done: false };
-                if (tc.function?.name) toolBuf[idx].name = tc.function.name;
-                if (tc.function?.arguments) toolBuf[idx].args += tc.function.arguments;
-                // Try eager apply — many providers send the full args in one chunk.
-                const buf = toolBuf[idx];
-                if (!buf.done && buf.name && buf.args.trim().length) {
-                  try {
-                    JSON.parse(buf.args);
-                    applyToolCall(buf.name, buf.args);
-                    buf.done = true;
-                  } catch {
-                    /* args still streaming — wait for next chunk */
-                  }
-                }
-              }
-              flush();
-            }
-            const finishReason = choice?.finish_reason;
-            if (finishReason === "tool_calls" || finishReason === "stop") {
-              for (const tc of toolBuf) {
-                if (tc && !tc.done && tc.name) {
-                  applyToolCall(tc.name, tc.args || "{}");
-                  tc.done = true;
-                }
-              }
-              flush();
-            }
-          } catch {
-            buffer = line + "\n" + buffer;
-            break;
-          }
-        }
-      }
-
-      if (pending.length > 0) {
-        const phaseValue = phase as number;
-        if (phaseValue === 1) thoughts += pending;
-        else if (phaseValue === 3) blueprintRaw += pending;
-        else answer += pending;
-        pending = "";
-      }
-
-      // Apply any tool_calls that finished without an explicit finish_reason event.
-      for (const tc of toolBuf) {
-        if (tc && !tc.done && tc.name) {
-          applyToolCall(tc.name, tc.args || "{}");
-          tc.done = true;
-        }
-      }
-      const usedTools = toolBuf.some((tc) => tc?.done);
-
-      const extractedThoughts = extractTaggedBlock(raw, "think").trim();
-      const extractedBlueprint = extractTaggedBlock(raw, "blueprint").trim() || blueprintRaw.trim();
-      const extractedCode = extractTaggedBlock(raw, "code").trim();
-      const strippedAnswer = stripTaggedBlocks(raw).trim();
-
-      // Build a smart fallback summary from the tool ops when the model
-      // forgot to write its own (otherwise we'd just show "tools_done").
-      const buildSummaryFromOps = () => {
-        if (!liveOps.length) return "";
-        const added = liveOps.filter((o) => o.name === "add_node").length;
-        const linked = liveOps.filter((o) => o.name === "connect").length;
-        const previewTouched = liveOps.some((o) => o.name === "set_preview");
-        const miniTouched = liveOps.some((o) => o.name === "set_miniapp");
-        const titles = liveOps
-          .filter((o) => o.name === "add_node")
-          .map((o) => (o.args as any).title)
-          .filter(Boolean)
-          .slice(0, 4);
-        const parts: string[] = [];
-        if (added) parts.push(`Собрал ${added} ${added === 1 ? "блок" : "блоков"}`);
-        if (linked) parts.push(`${linked} ${linked === 1 ? "связь" : "связи"}`);
-        if (previewTouched) parts.push("обновил превью");
-        if (miniTouched) parts.push("настроил Mini App");
-        const head = parts.length ? parts.join(", ") + "." : t("ai.msg.tools_done");
-        const tail = titles.length ? ` Сценарии: ${titles.join(" → ")}.` : "";
-        return head + tail;
-      };
-
-      const finalAnswer = strippedAnswer || buildSummaryFromOps() || (usedTools ? t("ai.msg.tools_done") : (answer || raw).trim());
-      // Only fall back to legacy blueprint when no tools were used.
-      if (!usedTools) {
-        const blueprint = safeParseAnvlBlueprint(extractedBlueprint);
-        if (blueprint) applyBlueprint(sanitizeBlueprintForMode(blueprint, miniAppEnabled));
-      }
-      if (extractedCode) setGeneratedCode(extractedCode);
-
-      // Build the final "thoughts" payload that the user can re-open under the
-      // bubble. Prefer the model's own <think> block; otherwise fall back to
-      // the synthesised step-by-step plan derived from real tool calls.
-      const finalThoughts =
-        extractedThoughts ||
-        thoughts.trim() ||
-        (liveSteps.length ? liveSteps.map((s) => "• " + s).join("\n") : "");
-
+        return prev;
+      });
+    } finally {
+      setIsStreaming(false);
+      // Make sure pending is cleared on the final message.
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
-        if (last?.role === "assistant") {
-          copy[copy.length - 1] = {
-            role: "assistant",
-            content: finalAnswer,
-            thoughts: finalThoughts || undefined,
-            toolOps: liveOps.length ? [...liveOps] : undefined,
-            liveSteps: liveSteps.length ? [...liveSteps] : undefined,
-          };
+        if (last?.role === "assistant" && last.pending) {
+          copy[copy.length - 1] = { ...last, pending: false };
         }
         return copy;
       });
-    } catch (e) {
-      console.error("architect-chat failed", e);
-      setError(t("ai.error"));
-      setMessages(baseHistory);
-    } finally {
-      stopStepper();
-      setIsStreaming(false);
     }
   };
 
