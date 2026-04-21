@@ -82,11 +82,55 @@ function findEntry(nodes: Node[]): string | null {
   return nodes[0]?.id ?? null;
 }
 
-/** Parse newline-separated buttons. Supports "Label|action" and simple labels. */
+/**
+ * Parse buttons from a node param. Supports three formats produced by the AI:
+ *   1. JSON array: `[{"label":"A","action":"x"}, ...]`
+ *   2. Newline-separated `Label|action` pairs
+ *   3. Plain labels (one per line)
+ */
 function parseButtons(raw: string | undefined): SimButton[] {
   if (!raw || !raw.trim()) return [];
-  const parts = raw
-    .split(/\n/)
+  const trimmed = raw.trim();
+
+  // Strategy 1 — JSON array (object items or plain string items).
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item, i) => {
+            if (typeof item === "string") {
+              const label = item.trim();
+              if (!label) return null;
+              return { id: `btn-${i}`, label, action: label, primary: i === 0 };
+            }
+            if (item && typeof item === "object") {
+              const obj = item as Record<string, unknown>;
+              const label =
+                (typeof obj.label === "string" && obj.label) ||
+                (typeof obj.text === "string" && obj.text) ||
+                (typeof obj.title === "string" && obj.title) ||
+                `Button ${i + 1}`;
+              const action =
+                (typeof obj.action === "string" && obj.action) ||
+                (typeof obj.callback === "string" && obj.callback) ||
+                (typeof obj.callback_data === "string" && obj.callback_data) ||
+                (typeof obj.data === "string" && obj.data) ||
+                label;
+              return { id: `btn-${i}`, label, action, primary: i === 0 };
+            }
+            return null;
+          })
+          .filter((b): b is SimButton => b !== null);
+      }
+    } catch {
+      // fall through to text parsing
+    }
+  }
+
+  // Strategy 2/3 — newline-separated `Label|action` or plain labels.
+  const parts = trimmed
+    .split(/\n|,(?=\s*[^\d])/) // also split on commas before non-digit (CSV-like)
     .map((p) => p.trim())
     .filter(Boolean);
   return parts.map((p, i) => {
