@@ -51,6 +51,47 @@ interface Msg {
   pending?: boolean;
   step?: number;
   toolOps?: ToolOp[];
+  /** Synthesised "what AI is doing right now" lines — drives Architect Logic when the model
+   *  emits only tool_calls and no <think> block. */
+  liveSteps?: string[];
+}
+
+/** Turn a tool call into a short human-readable plan line. */
+function describeToolStep(name: string, args: Record<string, any>): string {
+  switch (name) {
+    case "reset_canvas":
+      return "Очищаю холст для новой схемы";
+    case "add_node": {
+      const kind = args.kind ?? "block";
+      const title = args.title ?? args.id ?? "";
+      const kindLabel: Record<string, string> = {
+        "trigger.command": "команда",
+        "trigger.message": "входящее сообщение",
+        "trigger.callback": "callback",
+        "message.text": "текстовое сообщение",
+        "message.photo": "фото",
+        "message.document": "документ",
+        "keyboard.inline": "inline-клавиатура",
+        "keyboard.reply": "reply-клавиатура",
+        "miniapp.screen": "экран Mini App",
+        "logic.condition": "условие",
+        "action.api": "API-вызов",
+      };
+      return `Добавляю ${kindLabel[kind] ?? kind}: «${title}»`;
+    }
+    case "connect":
+      return `Соединяю ${args.from} → ${args.to}`;
+    case "set_param": {
+      const v = String(args.value ?? "").trim().slice(0, 40);
+      return `Параметр ${args.id}.${args.key} = ${v}${v.length === 40 ? "…" : ""}`;
+    }
+    case "set_preview":
+      return "Настраиваю превью бота";
+    case "set_miniapp":
+      return "Настраиваю Mini App";
+    default:
+      return name;
+  }
 }
 
 function extractTaggedBlock(source: string, tag: string) {
