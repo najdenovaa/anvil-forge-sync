@@ -685,55 +685,192 @@ function MessageBubble({ msg }: { msg: Msg }) {
 
   const isLive = !!msg.pending;
   const hasThoughts = !!msg.thoughts && msg.thoughts.trim().length > 0;
-
   const hasOps = !!msg.toolOps && msg.toolOps.length > 0;
+  const hasContent = msg.content.trim().length > 0;
+
+  // While streaming, show the model's live <think> stream INSIDE the bubble
+  // (typewriter), so the chat shows exactly what the AI is saying right now.
+  // Once the model emits its real summary, swap to that.
+  const liveBubbleText = hasContent ? msg.content : (msg.thoughts ?? "");
+  const showingThoughtsAsContent = isLive && !hasContent && hasThoughts;
 
   return (
     <div className="max-w-[88%] space-y-1.5">
+      {/* The chat bubble — always visible. Streams the model's own words. */}
+      <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-foreground/90">
+        {liveBubbleText ? (
+          <div className="whitespace-pre-wrap">
+            {showingThoughtsAsContent && (
+              <span className="mr-1.5 inline-flex items-center gap-1 align-middle text-[10px] font-semibold uppercase tracking-[0.14em] text-[oklch(0.78_0.18_280)]">
+                <Brain className="h-2.5 w-2.5" />
+                <span>thinking</span>
+              </span>
+            )}
+            {liveBubbleText}
+            {isLive && (
+              <span className="ml-0.5 inline-block h-3 w-[2px] translate-y-[2px] animate-pulse bg-foreground/60 align-middle" />
+            )}
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> {t("ai.thinking")}
+          </span>
+        )}
+
+        {!isLive && hasThoughts && hasContent && (
+          <div className="mt-2 border-t border-hairline pt-2">
+            <button
+              onClick={() => setOpenThoughts((v) => !v)}
+              className="flex w-full items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground transition hover:text-foreground"
+            >
+              <Brain className="h-3 w-3" />
+              <span>{t("ai.thoughts")}</span>
+              <ChevronRight className={cn("h-3 w-3 transition", openThoughts && "rotate-90")} />
+            </button>
+            {openThoughts && (
+              <div className="mt-1.5 whitespace-pre-wrap rounded-md bg-accent/40 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                {msg.thoughts}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Visualisation pipeline — what the AI is currently transferring into
+          the canvas / preview. Lives BELOW the chat text, never replaces it. */}
       {isLive && (
-        <ThinkingStepper
+        <BuildPipeline
           step={msg.step ?? 0}
-          liveThoughts={msg.thoughts ?? ""}
+          ops={msg.toolOps ?? []}
           liveSteps={msg.liveSteps ?? []}
         />
-      )}
-
-      {/* Live tool ops feed — Rork/Lovable-style: shows what's happening RIGHT NOW */}
-      {isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} live />}
-
-      {(msg.content.length > 0 || !isLive) && (
-        <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-foreground/90">
-          {msg.content ? (
-            <div className="whitespace-pre-wrap">{msg.content}</div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> {t("ai.thinking")}
-            </span>
-          )}
-
-          {!isLive && hasThoughts && (
-            <div className="mt-2 border-t border-hairline pt-2">
-              <button
-                onClick={() => setOpenThoughts((v) => !v)}
-                className="flex w-full items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground transition hover:text-foreground"
-              >
-                <Brain className="h-3 w-3" />
-                <span>{t("ai.thoughts")}</span>
-                <ChevronRight className={cn("h-3 w-3 transition", openThoughts && "rotate-90")} />
-              </button>
-              {openThoughts && (
-                <div className="mt-1.5 whitespace-pre-wrap rounded-md bg-accent/40 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                  {msg.thoughts}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       )}
 
       {/* Final tool ops list — collapsed under the bubble */}
       {!isLive && hasOps && <ToolOpsFeed ops={msg.toolOps!} />}
     </div>
+  );
+}
+
+/** Compact "transferring to canvas" pipeline shown under the live chat bubble.
+ *  Keeps the chat text pristine (just what AI says) and shows the build phase
+ *  + live action feed separately. */
+function BuildPipeline({
+  step,
+  ops,
+  liveSteps,
+}: {
+  step: number;
+  ops: ToolOp[];
+  liveSteps: string[];
+}) {
+  const { t } = useI18n();
+  const phases = [
+    { icon: Brain, key: "ai.step.analyze" },
+    { icon: Cpu, key: "ai.step.plan" },
+    { icon: PencilLine, key: "ai.step.compose" },
+  ];
+  const hasActivity = ops.length > 0 || liveSteps.length > 0;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      className="reasoning-glass relative overflow-hidden rounded-xl px-3 py-2"
+    >
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, oklch(0.78 0.18 280 / 80%), transparent)",
+        }}
+        animate={{ x: ["-100%", "100%"] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
+      />
+
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Cpu className="h-3 w-3 text-[oklch(0.78_0.18_280)]" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/80">
+          {t("ai.pipeline") /* falls back via i18n */}
+        </span>
+        {hasActivity && (
+          <span className="ml-auto rounded-full bg-foreground/10 px-1.5 py-px font-mono text-[9px] text-foreground/80">
+            {liveSteps.length || ops.length}
+          </span>
+        )}
+      </div>
+
+      <ol className="flex items-center gap-1.5">
+        {phases.map((p, i) => {
+          const state = i < step ? "done" : i === step ? "active" : "pending";
+          const Icon = p.icon;
+          return (
+            <li key={p.key} className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "flex h-4 w-4 items-center justify-center rounded-full border transition",
+                  state === "done" && "border-foreground/40 bg-foreground/10 text-foreground/70",
+                  state === "active" &&
+                    "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] text-foreground shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
+                  state === "pending" && "border-hairline text-muted-foreground/50",
+                )}
+              >
+                {state === "done" ? (
+                  <Check className="h-2 w-2" />
+                ) : state === "active" ? (
+                  <Loader2 className="h-2 w-2 animate-spin" />
+                ) : (
+                  <Icon className="h-2 w-2" />
+                )}
+              </span>
+              <span
+                className={cn(
+                  "text-[10.5px]",
+                  state === "active" ? "text-foreground" : "text-muted-foreground/70",
+                )}
+              >
+                {t(p.key)}
+              </span>
+              {i < phases.length - 1 && (
+                <span className="mx-0.5 h-px w-3 bg-hairline" />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      <AnimatePresence initial={false}>
+        {liveSteps.length > 0 && (
+          <motion.ul
+            key="live-steps"
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border border-hairline bg-background/40 px-2 py-1.5"
+          >
+            <AnimatePresence initial={false}>
+              {liveSteps.map((line, i) => (
+                <motion.li
+                  key={`${i}-${line}`}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground/85"
+                >
+                  <Check className="mt-[2px] h-2.5 w-2.5 shrink-0 text-status-ok" />
+                  <span className="break-words">{line}</span>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
