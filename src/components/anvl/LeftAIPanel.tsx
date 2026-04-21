@@ -776,7 +776,15 @@ function ToolOpsFeed({ ops, live = false }: { ops: ToolOp[]; live?: boolean }) {
   );
 }
 
-function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: string }) {
+function ThinkingStepper({
+  step,
+  liveThoughts,
+  liveSteps,
+}: {
+  step: number;
+  liveThoughts: string;
+  liveSteps: string[];
+}) {
   const { t } = useI18n();
   const steps = [
     { icon: Brain, key: "ai.step.analyze" },
@@ -803,6 +811,8 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
 
   const visibleThoughts = liveThoughts.slice(0, revealed);
   const stillTyping = revealed < liveThoughts.length;
+  const hasLiveSteps = liveSteps.length > 0;
+  const hasThoughtsStream = liveThoughts.trim().length > 0;
 
   return (
     <motion.div
@@ -834,7 +844,6 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           className="relative flex h-5 w-5 items-center justify-center rounded-md bg-foreground/10 text-[oklch(0.78_0.18_280)]"
         >
-          {/* Soft glow halo behind brain */}
           <span
             aria-hidden
             className="pointer-events-none absolute inset-[-4px] rounded-lg blur-md"
@@ -846,7 +855,12 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
           Architect Logic
         </span>
         <span className="text-[10px] text-muted-foreground">· {t("ai.thinking")}</span>
-        {stillTyping && (
+        {hasLiveSteps && (
+          <span className="ml-auto rounded-full bg-foreground/10 px-1.5 py-px font-mono text-[9px] text-foreground/80">
+            {liveSteps.length}
+          </span>
+        )}
+        {!hasLiveSteps && stillTyping && (
           <span className="ml-auto font-mono text-[9px] text-muted-foreground/70">
             {revealed}/{liveThoughts.length}
           </span>
@@ -871,7 +885,8 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
                 className={cn(
                   "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
                   state === "done" && "border-foreground/40 bg-foreground/10",
-                  state === "active" && "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
+                  state === "active" &&
+                    "border-[oklch(0.78_0.18_280)] bg-[oklch(0.78_0.18_280/15%)] shadow-[0_0_8px_0_oklch(0.78_0.18_280/40%)]",
                   state === "pending" && "border-hairline",
                 )}
               >
@@ -889,8 +904,39 @@ function ThinkingStepper({ step, liveThoughts }: { step: number; liveThoughts: s
         })}
       </motion.ol>
 
+      {/* Live action feed: synthesised plan derived from real tool calls.
+       *  Each line slides in as the AI applies it to the canvas. */}
       <AnimatePresence initial={false}>
-        {liveThoughts.trim().length > 0 && (
+        {hasLiveSteps && (
+          <motion.ul
+            key="live-steps"
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-1 max-h-44 space-y-1 overflow-y-auto rounded-md border border-hairline bg-background/40 px-2 py-1.5"
+          >
+            <AnimatePresence initial={false}>
+              {liveSteps.map((line, i) => (
+                <motion.li
+                  key={`${i}-${line}`}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground/85"
+                >
+                  <Check className="mt-[2px] h-2.5 w-2.5 shrink-0 text-status-ok" />
+                  <span className="break-words">{line}</span>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </motion.ul>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {hasThoughtsStream && (
           <motion.div
             key="thoughts-stream"
             layout
