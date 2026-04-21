@@ -82,19 +82,23 @@ function findEntry(nodes: Node[]): string | null {
   return nodes[0]?.id ?? null;
 }
 
-/** Parse "Label A | Label B" or newline-separated lists from a params.buttons string. */
+/** Parse newline-separated buttons. Supports "Label|action" and simple labels. */
 function parseButtons(raw: string | undefined): SimButton[] {
   if (!raw || !raw.trim()) return [];
   const parts = raw
-    .split(/\n|\|/)
+    .split(/\n/)
     .map((p) => p.trim())
     .filter(Boolean);
-  return parts.map((p, i) => ({
-    id: `btn-${i}`,
-    label: p,
-    action: p, // reuse label as action — handlers see it as bare string
-    primary: i === 0,
-  }));
+  return parts.map((p, i) => {
+    const [labelRaw, actionRaw] = p.split("|").map((part) => part.trim());
+    const label = labelRaw || `Button ${i + 1}`;
+    return {
+      id: `btn-${i}`,
+      label,
+      action: actionRaw || label,
+      primary: i === 0,
+    };
+  });
 }
 
 /** Build the bot message + buttons that should be shown when we land on `node`. */
