@@ -274,10 +274,19 @@ export function LeftAIPanel() {
       // Tool-calling state: assemble streaming tool_calls by index
       const toolBuf: { name: string; args: string; done: boolean }[] = [];
       const liveOps: ToolOp[] = [];
+      const liveSteps: string[] = [];
+      let liveStep: 0 | 1 | 2 | 3 = 0;
       const applyToolCall = (name: string, argsRaw: string) => {
         let args: any;
         try { args = JSON.parse(argsRaw); } catch { return; }
         liveOps.push({ name, args: args ?? {} });
+        liveSteps.push(describeToolStep(name, args ?? {}));
+        // Drive the Architect Logic stepper from real tool activity:
+        // reset → step 1 (planning), add_node/connect → step 2 (composing),
+        // set_preview/set_miniapp → step 3 (finalising).
+        if (name === "reset_canvas" && liveStep < 1) liveStep = 1;
+        else if ((name === "add_node" || name === "connect") && liveStep < 2) liveStep = 2;
+        else if ((name === "set_preview" || name === "set_miniapp" || name === "set_param") && liveStep < 3) liveStep = 3;
         try {
           if (name === "reset_canvas") resetAiCanvas();
           else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
@@ -307,11 +316,15 @@ export function LeftAIPanel() {
           const copy = prev.slice();
           const last = copy[copy.length - 1];
           if (!last || last.role !== "assistant") return prev;
+          // Keep step monotonically growing — never roll backwards.
+          const nextStep = Math.max(last.step ?? 0, liveStep);
           copy[copy.length - 1] = {
             ...last,
             thoughts,
             content: answer,
             toolOps: liveOps.length ? [...liveOps] : last.toolOps,
+            liveSteps: liveSteps.length ? [...liveSteps] : last.liveSteps,
+            step: nextStep,
             pending: phase !== 4 && answer.length === 0,
           };
           return copy;
