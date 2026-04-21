@@ -98,7 +98,7 @@ function parseButtons(raw: string | undefined): SimButton[] {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
         return parsed
-          .map((item, i) => {
+          .map((item, i): SimButton | null => {
             if (typeof item === "string") {
               const label = item.trim();
               if (!label) return null;
@@ -121,7 +121,7 @@ function parseButtons(raw: string | undefined): SimButton[] {
             }
             return null;
           })
-          .filter((b): b is SimButton => b !== null);
+          .filter((b: SimButton | null): b is SimButton => b !== null);
       }
     } catch {
       // fall through to text parsing
