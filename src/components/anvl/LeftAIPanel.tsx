@@ -89,6 +89,8 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return "Настраиваю превью бота";
     case "set_miniapp":
       return "Настраиваю Mini App";
+    case "set_code":
+      return `Пишу рабочий код: ${args.filename ?? args.language ?? "bot"}`;
     default:
       return name;
   }
@@ -259,6 +261,7 @@ export function LeftAIPanel() {
         else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
         else if (name === "set_preview") mergePreview(args);
         else if (name === "set_miniapp") mergeMiniApp(args);
+        else if (name === "set_code") setGeneratedCode(String(args.content ?? ""));
       } catch (err) { console.warn("tool apply failed", name, err); }
     };
 
