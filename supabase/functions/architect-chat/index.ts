@@ -220,6 +220,23 @@ function buildTools(miniAppEnabled: boolean) {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "set_code",
+        description: "Store the runnable bot source code generated from the current canvas. Required after set_preview.",
+        parameters: {
+          type: "object",
+          properties: {
+            language: { type: "string", enum: ["typescript", "javascript", "python"] },
+            filename: { type: "string" },
+            content: { type: "string", description: "Runnable source code with real texts/buttons from the flow." },
+          },
+          required: ["language", "filename", "content"],
+          additionalProperties: false,
+        },
+      },
+    },
   ];
 
   if (miniAppEnabled) {
