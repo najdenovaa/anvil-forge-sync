@@ -217,11 +217,21 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
   const params = (node.data?.params ?? {}) as Record<string, any>;
   const exprCtx: ExprContext = { var: ctx.variables as any, user: ctx.user as any, text: ctx.text };
 
-  await logEvent(ctx.bot.id, ctx.chatId, "node.enter", node.id, { kind });
+  await logEvent(ctx.bot.id, ctx.chatId, "node_visited", node.id, { kind });
 
   const goNext = (handle?: string): string | null => {
     const edges = nextEdges(ctx.flow, node.id, handle);
     return edges[0]?.target ?? null;
+  };
+
+  const sendAndLog = async (method: string, body: Record<string, unknown>) => {
+    const res = await tgCall(ctx.token, method, body);
+    if (res?.ok) {
+      await logEvent(ctx.bot.id, ctx.chatId, "message_sent", node.id, { method });
+    } else {
+      await logEvent(ctx.bot.id, ctx.chatId, "telegram_error", node.id, { method, response: res });
+    }
+    return res;
   };
 
   switch (kind) {
@@ -234,7 +244,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       const text = interpolate(String(params.text ?? node.data?.preview ?? ""), exprCtx);
       const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
       ctx.pendingKeyboard = undefined;
-      await tgCall(ctx.token, "sendMessage", { chat_id: ctx.chatId, text, reply_markup, parse_mode: "HTML" });
+      await sendAndLog("sendMessage", { chat_id: ctx.chatId, text, reply_markup });
       return goNext();
     }
 
@@ -244,7 +254,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       if (photo) {
         const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
         ctx.pendingKeyboard = undefined;
-        await tgCall(ctx.token, "sendPhoto", { chat_id: ctx.chatId, photo, caption, reply_markup });
+        await sendAndLog("sendPhoto", { chat_id: ctx.chatId, photo, caption, reply_markup });
       }
       return goNext();
     }
@@ -252,7 +262,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     case "message.document": {
       const document = String(params.url ?? params.document ?? "");
       if (document) {
-        await tgCall(ctx.token, "sendDocument", { chat_id: ctx.chatId, document });
+        await sendAndLog("sendDocument", { chat_id: ctx.chatId, document });
       }
       return goNext();
     }
@@ -328,6 +338,12 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   const chatId = String(chatRaw);
   const fromUser = message?.from ?? callback?.from ?? {};
   const text = message?.text ?? callback?.data ?? "";
+
+  await logEvent(botId, chatId, "message_received", null, {
+    kind: callback ? "callback_query" : "message",
+    text,
+    from: { id: fromUser.id, username: fromUser.username },
+  });
 
   let token: string;
   try {
