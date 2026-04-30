@@ -263,7 +263,9 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "keyboard.reply": {
-      ctx.pendingKeyboard = { reply: parseButtons(params.buttons) };
+      const buttons = parseButtons(params.buttons);
+      ctx.pendingKeyboard = { reply: buttons };
+      ctx.nextReplyKeyboardLabels = buttons.map((b) => b.label);
       return goNext();
     }
 
