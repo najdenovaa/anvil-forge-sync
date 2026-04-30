@@ -12,7 +12,7 @@
 //      call APIs. Persist (current_node_id, variables) in bot_sessions.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { decryptToken } from "./crypto.ts";
+import { decryptToken } from "../_shared/crypto.ts";
 import { evalExpr, type ExprContext } from "./expr.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -149,6 +149,10 @@ interface RunCtx {
   user: Record<string, unknown>;
   text: string;
   pendingKeyboard?: OutgoingKeyboard;
+  /** Labels of the last reply keyboard shown to this user (persisted across turns). */
+  replyKeyboardLabels: string[];
+  /** Mutated by keyboard.reply nodes during this turn; flushed to session at the end. */
+  nextReplyKeyboardLabels: string[];
 }
 
 function findNode(flow: Flow, id: string | null | undefined): FlowNode | undefined {
@@ -259,7 +263,9 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "keyboard.reply": {
-      ctx.pendingKeyboard = { reply: parseButtons(params.buttons) };
+      const buttons = parseButtons(params.buttons);
+      ctx.pendingKeyboard = { reply: buttons };
+      ctx.nextReplyKeyboardLabels = buttons.map((b) => b.label);
       return goNext();
     }
 
@@ -340,6 +346,29 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     .maybeSingle();
 
   const variables: Record<string, unknown> = (existing?.variables as any) ?? {};
+  const replyKeyboardLabels: string[] = Array.isArray(existing?.last_reply_keyboard)
+    ? (existing!.last_reply_keyboard as string[]).map(String)
+    : [];
+
+  // Reply-keyboard handling: Telegram sends a tap on a reply-button as a plain
+  // text message indistinguishable from free input. If the incoming text exactly
+  // matches one of the labels we showed last, synthesize a callback_query so
+  // trigger.callback nodes can react to it like an inline button.
+  let effectiveUpdate = update;
+  let effectiveText = text;
+  if (message?.text && !callback && replyKeyboardLabels.includes(message.text)) {
+    effectiveUpdate = {
+      ...update,
+      callback_query: {
+        id: `synthetic-${Date.now()}`,
+        from: message.from,
+        message: { chat: message.chat },
+        data: message.text,
+      },
+    };
+    effectiveText = message.text;
+  }
+
   const ctx: RunCtx = {
     bot: bot as Bot,
     token,
@@ -352,14 +381,16 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
       last_name: fromUser.last_name,
       username: fromUser.username,
     },
-    text,
+    text: effectiveText,
+    replyKeyboardLabels,
+    nextReplyKeyboardLabels: replyKeyboardLabels, // carry forward unless overwritten
   };
 
   // Decide entry point:
   // - If new update matches a trigger → restart from that trigger.
   // - Otherwise resume from existing current_node_id (acknowledge user input).
   let startId: string | undefined;
-  const trig = pickTrigger(flow, update);
+  const trig = pickTrigger(flow, effectiveUpdate);
   if (trig) {
     startId = trig.id;
   } else if (existing?.current_node_id) {
@@ -369,7 +400,7 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   }
 
   if (!startId) {
-    await logEvent(botId, chatId, "no_match", null, { text });
+    await logEvent(botId, chatId, "no_match", null, { text: effectiveText });
     return new Response("ok", { status: 200 });
   }
 
@@ -380,6 +411,7 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     chat_id: chatId,
     current_node_id: lastNode,
     variables: ctx.variables as never,
+    last_reply_keyboard: ctx.nextReplyKeyboardLabels as never,
     last_seen_at: new Date().toISOString(),
   });
 

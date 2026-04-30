@@ -1,6 +1,6 @@
-// AES-GCM symmetric encryption for bot tokens.
-// Format stored in DB: base64(iv (12 bytes) || ciphertext || tag).
-// Key: BOT_TOKEN_ENCRYPTION_KEY env, any length — derived to 32 bytes via SHA-256.
+// Shared AES-GCM symmetric encryption for bot tokens.
+// On-disk format: base64( iv[12] || ciphertext+tag ).
+// Key: BOT_TOKEN_ENCRYPTION_KEY (any string, normalized to 32 bytes via SHA-256).
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();

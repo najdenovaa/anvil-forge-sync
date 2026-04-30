@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.bot-runtime]
 verify_jwt = false
+
+[functions.deploy-bot]
+verify_jwt = false
+
+[functions.undeploy-bot]
+verify_jwt = false
