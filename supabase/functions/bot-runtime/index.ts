@@ -12,7 +12,7 @@
 //      call APIs. Persist (current_node_id, variables) in bot_sessions.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { decryptToken } from "./crypto.ts";
+import { decryptToken } from "../_shared/crypto.ts";
 import { evalExpr, type ExprContext } from "./expr.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
