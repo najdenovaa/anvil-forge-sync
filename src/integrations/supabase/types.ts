@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_events: {
+        Row: {
+          bot_id: string
+          chat_id: string | null
+          created_at: string
+          event_type: string
+          id: number
+          node_id: string | null
+          payload: Json | null
+        }
+        Insert: {
+          bot_id: string
+          chat_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: number
+          node_id?: string | null
+          payload?: Json | null
+        }
+        Update: {
+          bot_id?: string
+          chat_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: number
+          node_id?: string | null
+          payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_events_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_sessions: {
+        Row: {
+          bot_id: string
+          chat_id: string
+          current_node_id: string | null
+          last_seen_at: string
+          variables: Json
+        }
+        Insert: {
+          bot_id: string
+          chat_id: string
+          current_node_id?: string | null
+          last_seen_at?: string
+          variables?: Json
+        }
+        Update: {
+          bot_id?: string
+          chat_id?: string
+          current_node_id?: string | null
+          last_seen_at?: string
+          variables?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_sessions_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bots: {
+        Row: {
+          bot_token_encrypted: string
+          bot_username: string | null
+          created_at: string
+          flow_id: string
+          id: string
+          last_error: string | null
+          platform: string
+          status: string
+          updated_at: string
+          webhook_secret: string
+        }
+        Insert: {
+          bot_token_encrypted: string
+          bot_username?: string | null
+          created_at?: string
+          flow_id: string
+          id?: string
+          last_error?: string | null
+          platform: string
+          status?: string
+          updated_at?: string
+          webhook_secret?: string
+        }
+        Update: {
+          bot_token_encrypted?: string
+          bot_username?: string | null
+          created_at?: string
+          flow_id?: string
+          id?: string
+          last_error?: string | null
+          platform?: string
+          status?: string
+          updated_at?: string
+          webhook_secret?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bots_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flow_versions: {
         Row: {
           created_at: string
