@@ -483,7 +483,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => dicts[lang][key] ?? dicts.ru[key] ?? key,
+    (key: string, vars?: Record<string, string | number>) => {
+      const raw = dicts[lang][key] ?? dicts.ru[key] ?? key;
+      if (!vars) return raw;
+      return raw.replace(/\{(\w+)\}/g, (_, k) =>
+        vars[k] !== undefined ? String(vars[k]) : `{${k}}`,
+      );
+    },
     [lang],
   );
 
