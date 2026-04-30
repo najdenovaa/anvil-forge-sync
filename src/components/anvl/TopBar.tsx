@@ -1,9 +1,10 @@
-import { ChevronDown, Rocket, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen } from "lucide-react";
+import { ChevronDown, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { VersionHistory } from "./VersionHistory";
+import { DeployButton } from "./DeployButton";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 import maxLogo from "@/assets/max-logo.png";
