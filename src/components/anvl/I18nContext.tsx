@@ -10,6 +10,48 @@ const ru: Dict = {
   "topbar.flow": "/ основной флоу",
   "topbar.preview": "Превью",
   "topbar.deploy": "Опубликовать",
+  "topbar.deploy.live": "live",
+  "topbar.deploy.paused": "приостановлен",
+
+  // Deploy dialog
+  "deploy.dialog.title": "Опубликовать бота",
+  "deploy.dialog.platform": "Платформа",
+  "deploy.dialog.platform.max_soon": "Coming soon",
+  "deploy.token.label": "Токен бота от @BotFather",
+  "deploy.token.placeholder": "1234567890:AAH...",
+  "deploy.token.show": "Показать",
+  "deploy.token.hide": "Скрыть",
+  "deploy.token.error.format": "Неверный формат токена. Ожидается 1234567890:AAH...",
+  "deploy.token.error.rejected": "Telegram отверг токен — проверьте правильность",
+  "deploy.token.error.network": "Не удалось проверить токен — проверьте сеть",
+  "deploy.token.checking": "Проверяю токен…",
+  "deploy.token.ok": "Бот найден",
+  "deploy.consent": "Я понимаю что бот станет публично доступен через Telegram",
+  "deploy.cancel": "Отмена",
+  "deploy.submit": "Опубликовать",
+  "deploy.submitting": "Публикую…",
+  "deploy.replace.title": "Заменить существующего бота?",
+  "deploy.replace.body": "Для этого флоу уже задеплоен бот {old}. Опубликовать вместо него {new}?",
+  "deploy.replace.confirm": "Заменить",
+  "deploy.success.title": "Бот опубликован!",
+  "deploy.success.hint": "Откройте бота в Telegram и напишите /start чтобы протестировать.",
+  "deploy.success.done": "Готово",
+  "deploy.error.network": "Не удалось связаться с сервером",
+  "deploy.error.server": "Что-то пошло не так на стороне Anvl",
+  "deploy.error.retry": "Повторить",
+
+  // Bot status popover
+  "bot.popover.live": "Live",
+  "bot.popover.paused": "Приостановлен",
+  "bot.popover.messages_today": "{n} сообщений сегодня",
+  "bot.popover.open_telegram": "Открыть в Telegram",
+  "bot.popover.copy_webhook": "Скопировать webhook URL",
+  "bot.popover.copied": "Скопировано",
+  "bot.popover.reissue": "Перевыпустить токен",
+  "bot.popover.pause": "Приостановить",
+  "bot.popover.resume": "Возобновить",
+  "bot.popover.delete": "Удалить бота",
+  "bot.popover.delete.confirm": "Удалить бота окончательно? Сессии и события сохранятся, но webhook будет снят и токен удалён.",
   "platform.telegram": "Telegram",
   "platform.max": "Max",
   "platform.miniapp": "Mini App",
@@ -190,6 +232,48 @@ const en: Dict = {
   "topbar.flow": "/ main flow",
   "topbar.preview": "Preview",
   "topbar.deploy": "Deploy",
+  "topbar.deploy.live": "live",
+  "topbar.deploy.paused": "paused",
+
+  // Deploy dialog
+  "deploy.dialog.title": "Deploy your bot",
+  "deploy.dialog.platform": "Platform",
+  "deploy.dialog.platform.max_soon": "Coming soon",
+  "deploy.token.label": "Bot token from @BotFather",
+  "deploy.token.placeholder": "1234567890:AAH...",
+  "deploy.token.show": "Show",
+  "deploy.token.hide": "Hide",
+  "deploy.token.error.format": "Invalid token format. Expected 1234567890:AAH...",
+  "deploy.token.error.rejected": "Telegram rejected the token — double-check it",
+  "deploy.token.error.network": "Couldn't validate the token — check your connection",
+  "deploy.token.checking": "Validating token…",
+  "deploy.token.ok": "Bot found",
+  "deploy.consent": "I understand the bot will be publicly reachable on Telegram",
+  "deploy.cancel": "Cancel",
+  "deploy.submit": "Deploy",
+  "deploy.submitting": "Deploying…",
+  "deploy.replace.title": "Replace existing bot?",
+  "deploy.replace.body": "A bot {old} is already deployed for this flow. Deploy {new} instead?",
+  "deploy.replace.confirm": "Replace",
+  "deploy.success.title": "Bot deployed!",
+  "deploy.success.hint": "Open the bot in Telegram and send /start to test it.",
+  "deploy.success.done": "Done",
+  "deploy.error.network": "Couldn't reach the server",
+  "deploy.error.server": "Something went wrong on Anvl's side",
+  "deploy.error.retry": "Retry",
+
+  // Bot status popover
+  "bot.popover.live": "Live",
+  "bot.popover.paused": "Paused",
+  "bot.popover.messages_today": "{n} messages today",
+  "bot.popover.open_telegram": "Open in Telegram",
+  "bot.popover.copy_webhook": "Copy webhook URL",
+  "bot.popover.copied": "Copied",
+  "bot.popover.reissue": "Re-issue token",
+  "bot.popover.pause": "Pause",
+  "bot.popover.resume": "Resume",
+  "bot.popover.delete": "Delete bot",
+  "bot.popover.delete.confirm": "Delete this bot for good? Sessions and events stay, but the webhook is removed and the token is wiped.",
   "platform.telegram": "Telegram",
   "platform.max": "Max",
   "platform.miniapp": "Mini App",
@@ -362,7 +446,7 @@ const dicts: Record<Lang, Dict> = { ru, en };
 interface I18nCtx {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 const Ctx = createContext<I18nCtx | null>(null);
@@ -399,7 +483,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => dicts[lang][key] ?? dicts.ru[key] ?? key,
+    (key: string, vars?: Record<string, string | number>) => {
+      const raw = dicts[lang][key] ?? dicts.ru[key] ?? key;
+      if (!vars) return raw;
+      return raw.replace(/\{(\w+)\}/g, (_, k) =>
+        vars[k] !== undefined ? String(vars[k]) : `{${k}}`,
+      );
+    },
     [lang],
   );
 
