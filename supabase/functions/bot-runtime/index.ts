@@ -149,6 +149,10 @@ interface RunCtx {
   user: Record<string, unknown>;
   text: string;
   pendingKeyboard?: OutgoingKeyboard;
+  /** Labels of the last reply keyboard shown to this user (persisted across turns). */
+  replyKeyboardLabels: string[];
+  /** Mutated by keyboard.reply nodes during this turn; flushed to session at the end. */
+  nextReplyKeyboardLabels: string[];
 }
 
 function findNode(flow: Flow, id: string | null | undefined): FlowNode | undefined {
