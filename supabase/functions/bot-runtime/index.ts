@@ -339,6 +339,12 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   const fromUser = message?.from ?? callback?.from ?? {};
   const text = message?.text ?? callback?.data ?? "";
 
+  await logEvent(botId, chatId, "message_received", null, {
+    kind: callback ? "callback_query" : "message",
+    text,
+    from: { id: fromUser.id, username: fromUser.username },
+  });
+
   let token: string;
   try {
     token = await decryptToken(bot.bot_token_encrypted);
