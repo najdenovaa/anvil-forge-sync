@@ -57,6 +57,7 @@ export type Database = {
           bot_id: string
           chat_id: string
           current_node_id: string | null
+          last_reply_keyboard: Json
           last_seen_at: string
           variables: Json
         }
@@ -64,6 +65,7 @@ export type Database = {
           bot_id: string
           chat_id: string
           current_node_id?: string | null
+          last_reply_keyboard?: Json
           last_seen_at?: string
           variables?: Json
         }
@@ -71,6 +73,7 @@ export type Database = {
           bot_id?: string
           chat_id?: string
           current_node_id?: string | null
+          last_reply_keyboard?: Json
           last_seen_at?: string
           variables?: Json
         }
