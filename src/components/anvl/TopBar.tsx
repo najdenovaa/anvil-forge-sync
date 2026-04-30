@@ -101,10 +101,7 @@ export function TopBar() {
         <button className="hidden items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground sm:flex">
           {t("topbar.preview")}
         </button>
-        <button className="group flex items-center gap-2 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition hover:bg-foreground/90">
-          <Rocket className="h-3.5 w-3.5" />
-          {t("topbar.deploy")}
-        </button>
+        <DeployButton />
       </div>
     </header>
   );
