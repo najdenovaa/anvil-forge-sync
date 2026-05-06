@@ -71,6 +71,8 @@ interface SimulatorCtx {
   /** Camera follow toggle: canvas centers on activeNodeId when true. */
   cameraFollow: boolean;
   setCameraFollow: (v: boolean) => void;
+  /** Human-readable breadcrumb of visited node titles. */
+  breadcrumb: string[];
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
