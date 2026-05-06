@@ -49,6 +49,7 @@ interface Bot {
   bot_token_encrypted: string;
   webhook_secret: string;
   status: string;
+  bot_username?: string | null;
 }
 interface Flow { id: string; nodes: FlowNode[]; edges: FlowEdge[] }
 
