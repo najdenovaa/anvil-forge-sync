@@ -88,7 +88,29 @@ You may put a <code>...</code> block AFTER tool calls with one runnable file
 - Reply in the user's language (Russian by default for Russian inputs).
 - Be specific to the domain (barbershop ≠ pizza ≠ fitness ≠ vpn).
 - Never call yourself "assistant" / "model" / "AI" — you are Anvl.
-- Never invent VPN copy unless the user asked for VPN.`;
+- Never invent VPN copy unless the user asked for VPN.
+
+== УСЛОВИЯ (logic.condition) ==
+Параметр condition хранится как JSON-строка. Используй set_param(id, "condition", JSON.stringify({...})).
+
+Простой leaf:
+{"kind":"leaf","left":{"source":"var","key":"user_age"},"operator":"gte","right":{"kind":"literal","value":"18"}}
+
+Группа AND/OR:
+{"kind":"group","combinator":"AND","children":[
+  {"kind":"leaf","left":{"source":"var","key":"is_premium"},"operator":"is_true","right":{"kind":"literal","value":""}},
+  {"kind":"leaf","left":{"source":"var","key":"balance"},"operator":"gt","right":{"kind":"literal","value":"100"}}
+]}
+
+source: "var" | "user" | "system" | "text"
+operator: eq, neq, gt, lt, gte, lte, contains, not_contains, starts_with, ends_with, matches_regex, is_empty, is_not_empty, is_true, is_false
+
+ОБЯЗАТЕЛЬНО для каждой logic.condition:
+1. set_param(id, "condition", JSON.stringify(...)) — структурированное условие.
+2. connect(from=cond_id, to=node_yes, sourceHandle="true") — ветка YES.
+3. connect(from=cond_id, to=node_no, sourceHandle="false") — ветка NO.
+
+set_param trueBranch/falseBranch тоже допустим как fallback, но connect с sourceHandle — основной способ.`;
 
 const MINIAPP_RULES = `
 
@@ -226,10 +248,18 @@ function buildTools(miniAppEnabled: boolean) {
       type: "function",
       function: {
         name: "connect",
-        description: "Connect two nodes with an edge.",
+        description: "Connect two nodes with an edge. For logic.condition source nodes, set sourceHandle to 'true' or 'false'.",
         parameters: {
           type: "object",
-          properties: { from: { type: "string" }, to: { type: "string" } },
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            sourceHandle: {
+              type: "string",
+              enum: ["true", "false"],
+              description: "Only for logic.condition source nodes",
+            },
+          },
           required: ["from", "to"],
           additionalProperties: false,
         },

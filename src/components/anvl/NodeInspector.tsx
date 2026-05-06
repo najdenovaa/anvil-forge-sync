@@ -6,6 +6,8 @@ import { useSelection } from "./SelectionContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useI18n } from "./I18nContext";
 import { TemplateInput } from "./TemplateInput";
+import { ConditionBuilder } from "./ConditionBuilder";
+import { tryParseCondition } from "@/lib/condition-eval-shared";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
@@ -58,9 +60,9 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
     { key: "url", label: "WebApp URL", type: "text", placeholder: "https://app.anvl.ai/u/..." },
   ],
   "logic.condition": [
-    { key: "expression", label: "Condition", type: "textarea", placeholder: "user.balance > 100" },
-    { key: "trueBranch", label: "True → node id", type: "text", placeholder: "n2" },
-    { key: "falseBranch", label: "False → node id", type: "text", placeholder: "n3" },
+    // Visual builder is rendered separately. Keep legacy `expression` for
+    // inspecting old flows.
+    { key: "expression", label: "Legacy expression (read-only)", type: "text", placeholder: "" },
   ],
   "action.api": [
     { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "DELETE"] },
@@ -135,10 +137,26 @@ export function NodeInspector() {
         </button>
       </div>
 
-      <Accordion.Root type="multiple" defaultValue={["general", "params"]} className="space-y-2">
+      <Accordion.Root type="multiple" defaultValue={["general", "condition", "params"]} className="space-y-2">
         <AccordionItem value="general" label="General">
           <FieldRow label="Title" value={titleVal} onChange={setTitle} />
         </AccordionItem>
+
+        {kind === "logic.condition" && (
+          <AccordionItem value="condition" label="Condition">
+            <ConditionBuilder
+              value={tryParseCondition(params.condition) ?? { kind: "group", combinator: "AND", children: [] }}
+              onChange={(c) => updateAiNodeParam(node.id, "condition", JSON.stringify(c))}
+              trueBranch={params.trueBranch}
+              falseBranch={params.falseBranch}
+              onTrueBranchChange={(v) => updateAiNodeParam(node.id, "trueBranch", v)}
+              onFalseBranchChange={(v) => updateAiNodeParam(node.id, "falseBranch", v)}
+              availableVars={variables}
+              availableNodes={nodes}
+              selfNodeId={node.id}
+            />
+          </AccordionItem>
+        )}
 
         <AccordionItem value="params" label="Parameters">
           {schema.length === 0 ? (

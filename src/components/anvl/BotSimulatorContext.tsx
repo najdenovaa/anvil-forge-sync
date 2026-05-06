@@ -15,6 +15,7 @@ import {
   renderTemplate,
   type TemplateContext,
 } from "@/lib/template-shared";
+import { evaluateCondition, tryParseCondition } from "@/lib/condition-eval-shared";
 
 /** Hardcoded demo user used by the in-canvas simulator. Configurable later (Step 11). */
 const DEMO_USER: TemplateContext["user"] = {
@@ -47,8 +48,10 @@ export interface SimMessage {
    *  "Отправляю…" → "✅ Готово" sequence. */
   apiCall?: { method: string; url: string; pseudoId: string };
   /** Set when the effective node is logic.condition — preview shows
-   *  the inline condition prompt with two buttons. */
+   *  the inline condition prompt and (when available) computed branch. */
   conditionExpr?: string;
+  /** "yes" | "no" — computed result when a structured condition is set. */
+  conditionResult?: "yes" | "no" | null;
   /** Soft warning (broken route / unconnected button) shown as a red plate. */
   warning?: string;
 }
@@ -192,6 +195,7 @@ function composeMessage(
   let lastVisited: Node = node;
   let apiCall: SimMessage["apiCall"] | undefined;
   let conditionExpr: string | undefined;
+  let conditionResultLocal: "yes" | "no" | null = null;
 
   while (cursor && !visited.has(cursor.id)) {
     visited.add(cursor.id);
@@ -220,7 +224,16 @@ function composeMessage(
       stopKind = k;
       break;
     } else if (k === "logic.condition") {
-      conditionExpr = p.expression || p.condition || "var.X > 100";
+      const condJson = p.condition || "";
+      const parsed = tryParseCondition(condJson);
+      if (parsed) {
+        const res = evaluateCondition(parsed, tplCtx as never);
+        conditionExpr = `condition → ${res ? "YES" : "NO"}`;
+        conditionResultLocal = res ? "yes" : "no";
+      } else {
+        conditionExpr = p.expression || "var.X > 100";
+        conditionResultLocal = null;
+      }
       stopKind = k;
       break;
     } else if (k === "action.api") {
@@ -339,6 +352,7 @@ function composeMessage(
       buttons,
       apiCall,
       conditionExpr,
+      conditionResult: conditionResultLocal,
       warning,
     },
     effectiveNodeId: effectiveNode.id,
@@ -519,7 +533,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       }
       if (!cursor || (cursor.data?.kind as NodeKind) !== "logic.condition") return;
       const out = edges.filter((e) => e.source === cursor!.id);
-      const target = b === "yes" ? out[0]?.target : (out[1]?.target ?? out[0]?.target);
+      const handle = b === "yes" ? "true" : "false";
+      const params = (cursor.data?.params as Record<string, string>) ?? {};
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      const target =
+        byHandle?.target ??
+        (b === "yes" ? params.trueBranch : params.falseBranch) ??
+        (b === "yes" ? out[0]?.target : (out[1]?.target ?? out[0]?.target));
       if (target) jumpTo(target);
     },
     [activeNode, edges, nodes, jumpTo],
@@ -547,10 +567,24 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const advance = useCallback(() => {
     if (!composed) return;
     const id = composed.effectiveNodeId;
+    const node = nodes.find((n) => n.id === id);
     const out = edges.filter((e) => e.source === id);
+
+    // For condition nodes with a structured (computed) result — auto-follow that branch.
+    if (node?.data?.kind === "logic.condition" && composed.message?.conditionResult) {
+      const handle = composed.message.conditionResult === "yes" ? "true" : "false";
+      const params = (node.data?.params as Record<string, string>) ?? {};
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      const fallback =
+        (composed.message.conditionResult === "yes" ? params.trueBranch : params.falseBranch) ?? null;
+      const target = byHandle?.target ?? fallback ?? out[0]?.target;
+      if (target) jumpTo(target, byHandle?.id ?? null);
+      return;
+    }
+
     const next = out[0];
     if (next) jumpTo(next.target, next.id);
-  }, [composed, edges, jumpTo]);
+  }, [composed, edges, nodes, jumpTo]);
 
   const breadcrumb = useMemo(() => {
     const raw = [...history, activeNodeId].filter(Boolean) as string[];

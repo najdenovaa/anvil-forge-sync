@@ -36,3 +36,49 @@ export interface VariableDef {
   defaultValue?: string;
   description?: string;
 }
+
+// --- Conditions ----------------------------------------------------------
+
+export type CompareOp =
+  | "eq" | "neq"
+  | "gt" | "lt" | "gte" | "lte"
+  | "contains" | "not_contains" | "starts_with" | "ends_with" | "matches_regex"
+  | "is_empty" | "is_not_empty"
+  | "is_true" | "is_false";
+
+export type ConditionSource = "var" | "user" | "system" | "text";
+
+export interface ConditionLeaf {
+  kind: "leaf";
+  left: { source: ConditionSource; key?: string };
+  operator: CompareOp;
+  right: { kind: "literal"; value: string } | { kind: "variable"; key: string };
+}
+
+export interface ConditionGroup {
+  kind: "group";
+  combinator: "AND" | "OR";
+  children: Condition[];
+}
+
+export type Condition = ConditionLeaf | ConditionGroup;
+
+/**
+ * Parse a serialized condition (JSON string) saved in node.params.condition.
+ * Backward compat: if invalid/empty, fall back to a leaf that always returns true.
+ * If a raw `expression` string is provided as fallback, encode it as a placeholder
+ * leaf with text source — the runtime will treat it as always-true.
+ */
+export function parseCondition(raw: string | undefined | null): Condition {
+  if (raw && raw.trim()) {
+    try {
+      const c = JSON.parse(raw);
+      if (c && (c.kind === "leaf" || c.kind === "group")) return c as Condition;
+    } catch { /* fall through */ }
+  }
+  return {
+    kind: "group",
+    combinator: "AND",
+    children: [],
+  };
+}

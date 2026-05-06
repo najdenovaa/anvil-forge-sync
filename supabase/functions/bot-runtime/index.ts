@@ -21,6 +21,11 @@ import {
   buildSystemContext,
   type TemplateContext,
 } from "../_shared/template.ts";
+import {
+  evaluateCondition,
+  tryParseCondition,
+  type EvalSubResult,
+} from "../_shared/condition-eval.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -318,13 +323,52 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
 
     case "logic.condition": {
       let result = false;
-      try {
-        result = !!evalExpr(String(params.expr ?? "false"), exprCtx);
-      } catch (err) {
-        await logEvent(ctx.bot.id, ctx.chatId, "expr.error", node.id, { err: String(err) });
-        result = false;
+      let usedStructured = false;
+      const subResults: EvalSubResult[] = [];
+
+      const cond = tryParseCondition(String(params.condition ?? ""));
+      if (cond) {
+        usedStructured = true;
+        try {
+          result = evaluateCondition(cond, buildTplCtx(ctx) as never, subResults);
+        } catch (err) {
+          await logEvent(ctx.bot.id, ctx.chatId, "condition.error", node.id, { err: String(err) });
+          result = false;
+        }
+      } else {
+        // Legacy fallback — old `expression` string via expr.ts.
+        try {
+          result = !!evalExpr(String(params.expression ?? params.expr ?? "false"), exprCtx);
+        } catch (err) {
+          await logEvent(ctx.bot.id, ctx.chatId, "expr.error", node.id, { err: String(err) });
+          result = false;
+        }
       }
-      return goNext(result ? "true" : "false");
+
+      const handle = result ? "true" : "false";
+      // Prefer edge with matching sourceHandle; fallback to params.trueBranch/falseBranch;
+      // last resort — any outgoing edge.
+      let next: string | null = null;
+      const handleEdges = nextEdges(ctx.flow, node.id, handle);
+      if (handleEdges[0]) next = handleEdges[0].target;
+      if (!next) {
+        const fb = result ? params.trueBranch : params.falseBranch;
+        if (fb && findNode(ctx.flow, String(fb))) next = String(fb);
+      }
+      if (!next) {
+        const any = nextEdges(ctx.flow, node.id);
+        next = any[0]?.target ?? null;
+      }
+
+      await logEvent(ctx.bot.id, ctx.chatId, "condition_evaluated", node.id, {
+        node_id: node.id,
+        result,
+        branch_taken: next ? handle : "none",
+        structured: usedStructured,
+        sub_results: subResults,
+      });
+
+      return next;
     }
 
     case "action.api": {
