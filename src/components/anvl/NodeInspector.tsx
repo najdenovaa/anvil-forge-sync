@@ -5,8 +5,19 @@ import { motion } from "framer-motion";
 import { useSelection } from "./SelectionContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useI18n } from "./I18nContext";
+import { TemplateInput } from "./TemplateInput";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
+
+/** Param keys per kind that are run through the template engine — they get
+ *  the TemplateInput editor with placeholder autocomplete + preview. */
+const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
+  "message.text": new Set(["text"]),
+  "message.photo": new Set(["caption"]),
+  "action.set_var": new Set(["value"]),
+  "action.input": new Set(["prompt"]),
+  "action.api": new Set(["url", "body"]),
+};
 
 /**
  * Per-kind parameter schema. Each entry describes which fields the inspector
@@ -56,12 +67,24 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
     { key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/..." },
     { key: "body", label: "Body (JSON)", type: "textarea", placeholder: "{ \"key\": \"value\" }" },
   ],
+  "action.set_var": [
+    { key: "variable", label: "Variable", type: "text", placeholder: "user_name" },
+    { key: "value", label: "Value", type: "textarea", placeholder: "{first_name} or static value" },
+    { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
+  "action.input": [
+    { key: "variable", label: "Save to variable", type: "text", placeholder: "user_phone" },
+    { key: "prompt", label: "Question to user", type: "textarea", placeholder: "Введите ваш телефон:" },
+    { key: "validation", label: "Validation regex (optional)", type: "text", placeholder: "^\\+?\\d{10,12}$" },
+    { key: "errorMessage", label: "Error message", type: "text", placeholder: "Неверный формат, попробуйте ещё раз" },
+    { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
 };
 
 export function NodeInspector() {
   const { t } = useI18n();
   const { selectedId, setSelectedId } = useSelection();
-  const { nodes, setNodes, setEdges, updateAiNodeParam } = useAnvlWorkspace();
+  const { nodes, setNodes, setEdges, updateAiNodeParam, variables } = useAnvlWorkspace();
 
   const node = useMemo(() => nodes.find((n) => n.id === selectedId) ?? null, [nodes, selectedId]);
 
@@ -121,8 +144,22 @@ export function NodeInspector() {
           {schema.length === 0 ? (
             <div className="px-1 py-1 text-[11px] text-muted-foreground">No parameters for this node kind.</div>
           ) : (
-            schema.map((f) =>
-              f.type === "textarea" ? (
+            schema.map((f) => {
+              const isTpl = f.type === "textarea" && TEMPLATE_FIELDS[kind]?.has(f.key);
+              if (isTpl) {
+                return (
+                  <label key={f.key} className="block">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{f.label}</div>
+                    <TemplateInput
+                      value={params[f.key] ?? ""}
+                      placeholder={f.placeholder}
+                      onChange={(v) => updateAiNodeParam(node.id, f.key, v)}
+                      availableVars={variables}
+                    />
+                  </label>
+                );
+              }
+              return f.type === "textarea" ? (
                 <FieldArea
                   key={f.key}
                   label={f.label}
@@ -146,8 +183,8 @@ export function NodeInspector() {
                   placeholder={f.placeholder}
                   onChange={(v) => updateAiNodeParam(node.id, f.key, v)}
                 />
-              ),
-            )
+              );
+            })
           )}
         </AccordionItem>
 

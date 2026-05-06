@@ -348,6 +348,49 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
     }
 
+    case "action.set_var": {
+      const variable = String(params.variable ?? "").trim();
+      if (!variable) return goNext();
+      const rendered = await interpolateAndLog(String(params.value ?? ""), ctx, node.id);
+      ctx.variables[variable] = rendered;
+      await logEvent(ctx.bot.id, ctx.chatId, "variable_set", node.id, {
+        variable,
+        scope: params.scope ?? "session",
+        value_length: rendered.length,
+      });
+      return goNext();
+    }
+
+    case "action.input": {
+      const variable = String(params.variable ?? "").trim();
+      const awaitingFlag = `__awaiting_${node.id}`;
+      const isResuming = !!ctx.variables[awaitingFlag] && ctx.text;
+      if (isResuming) {
+        const validation = String(params.validation ?? "").trim();
+        if (validation) {
+          try {
+            if (!new RegExp(validation).test(ctx.text)) {
+              const errMsg = await interpolateAndLog(
+                String(params.errorMessage ?? "Invalid input, try again"),
+                ctx,
+                node.id,
+              );
+              await sendAndLog("sendMessage", { chat_id: ctx.chatId, text: errMsg });
+              return "PAUSE";
+            }
+          } catch { /* bad regex — accept */ }
+        }
+        if (variable) ctx.variables[variable] = ctx.text;
+        delete ctx.variables[awaitingFlag];
+        await logEvent(ctx.bot.id, ctx.chatId, "input_received", node.id, { variable });
+        return goNext();
+      }
+      const prompt = await interpolateAndLog(String(params.prompt ?? ""), ctx, node.id);
+      if (prompt) await sendAndLog("sendMessage", { chat_id: ctx.chatId, text: prompt });
+      ctx.variables[awaitingFlag] = true;
+      return "PAUSE";
+    }
+
     default:
       // Unknown / unsupported nodes — just walk through.
       return goNext();
@@ -449,9 +492,14 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   if (trig) {
     startId = trig.id;
   } else if (existing?.current_node_id) {
-    // Resume from next edge after current node (treat user reply as continuation).
-    const nx = nextEdges(flow, existing.current_node_id);
-    startId = nx[0]?.target;
+    const cur = findNode(flow, existing.current_node_id);
+    if (cur?.data?.kind === "action.input") {
+      // Resume by re-running the input node so it consumes the user's reply.
+      startId = cur.id;
+    } else {
+      const nx = nextEdges(flow, existing.current_node_id);
+      startId = nx[0]?.target;
+    }
   }
 
   if (!startId) {

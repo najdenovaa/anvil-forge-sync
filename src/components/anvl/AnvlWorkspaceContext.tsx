@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Edge, Node } from "reactflow";
 import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
+import type { VariableDef } from "@/lib/anvl-types";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
 import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
 import { autoLayout } from "@/lib/anvl-autolayout";
@@ -62,6 +63,8 @@ interface WorkspaceCtx {
   miniApp: Partial<AnvlMiniAppState>;
   generatedCode: string;
   setGeneratedCode: React.Dispatch<React.SetStateAction<string>>;
+  variables: VariableDef[];
+  setVariables: React.Dispatch<React.SetStateAction<VariableDef[]>>;
   applyBlueprint: (blueprint: AnvlBlueprint) => void;
   /** Tool-calling primitives — incremental mutations from the AI agent. */
   addAiNode: (id: string, kind: string, title: string, preview: string) => void;
@@ -95,6 +98,7 @@ export function AnvlWorkspaceProvider({
   const [preview, setPreview] = useState<Partial<AnvlPreviewState>>({});
   const [miniApp, setMiniApp] = useState<Partial<AnvlMiniAppState>>({});
   const [generatedCode, setGeneratedCode] = useState("");
+  const [variables, setVariables] = useState<VariableDef[]>([]);
   const hydratedSlugRef = useRef<string | null>(null);
 
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
@@ -144,6 +148,7 @@ export function AnvlWorkspaceProvider({
     setPreview(snap.preview ?? {});
     setMiniApp(snap.miniapp ?? {});
     setGeneratedCode(snap.generatedCode ?? "");
+    setVariables(snap.variables ?? []);
   }, []);
 
   const rollbackToVersion = useCallback((version: FlowVersionFull) => {
@@ -214,6 +219,7 @@ export function AnvlWorkspaceProvider({
     preview,
     miniapp: miniApp,
     generatedCode,
+    variables,
     onHydrate: hydrate,
     enabled: persist,
   });
@@ -222,13 +228,14 @@ export function AnvlWorkspaceProvider({
     () => ({
       nodes, edges, setNodes, setEdges,
       preview, miniApp, generatedCode, setGeneratedCode,
+      variables, setVariables,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

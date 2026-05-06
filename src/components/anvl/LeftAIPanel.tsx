@@ -186,6 +186,7 @@ export function LeftAIPanel() {
     mergeMiniApp,
     resetAiCanvas,
     relayoutCanvas,
+    setVariables,
     nodes,
     edges,
   } = useAnvlWorkspace();
@@ -292,6 +293,9 @@ export function LeftAIPanel() {
         else if (name === "set_code") {
           setGeneratedCode(String(args.content ?? ""));
           codeApplied = true;
+        }
+        else if (name === "set_variables") {
+          if (Array.isArray(args.variables)) setVariables(args.variables);
         }
       } catch (err) { console.warn("tool apply failed", name, err); }
     };

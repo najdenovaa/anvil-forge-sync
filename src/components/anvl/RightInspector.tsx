@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2 } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
-import type { NodeKind } from "@/lib/anvl-types";
+import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "node" | "settings" | "code";
+type Tab = "components" | "node" | "variables" | "settings" | "code";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
@@ -31,6 +32,9 @@ export function RightInspector() {
         <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />}>
           Node
         </TabBtn>
+        <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />}>
+          Vars
+        </TabBtn>
         <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />}>
           {t("inspector.settings")}
         </TabBtn>
@@ -48,7 +52,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -244,5 +248,217 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
       </div>
       <div className="mt-0.5 text-[12px] font-medium">{value}</div>
     </div>
+  );
+}
+
+function VariablesPane() {
+  const { variables, setVariables } = useAnvlWorkspace();
+  const [showAdd, setShowAdd] = useState(false);
+
+  const byScope = useMemo(
+    () => ({
+      session: variables.filter((v) => v.scope === "session"),
+      user: variables.filter((v) => v.scope === "user"),
+      global: variables.filter((v) => v.scope === "global"),
+    }),
+    [variables],
+  );
+
+  return (
+    <div className="h-full overflow-y-auto px-3 py-3">
+      <button
+        onClick={() => setShowAdd(true)}
+        className="hairline mb-3 flex w-full items-center justify-center gap-1 rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] font-medium hover:bg-accent"
+      >
+        <Plus className="h-3 w-3" /> New variable
+      </button>
+
+      {(["session", "user"] as const).map((scope) => (
+        <div key={scope} className="mb-4">
+          <div className="mb-1.5 px-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            {scope === "session" ? "Session" : "User"}
+          </div>
+          {byScope[scope].length === 0 ? (
+            <div className="px-1 py-1 text-[11px] text-muted-foreground">No variables yet</div>
+          ) : (
+            <div className="space-y-1">
+              {byScope[scope].map((v) => (
+                <VariableRow
+                  key={v.key + v.scope}
+                  def={v}
+                  onDelete={() => setVariables((vs) => vs.filter((x) => !(x.key === v.key && x.scope === v.scope)))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div className="hairline mt-4 rounded-md bg-surface px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
+        <div className="mb-1 font-semibold uppercase tracking-[0.12em] text-foreground/70">System variables</div>
+        <div className="font-mono">{"{first_name} {last_name} {username}"}</div>
+        <div className="font-mono">{"{system.now} {system.today}"}</div>
+        <div className="font-mono">{"{text}"} — last user message</div>
+      </div>
+
+      {showAdd && (
+        <AddVariableDialog
+          existing={variables}
+          onClose={() => setShowAdd(false)}
+          onAdd={(def) => {
+            setVariables((vs) => [...vs, def]);
+            setShowAdd(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VariableRow({ def, onDelete }: { def: VariableDef; onDelete: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="hairline flex items-center justify-between gap-2 rounded-md bg-surface px-2 py-1.5">
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-mono text-[11.5px]">{def.key}</div>
+        {def.description && (
+          <div className="truncate text-[10px] text-muted-foreground">{def.description}</div>
+        )}
+      </div>
+      <span className="hairline rounded bg-surface-elevated px-1 py-0.5 text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+        {def.type}
+      </span>
+      <button
+        onClick={() => (confirm ? onDelete() : setConfirm(true))}
+        onBlur={() => setConfirm(false)}
+        className={cn(
+          "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-status-err/10 hover:text-status-err",
+          confirm && "bg-status-err/10 text-status-err",
+        )}
+        title={confirm ? "Click again to confirm" : "Delete"}
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+const KEY_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function AddVariableDialog({
+  existing,
+  onClose,
+  onAdd,
+}: {
+  existing: VariableDef[];
+  onClose: () => void;
+  onAdd: (def: VariableDef) => void;
+}) {
+  const [key, setKey] = useState("");
+  const [scope, setScope] = useState<VariableScope>("session");
+  const [type, setType] = useState<VariableType>("string");
+  const [defaultValue, setDefaultValue] = useState("");
+  const [description, setDescription] = useState("");
+
+  const trimmed = key.trim();
+  const error = !trimmed
+    ? "Key is required"
+    : !KEY_RE.test(trimmed)
+      ? "Latin letters, digits and _, must not start with digit"
+      : existing.some((v) => v.key === trimmed)
+        ? "Key already exists"
+        : null;
+
+  return (
+    <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-hairline bg-popover p-4 text-popover-foreground shadow-2xl">
+          <div className="mb-3 flex items-center justify-between">
+            <Dialog.Title className="text-[13px] font-semibold">New variable</Dialog.Title>
+            <Dialog.Close className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></Dialog.Close>
+          </div>
+
+          <div className="space-y-2.5">
+            <label className="block">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Key</div>
+              <input
+                autoFocus
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="user_name"
+                className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 font-mono text-[12px] outline-none focus:border-foreground/30"
+              />
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Scope</div>
+                <select
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value as VariableScope)}
+                  className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+                >
+                  <option value="session">session</option>
+                  <option value="user">user</option>
+                </select>
+              </label>
+              <label className="block">
+                <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Type</div>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value as VariableType)}
+                  className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+                >
+                  <option value="string">string</option>
+                  <option value="number">number</option>
+                  <option value="boolean">boolean</option>
+                  <option value="json">json</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="block">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Default (optional)</div>
+              <input
+                value={defaultValue}
+                onChange={(e) => setDefaultValue(e.target.value)}
+                className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+              />
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Description (optional)</div>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+              />
+            </label>
+
+            {error && <div className="text-[11px] text-status-err">{error}</div>}
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button onClick={onClose} className="rounded-md px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-accent">Cancel</button>
+            <button
+              disabled={!!error}
+              onClick={() =>
+                onAdd({
+                  key: trimmed,
+                  scope,
+                  type,
+                  defaultValue: defaultValue || undefined,
+                  description: description || undefined,
+                })
+              }
+              className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
