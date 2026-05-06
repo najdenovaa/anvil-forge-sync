@@ -211,6 +211,7 @@ function buildTools(miniAppEnabled: boolean) {
                 "message.text", "message.photo", "message.document",
                 "keyboard.inline", "keyboard.reply",
                 "miniapp.screen", "logic.condition", "action.api",
+                "action.set_var", "action.input",
               ],
             },
             title: { type: "string" },
