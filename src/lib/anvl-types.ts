@@ -11,7 +11,9 @@ export type NodeKind =
   | "keyboard.reply"
   | "miniapp.screen"
   | "logic.condition"
-  | "action.api";
+  | "action.api"
+  | "action.set_var"
+  | "action.input";
 
 export interface NodeMeta {
   kind: NodeKind;

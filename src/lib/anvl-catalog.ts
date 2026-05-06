@@ -10,6 +10,8 @@ import {
   AppWindow,
   GitBranch,
   Webhook,
+  Variable,
+  TextCursorInput,
   type LucideIcon,
 } from "lucide-react";
 import type { NodeKind } from "./anvl-types";
@@ -103,6 +105,20 @@ export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
     labelKey: "node.action.api.label",
     descKey: "node.action.api.desc",
     icon: Webhook,
+  },
+  "action.set_var": {
+    kind: "action.set_var",
+    group: "Logic",
+    labelKey: "node.action.set_var.label",
+    descKey: "node.action.set_var.desc",
+    icon: Variable,
+  },
+  "action.input": {
+    kind: "action.input",
+    group: "Triggers",
+    labelKey: "node.action.input.label",
+    descKey: "node.action.input.desc",
+    icon: TextCursorInput,
   },
 };
 

@@ -134,6 +134,10 @@ const ru: Dict = {
   "node.logic.condition.desc": "Ветка if / else",
   "node.action.api.label": "API запрос",
   "node.action.api.desc": "Исходящий HTTP-запрос",
+  "node.action.set_var.label": "Задать переменную",
+  "node.action.set_var.desc": "Сохранить значение в переменную",
+  "node.action.input.label": "Запрос ввода",
+  "node.action.input.desc": "Спросить пользователя и сохранить ответ",
 
   // Settings pane
   "settings.cloud_status": "Статус облака",
@@ -352,6 +356,10 @@ const en: Dict = {
   "node.logic.condition.desc": "If / else branch",
   "node.action.api.label": "API call",
   "node.action.api.desc": "Outbound HTTP request",
+  "node.action.set_var.label": "Set variable",
+  "node.action.set_var.desc": "Save value to variable",
+  "node.action.input.label": "Input request",
+  "node.action.input.desc": "Ask user and save reply",
 
   "settings.cloud_status": "Cloud status",
   "settings.production": "Production",
