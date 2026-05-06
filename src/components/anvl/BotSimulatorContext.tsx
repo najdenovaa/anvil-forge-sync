@@ -167,9 +167,12 @@ function composeMessage(
   let cursor: Node | undefined = node;
   const lines: string[] = [];
   let imageUrl: string | undefined;
+  let imageCaption: string | undefined;
   let buttonsNode: Node | undefined;
   let stopKind: NodeKind | null = null;
   let lastVisited: Node = node;
+  let apiCall: SimMessage["apiCall"] | undefined;
+  let conditionExpr: string | undefined;
 
   while (cursor && !visited.has(cursor.id)) {
     visited.add(cursor.id);
@@ -183,8 +186,10 @@ function composeMessage(
       else if (cursor.data?.preview) lines.push(cursor.data.preview as string);
       else if (title) lines.push(title);
     } else if (k === "message.photo") {
-      imageUrl = p.url;
-      if (p.caption) lines.push(p.caption);
+      imageUrl = p.url || "placeholder";
+      imageCaption = p.caption;
+      stopKind = k;
+      break;
     } else if (k === "message.document") {
       lines.push(`📎 ${p.filename ?? "file"}`);
     } else if (KEYBOARD_KINDS.includes(k as NodeKind)) {
@@ -196,24 +201,29 @@ function composeMessage(
       stopKind = k;
       break;
     } else if (k === "logic.condition") {
+      conditionExpr = p.expression || p.condition || "var.X > 100";
       stopKind = k;
       break;
     } else if (k === "action.api") {
-      lines.push(`⚡ ${p.method ?? "POST"} ${p.url ?? ""}`.trim());
+      const pseudoId =
+        "A" + Math.floor(1000 + (cursor.id.length * 137 + visited.size * 4321) % 9000);
+      apiCall = {
+        method: (p.method || "POST").toUpperCase(),
+        url: p.url || "https://api.example.com",
+        pseudoId,
+      };
+      stopKind = k;
+      break;
     } else if (k && TRIGGER_KINDS.includes(k)) {
       // Trigger nodes only seed the conversation — keep moving.
     }
 
-    // If current node has multiple outgoing edges → treat it as an implicit
-    // switch (synthesize buttons from targets) and stop here.
-    // (Keyboard / condition / miniapp / photo all already broke out above.)
     const outAll = edges.filter((e) => e.source === cursor!.id);
     if (outAll.length >= 2) {
       buttonsNode = cursor;
       break;
     }
 
-    // Advance: take the FIRST outgoing edge.
     const next = outAll[0];
     cursor = next ? nodes.find((n) => n.id === next.target) : undefined;
   }
@@ -233,7 +243,6 @@ function composeMessage(
         id: outgoing[i]?.sourceHandle ?? outgoing[i]?.id ?? `${buttonsNode!.id}:${i}`,
       }));
     } else {
-      // Synthesize from outgoing edges → use target node's title or kind.
       buttons = outgoing.slice(0, 6).map((e, i) => {
         const target = nodes.find((n) => n.id === e.target);
         const tParams = (target?.data?.params as Record<string, string>) ?? {};
@@ -254,16 +263,56 @@ function composeMessage(
     }
   }
 
+  // Dead-end / broken-route detection.
+  let warning: string | undefined;
+  const effectiveOut = edges.filter((e) => e.source === effectiveNode.id);
+  const effKind = stopKind ?? effectiveKind;
+  const isMessageLeaf =
+    effKind === "message.text" || effKind === "message.photo" || effKind === "message.document";
+  if (
+    !buttonsNode &&
+    !apiCall &&
+    !conditionExpr &&
+    effectiveOut.length === 0 &&
+    !isMessageLeaf &&
+    effKind !== "miniapp.screen"
+  ) {
+    const name =
+      (effectiveNode.data?.title as string) ||
+      (effKind ? `(${effKind})` : effectiveNode.id);
+    warning = `⚠️ Маршрут оборван. Добавьте связь от ноды «${name}» к следующему шагу.`;
+  }
+  if (buttonsNode && buttons.length > 0) {
+    const outIds = new Set(
+      edges.filter((e) => e.source === buttonsNode!.id).map((e) => e.id + "|" + (e.sourceHandle ?? "")),
+    );
+    const unconnected = buttons.find(
+      (b) => !outIds.has(b.id + "|" + b.id) && !outIds.has(b.id + "|"),
+    );
+    // (best-effort; resolveTarget handles fallback)
+    void unconnected;
+  }
+
   // Headline fallback: original node title.
   const seedTitle = (node.data?.title as string) ?? "";
-  if (lines.length === 0 && seedTitle) lines.push(seedTitle);
-  if (lines.length === 0) {
+  if (lines.length === 0 && !imageUrl && !apiCall && !conditionExpr && seedTitle) {
+    lines.push(seedTitle);
+  }
+  if (lines.length === 0 && !imageUrl && !apiCall && !conditionExpr) {
     const k = (node.data?.kind as NodeKind | undefined) ?? null;
     lines.push(k ? `(${k})` : "…");
   }
 
   return {
-    message: { text: lines.join("\n"), imageUrl, buttons },
+    message: {
+      text: lines.join("\n"),
+      imageUrl,
+      imageCaption,
+      buttons,
+      apiCall,
+      conditionExpr,
+      warning,
+    },
     effectiveNodeId: effectiveNode.id,
     effectiveKind: stopKind ?? effectiveKind,
   };
