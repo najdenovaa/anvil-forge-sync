@@ -68,7 +68,7 @@ interface WorkspaceCtx {
   applyBlueprint: (blueprint: AnvlBlueprint) => void;
   /** Tool-calling primitives — incremental mutations from the AI agent. */
   addAiNode: (id: string, kind: string, title: string, preview: string) => void;
-  connectAiNodes: (from: string, to: string) => void;
+  connectAiNodes: (from: string, to: string, sourceHandle?: string) => void;
   updateAiNodeParam: (id: string, key: string, value: string) => void;
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
