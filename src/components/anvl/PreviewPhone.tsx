@@ -636,23 +636,30 @@ function SimulatorChatView({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
-              <BotBubble theme={theme}>
-                <div className="space-y-1.5">
-                  {turn.imageUrl && (
-                    <img
-                      src={turn.imageUrl}
-                      alt=""
-                      className="max-h-32 w-full rounded-lg object-cover"
-                      onError={(e) => ((e.currentTarget.style.display = "none"))}
-                    />
-                  )}
-                  <span className="whitespace-pre-wrap">{turn.text}</span>
-                  {turn.isLast && isCondition && <ConditionToggle onChoose={handleBranch} />}
-                  {turn.isLast && turn.buttons.length > 0 && (
-                    <SimInlineKb items={turn.buttons} onAction={handlePress} />
-                  )}
-                </div>
-              </BotBubble>
+              {turn.warning ? (
+                <WarningPlate text={turn.warning} />
+              ) : turn.apiCall ? (
+                <BotBubble theme={theme}>
+                  <ApiCallBubble call={turn.apiCall} stage={apiStage ?? "sending"} />
+                </BotBubble>
+              ) : turn.conditionExpr ? (
+                <BotBubble theme={theme}>
+                  <ConditionPrompt expr={turn.conditionExpr} onChoose={handleBranch} />
+                </BotBubble>
+              ) : (
+                <BotBubble theme={theme}>
+                  <div className="space-y-1.5">
+                    {turn.imageUrl && <PhotoBlock url={turn.imageUrl} caption={turn.imageCaption} />}
+                    {turn.text && <span className="whitespace-pre-wrap">{turn.text}</span>}
+                    {turn.isLast && isCondition && !turn.conditionExpr && (
+                      <ConditionToggle onChoose={handleBranch} />
+                    )}
+                    {turn.isLast && turn.buttons.length > 0 && (
+                      <SimInlineKb items={turn.buttons} onAction={handlePress} />
+                    )}
+                  </div>
+                </BotBubble>
+              )}
             </motion.div>
           );
         })}
