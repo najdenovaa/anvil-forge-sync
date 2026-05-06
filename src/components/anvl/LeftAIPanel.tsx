@@ -557,6 +557,10 @@ export function LeftAIPanel() {
     try {
       // Round 1 — model uses tools to mutate the canvas.
       const { liveSteps, usedTools, finalAnswer } = await runRound(baseHistory);
+      // Auto-layout the freshly built graph left-to-right.
+      if (usedTools) {
+        setTimeout(() => relayoutCanvas(), 50);
+      }
 
       // If the model only emitted tool_calls without a textual reply, run a
       // follow-up round asking for a short summary in the user's language.
