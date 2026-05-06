@@ -120,7 +120,7 @@ export function useFlowPersistence({
     // Wait until initial hydration completes (or we know there's no row to hydrate)
     if (hydratedSlugRef.current !== slug && snapshot !== undefined && snapshot !== null) return;
 
-    const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode });
+    const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode, variables });
     if (hash === lastSavedHashRef.current) return;
 
     if (debounceRef.current !== null) {
@@ -135,6 +135,7 @@ export function useFlowPersistence({
         preview,
         miniapp,
         generatedCode,
+        variables,
       });
     }, AUTOSAVE_DEBOUNCE_MS);
 
@@ -144,7 +145,7 @@ export function useFlowPersistence({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, slug, nodes, edges, preview, miniapp, generatedCode]);
+  }, [enabled, slug, nodes, edges, preview, miniapp, generatedCode, variables]);
 
   return {
     status,
