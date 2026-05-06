@@ -382,6 +382,10 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
   const [cameraFollow, setCameraFollow] = useState(false);
+  // Local-only variable bag for the simulator. Step 2B (action.set_var) will
+  // populate this; for now it stays empty so {var.X} renders to "".
+  const [variables] = useState<Record<string, unknown>>({});
+  const [lastInputText, setLastInputText] = useState<string>("");
 
   useEffect(() => {
     if (!entryId) {
@@ -403,10 +407,20 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     [activeNodeId, nodes],
   );
 
+  const tplCtx = useMemo<TemplateContext>(
+    () => ({
+      user: DEMO_USER,
+      var: variables,
+      text: lastInputText,
+      system: buildSystemContext(),
+    }),
+    [variables, lastInputText],
+  );
+
   const composed = useMemo(() => {
     if (!activeNode) return null;
-    return composeMessage(activeNode, nodes, edges);
-  }, [activeNode, nodes, edges]);
+    return composeMessage(activeNode, nodes, edges, tplCtx);
+  }, [activeNode, nodes, edges, tplCtx]);
 
   const message = composed?.message ?? null;
   const effectiveKind = composed?.effectiveKind ?? null;
