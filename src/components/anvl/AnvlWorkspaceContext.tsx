@@ -189,9 +189,13 @@ export function AnvlWorkspaceProvider({
     });
   }, []);
 
-  const connectAiNodes = useCallback((from: string, to: string) => {
-    const eid = `ai-${from}-${to}`;
-    setEdges((prev) => (prev.some((e) => e.id === eid) ? prev : [...prev, { id: eid, source: from, target: to, animated: true }]));
+  const connectAiNodes = useCallback((from: string, to: string, sourceHandle?: string) => {
+    const eid = sourceHandle ? `ai-${from}-${sourceHandle}-${to}` : `ai-${from}-${to}`;
+    setEdges((prev) =>
+      prev.some((e) => e.id === eid)
+        ? prev
+        : [...prev, { id: eid, source: from, target: to, animated: true, sourceHandle }],
+    );
   }, []);
 
   const updateAiNodeParam = useCallback((id: string, key: string, value: string) => {
