@@ -233,6 +233,12 @@ function composeMessage(
       };
       stopKind = k;
       break;
+    } else if (k === "action.input") {
+      lines.push(tpl(p.prompt || "…"));
+      stopKind = k;
+      break;
+    } else if (k === "action.set_var") {
+      // Silent — variables tracked in advance(); just walk through visually.
     } else if (k && TRIGGER_KINDS.includes(k)) {
       // Trigger nodes only seed the conversation — keep moving.
     }
@@ -428,6 +434,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const awaitingInput = useMemo(() => {
     if (!activeNode) return false;
     const kind = activeNode.data?.kind as NodeKind | undefined;
+    if (kind === "action.input") return true;
     return kind === "trigger.message" && (message?.buttons.length ?? 0) === 0;
   }, [activeNode, message]);
 
