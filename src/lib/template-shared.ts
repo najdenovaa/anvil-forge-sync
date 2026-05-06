@@ -1,10 +1,18 @@
+/**
+ * ⚠️ ДУБЛИРУЕТСЯ В ДВУХ МЕСТАХ — синхронизируй вручную:
+ *   - src/lib/template-shared.ts             (используется фронтом / симулятором)
+ *   - supabase/functions/_shared/template.ts (используется edge functions)
+ *
+ * Причина: Supabase Edge Functions bundler не может импортировать
+ * за пределы supabase/functions/. Vite не может импортировать .ts
+ * файлы из supabase/functions/ напрямую без хака.
+ *
+ * При изменении этого файла ОБЯЗАТЕЛЬНО обнови второй.
+ * Будущая защита: snapshot-тест который сравнивает оба файла побайтно.
+ */
 // Shared template engine. Used by both the simulator (browser/Vite) AND
 // the bot-runtime edge function (Deno). Keep this file dependency-free —
-// no Node, no Deno, no DOM imports — so it can be imported from either
-// runtime via a relative path.
-//
-// The edge function imports it as:
-//   import { renderTemplate } from "../../../src/lib/template-shared.ts";
+// no Node, no Deno, no DOM imports.
 
 export type TemplatePrimitive = string | number | boolean | null;
 
