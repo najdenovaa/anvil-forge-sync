@@ -492,9 +492,14 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   if (trig) {
     startId = trig.id;
   } else if (existing?.current_node_id) {
-    // Resume from next edge after current node (treat user reply as continuation).
-    const nx = nextEdges(flow, existing.current_node_id);
-    startId = nx[0]?.target;
+    const cur = findNode(flow, existing.current_node_id);
+    if (cur?.data?.kind === "action.input") {
+      // Resume by re-running the input node so it consumes the user's reply.
+      startId = cur.id;
+    } else {
+      const nx = nextEdges(flow, existing.current_node_id);
+      startId = nx[0]?.target;
+    }
   }
 
   if (!startId) {
