@@ -28,6 +28,8 @@ const PARAM_PREVIEW: Partial<Record<NodeKind, { key: string; prefix?: string }[]
   "miniapp.screen":   [{ key: "screenId", prefix: "#" }, { key: "url" }],
   "logic.condition":  [{ key: "expression", prefix: "if " }],
   "action.api":       [{ key: "method" }, { key: "url" }],
+  "action.set_var":   [{ key: "variable", prefix: "var." }, { key: "value" }],
+  "action.input":     [{ key: "variable", prefix: "→ var." }, { key: "prompt" }],
 };
 
 function clip(s: string, n = 36): string {
