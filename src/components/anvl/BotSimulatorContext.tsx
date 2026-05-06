@@ -15,6 +15,7 @@ import {
   renderTemplate,
   type TemplateContext,
 } from "@/lib/template-shared";
+import { evaluateCondition, tryParseCondition } from "@/lib/condition-eval-shared";
 
 /** Hardcoded demo user used by the in-canvas simulator. Configurable later (Step 11). */
 const DEMO_USER: TemplateContext["user"] = {
