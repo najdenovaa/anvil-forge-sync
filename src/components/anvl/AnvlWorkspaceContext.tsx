@@ -11,6 +11,7 @@ import type { Edge, Node } from "reactflow";
 import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
 import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
+import { autoLayout } from "@/lib/anvl-autolayout";
 
 const DEFAULT_FLOW_SLUG = "default";
 
