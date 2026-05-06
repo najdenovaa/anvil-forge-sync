@@ -32,6 +32,9 @@ export function RightInspector() {
         <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />}>
           Node
         </TabBtn>
+        <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />}>
+          Vars
+        </TabBtn>
         <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />}>
           {t("inspector.settings")}
         </TabBtn>
@@ -49,7 +52,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
