@@ -721,6 +721,21 @@ function SimulatorChatView({
         </AnimatePresence>
       </div>
 
+      {/* ───── Breadcrumb ───── */}
+      {sim.breadcrumb.length > 0 && (
+        <div
+          className="truncate border-t px-3 py-1 text-[9px] font-medium tracking-wide"
+          style={{
+            background: "var(--tg-theme-bg-color)",
+            color: "var(--tg-theme-hint-color)",
+            borderColor: "color-mix(in oklab, var(--tg-theme-text-color) 6%, transparent)",
+          }}
+          title={sim.breadcrumb.join(" → ")}
+        >
+          {sim.breadcrumb.join(" → ")}
+        </div>
+      )}
+
       {/* ───── Composer ───── */}
       <div
         className="flex items-center gap-2 border-t px-2 py-2"
