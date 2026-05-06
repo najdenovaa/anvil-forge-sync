@@ -195,6 +195,7 @@ function composeMessage(
   let lastVisited: Node = node;
   let apiCall: SimMessage["apiCall"] | undefined;
   let conditionExpr: string | undefined;
+  let conditionResultLocal: "yes" | "no" | null = null;
 
   while (cursor && !visited.has(cursor.id)) {
     visited.add(cursor.id);
