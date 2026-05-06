@@ -382,9 +382,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
   const [cameraFollow, setCameraFollow] = useState(false);
-  // Local-only variable bag for the simulator. Step 2B (action.set_var) will
-  // populate this; for now it stays empty so {var.X} renders to "".
-  const [variables] = useState<Record<string, unknown>>({});
+  // Local-only variable bag for the simulator. Populated by action.set_var
+  // and action.input nodes during the walk.
+  const [variables, setVariables] = useState<Record<string, unknown>>({});
   const [lastInputText, setLastInputText] = useState<string>("");
 
   useEffect(() => {
