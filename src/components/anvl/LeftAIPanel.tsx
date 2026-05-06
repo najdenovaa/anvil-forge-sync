@@ -185,6 +185,7 @@ export function LeftAIPanel() {
     mergePreview,
     mergeMiniApp,
     resetAiCanvas,
+    relayoutCanvas,
     nodes,
     edges,
   } = useAnvlWorkspace();
