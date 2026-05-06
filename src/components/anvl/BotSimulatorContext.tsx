@@ -533,7 +533,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       }
       if (!cursor || (cursor.data?.kind as NodeKind) !== "logic.condition") return;
       const out = edges.filter((e) => e.source === cursor!.id);
-      const target = b === "yes" ? out[0]?.target : (out[1]?.target ?? out[0]?.target);
+      const handle = b === "yes" ? "true" : "false";
+      const params = (cursor.data?.params as Record<string, string>) ?? {};
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      const target =
+        byHandle?.target ??
+        (b === "yes" ? params.trueBranch : params.falseBranch) ??
+        (b === "yes" ? out[0]?.target : (out[1]?.target ?? out[0]?.target));
       if (target) jumpTo(target);
     },
     [activeNode, edges, nodes, jumpTo],
