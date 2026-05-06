@@ -14,6 +14,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { decryptToken } from "../_shared/crypto.ts";
 import { evalExpr, type ExprContext } from "./expr.ts";
+import {
+  renderTemplate,
+  extractPlaceholders,
+  findMissingPlaceholders,
+  buildSystemContext,
+  type TemplateContext,
+} from "../../../src/lib/template-shared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
