@@ -398,14 +398,18 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     return kind === "trigger.message" && (message?.buttons.length ?? 0) === 0;
   }, [activeNode, message]);
 
+  // NOTE: do NOT call setHistory inside a setActiveNodeId updater — under
+  // React StrictMode the updater runs twice, which previously pushed the same
+  // node id into `history` twice and produced duplicate user-echo bubbles in
+  // the preview chat. Push history first as a separate, idempotent update.
   const jumpTo = useCallback((nodeId: string, edgeId?: string | null) => {
-    setActiveNodeId((prev) => {
-      if (prev) setHistory((h) => [...h, prev]);
-      return nodeId;
-    });
+    if (activeNodeId && activeNodeId !== nodeId) {
+      setHistory((h) => (h[h.length - 1] === activeNodeId ? h : [...h, activeNodeId]));
+    }
+    setActiveNodeId(nodeId);
     setActiveEdgeId(edgeId ?? null);
     setLastBranch(null);
-  }, []);
+  }, [activeNodeId]);
 
   const press = useCallback(
     (btn: SimButton) => {
