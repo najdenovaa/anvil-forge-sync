@@ -201,12 +201,12 @@ function composeMessage(
     const title = (cursor.data?.title as string) ?? "";
 
     if (k === "message.text") {
-      if (p.text) lines.push(p.text);
-      else if (cursor.data?.preview) lines.push(cursor.data.preview as string);
+      if (p.text) lines.push(tpl(p.text));
+      else if (cursor.data?.preview) lines.push(tpl(cursor.data.preview as string));
       else if (title) lines.push(title);
     } else if (k === "message.photo") {
       imageUrl = p.url || "placeholder";
-      imageCaption = p.caption;
+      imageCaption = p.caption ? tpl(p.caption) : undefined;
       stopKind = k;
       break;
     } else if (k === "message.document") {
@@ -228,7 +228,7 @@ function composeMessage(
         "A" + Math.floor(1000 + (cursor.id.length * 137 + visited.size * 4321) % 9000);
       apiCall = {
         method: (p.method || "POST").toUpperCase(),
-        url: p.url || "https://api.example.com",
+        url: tpl(p.url || "https://api.example.com"),
         pseudoId,
       };
       stopKind = k;
@@ -259,18 +259,21 @@ function composeMessage(
     if (parsed.length > 0) {
       buttons = parsed.map((b, i) => ({
         ...b,
+        label: tpl(b.label),
+        action: tpl(b.action),
         id: outgoing[i]?.sourceHandle ?? outgoing[i]?.id ?? `${buttonsNode!.id}:${i}`,
       }));
     } else {
       buttons = outgoing.slice(0, 6).map((e, i) => {
         const target = nodes.find((n) => n.id === e.target);
         const tParams = (target?.data?.params as Record<string, string>) ?? {};
-        const label =
+        const labelRaw =
           (target?.data?.title as string) ||
           tParams.text ||
           tParams.caption ||
           tParams.screenId ||
           `Шаг ${i + 1}`;
+        const label = tpl(labelRaw);
         const clipped = label.length > 28 ? label.slice(0, 27) + "…" : label;
         return {
           id: e.sourceHandle ?? e.id,
