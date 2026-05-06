@@ -60,9 +60,9 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
     { key: "url", label: "WebApp URL", type: "text", placeholder: "https://app.anvl.ai/u/..." },
   ],
   "logic.condition": [
-    { key: "expression", label: "Condition", type: "textarea", placeholder: "user.balance > 100" },
-    { key: "trueBranch", label: "True → node id", type: "text", placeholder: "n2" },
-    { key: "falseBranch", label: "False → node id", type: "text", placeholder: "n3" },
+    // Visual builder is rendered separately. Keep legacy `expression` for
+    // inspecting old flows.
+    { key: "expression", label: "Legacy expression (read-only)", type: "text", placeholder: "" },
   ],
   "action.api": [
     { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "DELETE"] },
