@@ -488,6 +488,26 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     setPendingBranch("yes");
   }, [entryId]);
 
+  const advance = useCallback(() => {
+    if (!composed) return;
+    const id = composed.effectiveNodeId;
+    const out = edges.filter((e) => e.source === id);
+    const next = out[0];
+    if (next) jumpTo(next.target, next.id);
+  }, [composed, edges, jumpTo]);
+
+  const breadcrumb = useMemo(() => {
+    const ids = [...history, activeNodeId].filter(Boolean) as string[];
+    return ids
+      .map((nid) => {
+        const n = nodes.find((nn) => nn.id === nid);
+        if (!n) return null;
+        const t = (n.data?.title as string) || (n.data?.kind as string) || nid;
+        return t.length > 18 ? t.slice(0, 17) + "…" : t;
+      })
+      .filter(Boolean) as string[];
+  }, [history, activeNodeId, nodes]);
+
   const value = useMemo<SimulatorCtx>(
     () => ({
       available,
@@ -506,6 +526,8 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       jumpTo,
       cameraFollow,
       setCameraFollow,
+      breadcrumb,
+      advance,
     }),
     [
       available,
@@ -524,6 +546,8 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       restart,
       jumpTo,
       cameraFollow,
+      breadcrumb,
+      advance,
     ],
   );
 
