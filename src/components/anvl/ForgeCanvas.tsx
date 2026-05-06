@@ -43,6 +43,16 @@ function CanvasInner() {
     return () => window.clearTimeout(t);
   }, [cameraFollow, activeNodeId, nodes, fitView]);
 
+  // After layout / node count changes, fit view smoothly.
+  const nodeCount = nodes.length;
+  useEffect(() => {
+    if (nodeCount === 0) return;
+    const t = window.setTimeout(() => {
+      try { fitView({ padding: 0.25, duration: 500 }); } catch { /* */ }
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [nodeCount, fitView]);
+
   // Decorate edges: brighter solid stroke; the just-traversed edge gets a glow.
   const decoratedEdges = useMemo(() => {
     return edges.map((e) => {
