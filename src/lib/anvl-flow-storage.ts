@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Edge, Node } from "reactflow";
 import type { AnvlMiniAppState, AnvlPreviewState } from "./anvl-blueprint";
+import type { VariableDef } from "./anvl-types";
 
 export interface FlowSnapshot {
   id: string;
@@ -13,6 +14,7 @@ export interface FlowSnapshot {
   preview: Partial<AnvlPreviewState>;
   miniapp: Partial<AnvlMiniAppState>;
   generatedCode: string;
+  variables: VariableDef[];
   currentVersion: number;
   updatedAt: string;
 }
@@ -27,6 +29,7 @@ export interface FlowSavePayload {
   preview: Partial<AnvlPreviewState>;
   miniapp: Partial<AnvlMiniAppState>;
   generatedCode: string;
+  variables?: VariableDef[];
 }
 
 function rowToSnapshot(row: Record<string, unknown>): FlowSnapshot {
@@ -41,6 +44,7 @@ function rowToSnapshot(row: Record<string, unknown>): FlowSnapshot {
     preview: (row.preview as Partial<AnvlPreviewState>) ?? {},
     miniapp: (row.miniapp as Partial<AnvlMiniAppState>) ?? {},
     generatedCode: (row.generated_code as string) ?? "",
+    variables: (row.variables as VariableDef[]) ?? [],
     currentVersion: (row.current_version as number) ?? 1,
     updatedAt: (row.updated_at as string) ?? new Date().toISOString(),
   };
@@ -147,6 +151,7 @@ export async function upsertFlow(payload: FlowSavePayload): Promise<FlowSnapshot
         preview: payload.preview,
         miniapp: payload.miniapp,
         generated_code: payload.generatedCode,
+        variables: payload.variables ?? [],
       },
       { onConflict: "slug" },
     )
