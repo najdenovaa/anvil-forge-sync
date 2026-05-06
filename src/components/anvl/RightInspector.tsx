@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2 } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X } from "lucide-react";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
-import type { NodeKind } from "@/lib/anvl-types";
+import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "node" | "settings" | "code";
+type Tab = "components" | "node" | "variables" | "settings" | "code";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
