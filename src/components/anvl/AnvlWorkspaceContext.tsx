@@ -159,6 +159,15 @@ export function AnvlWorkspaceProvider({
     setEdges([]);
   }, []);
 
+  const relayoutCanvas = useCallback(() => {
+    setNodes((ns) => {
+      // We need current edges; read via setEdges identity callback.
+      let currentEdges: Edge[] = [];
+      setEdges((es) => { currentEdges = es; return es; });
+      return autoLayout(ns, currentEdges);
+    });
+  }, []);
+
   const addAiNode = useCallback((id: string, kind: string, title: string, preview: string) => {
     setNodes((prev) => {
       if (prev.some((n) => n.id === id)) return prev;
