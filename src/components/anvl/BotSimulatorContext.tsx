@@ -10,6 +10,20 @@ import {
 import type { Edge, Node } from "reactflow";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import type { NodeKind } from "@/lib/anvl-types";
+import {
+  buildSystemContext,
+  renderTemplate,
+  type TemplateContext,
+} from "@/lib/template-shared";
+
+/** Hardcoded demo user used by the in-canvas simulator. Configurable later (Step 11). */
+const DEMO_USER: TemplateContext["user"] = {
+  first_name: "Саша",
+  last_name: "Тест",
+  username: "demo_user",
+  id: "12345",
+  language_code: "ru",
+};
 
 export interface SimButton {
   /** Stable id (handle id when present, else label-derived). */
