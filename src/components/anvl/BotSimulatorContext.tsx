@@ -223,7 +223,16 @@ function composeMessage(
       stopKind = k;
       break;
     } else if (k === "logic.condition") {
-      conditionExpr = p.expression || p.condition || "var.X > 100";
+      const condJson = p.condition || "";
+      const parsed = tryParseCondition(condJson);
+      if (parsed) {
+        const res = evaluateCondition(parsed, tplCtx as never);
+        conditionExpr = `condition → ${res ? "YES" : "NO"}`;
+        conditionResultLocal = res ? "yes" : "no";
+      } else {
+        conditionExpr = p.expression || "var.X > 100";
+        conditionResultLocal = null;
+      }
       stopKind = k;
       break;
     } else if (k === "action.api") {
