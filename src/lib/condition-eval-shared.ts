@@ -10,7 +10,16 @@
  * NEVER use eval() / new Function() here. Pure data evaluation only.
  */
 
-import type { TemplateContext } from "./template-shared";
+// Local minimal type — kept inline so this file is byte-identical to its
+// supabase mirror. The shape is a subset of TemplateContext from the
+// template engine; importing it directly would diverge the two paths.
+export interface CondTemplateContext {
+  user: Record<string, unknown>;
+  var: Record<string, unknown>;
+  text?: string;
+  system: Record<string, unknown>;
+}
+type TemplateContext = CondTemplateContext;
 
 export type CompareOp =
   | "eq" | "neq"
