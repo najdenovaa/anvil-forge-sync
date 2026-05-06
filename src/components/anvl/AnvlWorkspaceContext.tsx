@@ -70,6 +70,7 @@ interface WorkspaceCtx {
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
   resetAiCanvas: () => void;
+  relayoutCanvas: () => void;
   saveStatus: SaveStatus;
   lastSavedAt: Date | null;
   snapshotNow: (note?: string) => Promise<void>;
