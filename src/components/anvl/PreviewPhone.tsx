@@ -909,3 +909,123 @@ function Dot({ delay }: { delay: number }) {
     />
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Specialized renderers: api call, photo, condition, warning                 */
+/* -------------------------------------------------------------------------- */
+
+function ApiCallBubble({
+  call,
+  stage,
+}: {
+  call: { method: string; url: string; pseudoId: string };
+  stage: "sending" | "done";
+}) {
+  return (
+    <div className="space-y-1">
+      {stage === "sending" ? (
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>🔄 Отправляю запрос…</span>
+          <Dot delay={0} />
+          <Dot delay={0.15} />
+          <Dot delay={0.3} />
+        </span>
+      ) : (
+        <span>✅ Готово! Номер заявки: <b>#{call.pseudoId}</b></span>
+      )}
+      <div
+        className="font-mono text-[9px] opacity-50"
+        style={{ color: "var(--tg-theme-hint-color)" }}
+      >
+        {call.method} {call.url}
+      </div>
+    </div>
+  );
+}
+
+function PhotoBlock({ url, caption }: { url: string; caption?: string }) {
+  const isPlaceholder = url === "placeholder" || !/^https?:/i.test(url);
+  return (
+    <div
+      className="overflow-hidden rounded-lg"
+      style={{ background: "color-mix(in oklab, var(--tg-theme-text-color) 8%, transparent)" }}
+    >
+      {isPlaceholder ? (
+        <svg viewBox="0 0 280 180" className="h-[120px] w-full">
+          <rect width="280" height="180" fill="currentColor" opacity="0.06" />
+          <g transform="translate(140 80)" opacity="0.45" fill="currentColor">
+            <circle cx="-40" cy="-15" r="10" />
+            <path d="M-65 25 L-15 -10 L25 20 L65 -5 L65 35 L-65 35 Z" />
+          </g>
+          <text
+            x="140"
+            y="155"
+            textAnchor="middle"
+            fontSize="9"
+            opacity="0.55"
+            fill="currentColor"
+          >
+            {url.length > 38 ? url.slice(0, 37) + "…" : url}
+          </text>
+        </svg>
+      ) : (
+        <img
+          src={url}
+          alt=""
+          className="max-h-32 w-full object-cover"
+          onError={(e) => ((e.currentTarget.style.display = "none"))}
+        />
+      )}
+      {caption && <div className="px-2 py-1 text-[10.5px] opacity-90">{caption}</div>}
+    </div>
+  );
+}
+
+function ConditionPrompt({
+  expr,
+  onChoose,
+}: {
+  expr: string;
+  onChoose: (b: "yes" | "no") => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div
+        className="rounded-md px-2 py-1 font-mono text-[10px]"
+        style={{
+          background: "color-mix(in oklab, var(--tg-theme-text-color) 6%, transparent)",
+          color: "var(--tg-theme-hint-color)",
+        }}
+      >
+        🔀 Условие: <b style={{ color: "var(--tg-theme-text-color)" }}>{expr}</b>
+      </div>
+      <div className="text-[10px]" style={{ color: "var(--tg-theme-hint-color)" }}>
+        Тыкни «Да» или «Нет» для имитации ветки:
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <TgButton mode="filled" size="s" stretched onClick={() => onChoose("yes")}>
+          ✓ Да
+        </TgButton>
+        <TgButton mode="bezeled" size="s" stretched onClick={() => onChoose("no")}>
+          ✕ Нет
+        </TgButton>
+      </div>
+    </div>
+  );
+}
+
+function WarningPlate({ text }: { text: string }) {
+  return (
+    <div
+      className="rounded-lg border px-2.5 py-1.5 text-[10.5px] leading-snug"
+      style={{
+        background: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 14%, transparent)",
+        borderColor: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 40%, transparent)",
+        color: "var(--tg-theme-destructive-text-color)",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
