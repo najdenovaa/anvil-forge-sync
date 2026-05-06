@@ -11,6 +11,7 @@ import type { Edge, Node } from "reactflow";
 import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
 import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
+import { autoLayout } from "@/lib/anvl-autolayout";
 
 const DEFAULT_FLOW_SLUG = "default";
 
@@ -69,6 +70,7 @@ interface WorkspaceCtx {
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
   resetAiCanvas: () => void;
+  relayoutCanvas: () => void;
   saveStatus: SaveStatus;
   lastSavedAt: Date | null;
   snapshotNow: (note?: string) => Promise<void>;
@@ -157,6 +159,15 @@ export function AnvlWorkspaceProvider({
     setEdges([]);
   }, []);
 
+  const relayoutCanvas = useCallback(() => {
+    setNodes((ns) => {
+      // We need current edges; read via setEdges identity callback.
+      let currentEdges: Edge[] = [];
+      setEdges((es) => { currentEdges = es; return es; });
+      return autoLayout(ns, currentEdges);
+    });
+  }, []);
+
   const addAiNode = useCallback((id: string, kind: string, title: string, preview: string) => {
     setNodes((prev) => {
       if (prev.some((n) => n.id === id)) return prev;
@@ -213,11 +224,11 @@ export function AnvlWorkspaceProvider({
       preview, miniApp, generatedCode, setGeneratedCode,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
-      mergePreview, mergeMiniApp, resetAiCanvas,
+      mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

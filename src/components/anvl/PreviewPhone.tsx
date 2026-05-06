@@ -386,7 +386,17 @@ function MiniAppView({
 
 type SimTurn =
   | { kind: "user"; text: string }
-  | { kind: "bot"; text: string; imageUrl?: string; buttons: SimButton[]; isLast: boolean };
+  | {
+      kind: "bot";
+      text: string;
+      imageUrl?: string;
+      imageCaption?: string;
+      buttons: SimButton[];
+      apiCall?: { method: string; url: string; pseudoId: string };
+      conditionExpr?: string;
+      warning?: string;
+      isLast: boolean;
+    };
 
 function SimulatorChatView({
   isTg,
@@ -408,9 +418,27 @@ function SimulatorChatView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [typing, setTyping] = useState(false);
+  const [apiStage, setApiStage] = useState<"sending" | "done" | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [userInputs, setUserInputs] = useState<Record<string, string>>({});
+
+  // Reset apiStage whenever active node changes.
+  useEffect(() => {
+    setApiStage(null);
+  }, [sim.activeNodeId]);
+
+  // Drive the action.api 2-stage animation: sending → done → advance.
+  useEffect(() => {
+    if (!sim.message?.apiCall) return;
+    setApiStage("sending");
+    const t1 = window.setTimeout(() => setApiStage("done"), 1500);
+    const t2 = window.setTimeout(() => sim.advance(), 2700);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [sim.message?.apiCall, sim]);
 
   const turns = useMemo<SimTurn[]>(() => {
     const out: SimTurn[] = [];
@@ -423,7 +451,11 @@ function SimulatorChatView({
         kind: "bot",
         text: sim.message.text,
         imageUrl: sim.message.imageUrl,
+        imageCaption: sim.message.imageCaption,
         buttons: sim.message.buttons,
+        apiCall: sim.message.apiCall,
+        conditionExpr: sim.message.conditionExpr,
+        warning: sim.message.warning,
         isLast: true,
       });
     }
@@ -433,7 +465,7 @@ function SimulatorChatView({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns, typing]);
+  }, [turns, typing, apiStage]);
 
   const isCondition = sim.effectiveKind === "logic.condition";
 
@@ -458,7 +490,7 @@ function SimulatorChatView({
     window.setTimeout(() => {
       setTyping(false);
       sim.press(btn);
-    }, 380);
+    }, 550);
   };
 
   const handleSubmit = () => {
@@ -604,23 +636,30 @@ function SimulatorChatView({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
-              <BotBubble theme={theme}>
-                <div className="space-y-1.5">
-                  {turn.imageUrl && (
-                    <img
-                      src={turn.imageUrl}
-                      alt=""
-                      className="max-h-32 w-full rounded-lg object-cover"
-                      onError={(e) => ((e.currentTarget.style.display = "none"))}
-                    />
-                  )}
-                  <span className="whitespace-pre-wrap">{turn.text}</span>
-                  {turn.isLast && isCondition && <ConditionToggle onChoose={handleBranch} />}
-                  {turn.isLast && turn.buttons.length > 0 && (
-                    <SimInlineKb items={turn.buttons} onAction={handlePress} />
-                  )}
-                </div>
-              </BotBubble>
+              {turn.warning ? (
+                <WarningPlate text={turn.warning} />
+              ) : turn.apiCall ? (
+                <BotBubble theme={theme}>
+                  <ApiCallBubble call={turn.apiCall} stage={apiStage ?? "sending"} />
+                </BotBubble>
+              ) : turn.conditionExpr ? (
+                <BotBubble theme={theme}>
+                  <ConditionPrompt expr={turn.conditionExpr} onChoose={handleBranch} />
+                </BotBubble>
+              ) : (
+                <BotBubble theme={theme}>
+                  <div className="space-y-1.5">
+                    {turn.imageUrl && <PhotoBlock url={turn.imageUrl} caption={turn.imageCaption} />}
+                    {turn.text && <span className="whitespace-pre-wrap">{turn.text}</span>}
+                    {turn.isLast && isCondition && !turn.conditionExpr && (
+                      <ConditionToggle onChoose={handleBranch} />
+                    )}
+                    {turn.isLast && turn.buttons.length > 0 && (
+                      <SimInlineKb items={turn.buttons} onAction={handlePress} />
+                    )}
+                  </div>
+                </BotBubble>
+              )}
             </motion.div>
           );
         })}
@@ -681,6 +720,21 @@ function SimulatorChatView({
           )}
         </AnimatePresence>
       </div>
+
+      {/* ───── Breadcrumb ───── */}
+      {sim.breadcrumb.length > 0 && (
+        <div
+          className="truncate border-t px-3 py-1 text-[9px] font-medium tracking-wide"
+          style={{
+            background: "var(--tg-theme-bg-color)",
+            color: "var(--tg-theme-hint-color)",
+            borderColor: "color-mix(in oklab, var(--tg-theme-text-color) 6%, transparent)",
+          }}
+          title={sim.breadcrumb.join(" → ")}
+        >
+          {sim.breadcrumb.join(" → ")}
+        </div>
+      )}
 
       {/* ───── Composer ───── */}
       <div
@@ -853,5 +907,125 @@ function Dot({ delay }: { delay: number }) {
       className="inline-block h-1 w-1 rounded-full"
       style={{ background: "var(--tg-theme-hint-color)" }}
     />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Specialized renderers: api call, photo, condition, warning                 */
+/* -------------------------------------------------------------------------- */
+
+function ApiCallBubble({
+  call,
+  stage,
+}: {
+  call: { method: string; url: string; pseudoId: string };
+  stage: "sending" | "done";
+}) {
+  return (
+    <div className="space-y-1">
+      {stage === "sending" ? (
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>🔄 Отправляю запрос…</span>
+          <Dot delay={0} />
+          <Dot delay={0.15} />
+          <Dot delay={0.3} />
+        </span>
+      ) : (
+        <span>✅ Готово! Номер заявки: <b>#{call.pseudoId}</b></span>
+      )}
+      <div
+        className="font-mono text-[9px] opacity-50"
+        style={{ color: "var(--tg-theme-hint-color)" }}
+      >
+        {call.method} {call.url}
+      </div>
+    </div>
+  );
+}
+
+function PhotoBlock({ url, caption }: { url: string; caption?: string }) {
+  const isPlaceholder = url === "placeholder" || !/^https?:/i.test(url);
+  return (
+    <div
+      className="overflow-hidden rounded-lg"
+      style={{ background: "color-mix(in oklab, var(--tg-theme-text-color) 8%, transparent)" }}
+    >
+      {isPlaceholder ? (
+        <svg viewBox="0 0 280 180" className="h-[120px] w-full">
+          <rect width="280" height="180" fill="currentColor" opacity="0.06" />
+          <g transform="translate(140 80)" opacity="0.45" fill="currentColor">
+            <circle cx="-40" cy="-15" r="10" />
+            <path d="M-65 25 L-15 -10 L25 20 L65 -5 L65 35 L-65 35 Z" />
+          </g>
+          <text
+            x="140"
+            y="155"
+            textAnchor="middle"
+            fontSize="9"
+            opacity="0.55"
+            fill="currentColor"
+          >
+            {url.length > 38 ? url.slice(0, 37) + "…" : url}
+          </text>
+        </svg>
+      ) : (
+        <img
+          src={url}
+          alt=""
+          className="max-h-32 w-full object-cover"
+          onError={(e) => ((e.currentTarget.style.display = "none"))}
+        />
+      )}
+      {caption && <div className="px-2 py-1 text-[10.5px] opacity-90">{caption}</div>}
+    </div>
+  );
+}
+
+function ConditionPrompt({
+  expr,
+  onChoose,
+}: {
+  expr: string;
+  onChoose: (b: "yes" | "no") => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div
+        className="rounded-md px-2 py-1 font-mono text-[10px]"
+        style={{
+          background: "color-mix(in oklab, var(--tg-theme-text-color) 6%, transparent)",
+          color: "var(--tg-theme-hint-color)",
+        }}
+      >
+        🔀 Условие: <b style={{ color: "var(--tg-theme-text-color)" }}>{expr}</b>
+      </div>
+      <div className="text-[10px]" style={{ color: "var(--tg-theme-hint-color)" }}>
+        Тыкни «Да» или «Нет» для имитации ветки:
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <TgButton mode="filled" size="s" stretched onClick={() => onChoose("yes")}>
+          ✓ Да
+        </TgButton>
+        <TgButton mode="bezeled" size="s" stretched onClick={() => onChoose("no")}>
+          ✕ Нет
+        </TgButton>
+      </div>
+    </div>
+  );
+}
+
+function WarningPlate({ text }: { text: string }) {
+  return (
+    <div
+      className="rounded-lg border px-2.5 py-1.5 text-[10.5px] leading-snug"
+      style={{
+        background: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 14%, transparent)",
+        borderColor: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 40%, transparent)",
+        color: "var(--tg-theme-destructive-text-color)",
+      }}
+    >
+      {text}
+    </div>
   );
 }

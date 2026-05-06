@@ -43,24 +43,40 @@ function CanvasInner() {
     return () => window.clearTimeout(t);
   }, [cameraFollow, activeNodeId, nodes, fitView]);
 
-  // Decorate the just-traversed edge with a glowing accent so the user can
-  // visually trace the simulator's path on the graph.
+  // After layout / node count changes, fit view smoothly.
+  const nodeCount = nodes.length;
+  useEffect(() => {
+    if (nodeCount === 0) return;
+    const t = window.setTimeout(() => {
+      try { fitView({ padding: 0.25, duration: 500 }); } catch { /* */ }
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [nodeCount, fitView]);
+
+  // Decorate edges: brighter solid stroke; the just-traversed edge gets a glow.
   const decoratedEdges = useMemo(() => {
-    if (!activeEdgeId) return edges;
-    return edges.map((e) =>
-      e.id === activeEdgeId
-        ? {
-            ...e,
-            animated: true,
-            style: {
-              ...(e.style ?? {}),
-              stroke: "oklch(0.78 0.18 145 / 95%)",
-              strokeWidth: 2.4,
-              filter: "drop-shadow(0 0 6px oklch(0.78 0.18 145 / 60%))",
-            },
-          }
-        : e,
-    );
+    return edges.map((e) => {
+      const baseStyle = {
+        stroke: "var(--accent-primary, oklch(0.78 0.14 230))",
+        strokeWidth: 2,
+        opacity: 0.55,
+        ...(e.style ?? {}),
+      };
+      if (e.id === activeEdgeId) {
+        return {
+          ...e,
+          animated: true,
+          style: {
+            ...baseStyle,
+            stroke: "oklch(0.78 0.18 145 / 95%)",
+            strokeWidth: 2.4,
+            opacity: 1,
+            filter: "drop-shadow(0 0 6px oklch(0.78 0.18 145 / 60%))",
+          },
+        };
+      }
+      return { ...e, style: baseStyle };
+    });
   }, [edges, activeEdgeId]);
 
   const nodeTypes = useMemo(() => ({ anvl: ForgeNode }), []);
