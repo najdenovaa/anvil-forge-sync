@@ -48,8 +48,10 @@ export interface SimMessage {
    *  "Отправляю…" → "✅ Готово" sequence. */
   apiCall?: { method: string; url: string; pseudoId: string };
   /** Set when the effective node is logic.condition — preview shows
-   *  the inline condition prompt with two buttons. */
+   *  the inline condition prompt and (when available) computed branch. */
   conditionExpr?: string;
+  /** "yes" | "no" — computed result when a structured condition is set. */
+  conditionResult?: "yes" | "no" | null;
   /** Soft warning (broken route / unconnected button) shown as a red plate. */
   warning?: string;
 }
