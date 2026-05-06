@@ -226,10 +226,18 @@ function buildTools(miniAppEnabled: boolean) {
       type: "function",
       function: {
         name: "connect",
-        description: "Connect two nodes with an edge.",
+        description: "Connect two nodes with an edge. For logic.condition source nodes, set sourceHandle to 'true' or 'false'.",
         parameters: {
           type: "object",
-          properties: { from: { type: "string" }, to: { type: "string" } },
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            sourceHandle: {
+              type: "string",
+              enum: ["true", "false"],
+              description: "Only for logic.condition source nodes",
+            },
+          },
           required: ["from", "to"],
           additionalProperties: false,
         },
