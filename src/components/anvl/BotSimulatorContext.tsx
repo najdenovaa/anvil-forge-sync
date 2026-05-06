@@ -73,6 +73,9 @@ interface SimulatorCtx {
   setCameraFollow: (v: boolean) => void;
   /** Human-readable breadcrumb of visited node titles. */
   breadcrumb: string[];
+  /** Follow the first outgoing edge of the effective node — used by the
+   *  preview to continue past action.api / condition after staging. */
+  advance: () => void;
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
