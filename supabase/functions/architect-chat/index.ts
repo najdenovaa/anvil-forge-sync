@@ -110,7 +110,7 @@ operator: eq, neq, gt, lt, gte, lte, contains, not_contains, starts_with, ends_w
 2. connect(from=cond_id, to=node_yes, sourceHandle="true") — ветка YES.
 3. connect(from=cond_id, to=node_no, sourceHandle="false") — ветка NO.
 
-set_param trueBranch/falseBranch тоже допустим как fallback, но connect с sourceHandle — основной способ.
+set_param trueBranch/falseBranch тоже допустим как fallback, но connect с sourceHandle — основной способ.`;
 
 const MINIAPP_RULES = `
 
