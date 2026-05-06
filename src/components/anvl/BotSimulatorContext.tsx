@@ -25,8 +25,18 @@ export interface SimMessage {
   text: string;
   /** Optional image url for `message.photo`. */
   imageUrl?: string;
+  /** Optional caption for the photo. */
+  imageCaption?: string;
   /** Buttons rendered under the bubble (from keyboard.* nodes). */
   buttons: SimButton[];
+  /** Set when the effective node is action.api — preview shows
+   *  "Отправляю…" → "✅ Готово" sequence. */
+  apiCall?: { method: string; url: string; pseudoId: string };
+  /** Set when the effective node is logic.condition — preview shows
+   *  the inline condition prompt with two buttons. */
+  conditionExpr?: string;
+  /** Soft warning (broken route / unconnected button) shown as a red plate. */
+  warning?: string;
 }
 
 interface SimulatorCtx {
