@@ -78,15 +78,31 @@ async function logEvent(
   }
 }
 
-function interpolate(tmpl: string, ctx: ExprContext): string {
-  return tmpl.replace(/\{([a-zA-Z0-9_.]+)\}/g, (_, path) => {
-    try {
-      const v = evalExpr(path, ctx);
-      return v == null ? "" : String(v);
-    } catch {
-      return "";
-    }
-  });
+function buildTplCtx(ctx: RunCtx): TemplateContext {
+  return {
+    user: ctx.user as TemplateContext["user"],
+    var: ctx.variables as Record<string, unknown>,
+    text: ctx.text,
+    system: buildSystemContext(ctx.bot.bot_username ?? undefined),
+  };
+}
+
+async function interpolateAndLog(
+  tpl: string,
+  ctx: RunCtx,
+  nodeId: string,
+): Promise<string> {
+  const tplCtx = buildTplCtx(ctx);
+  const used = extractPlaceholders(tpl);
+  if (used.length > 0) {
+    const missing = findMissingPlaceholders(tpl, tplCtx);
+    await logEvent(ctx.bot.id, ctx.chatId, "template_rendered", nodeId, {
+      node_id: nodeId,
+      used_vars: used,
+      missing_vars: missing,
+    });
+  }
+  return renderTemplate(tpl, tplCtx);
 }
 
 function parseButtons(raw: unknown): Array<{ label: string; action: string }> {
