@@ -224,11 +224,11 @@ export function AnvlWorkspaceProvider({
       preview, miniApp, generatedCode, setGeneratedCode,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
-      mergePreview, mergeMiniApp, resetAiCanvas,
+      mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
+    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
