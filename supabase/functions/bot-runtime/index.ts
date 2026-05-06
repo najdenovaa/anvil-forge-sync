@@ -21,6 +21,11 @@ import {
   buildSystemContext,
   type TemplateContext,
 } from "../_shared/template.ts";
+import {
+  evaluateCondition,
+  tryParseCondition,
+  type EvalSubResult,
+} from "../_shared/condition-eval.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
