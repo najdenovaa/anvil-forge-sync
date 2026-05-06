@@ -56,6 +56,18 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
     { key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/..." },
     { key: "body", label: "Body (JSON)", type: "textarea", placeholder: "{ \"key\": \"value\" }" },
   ],
+  "action.set_var": [
+    { key: "variable", label: "Variable", type: "text", placeholder: "user_name" },
+    { key: "value", label: "Value", type: "textarea", placeholder: "{first_name} or static value" },
+    { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
+  "action.input": [
+    { key: "variable", label: "Save to variable", type: "text", placeholder: "user_phone" },
+    { key: "prompt", label: "Question to user", type: "textarea", placeholder: "Введите ваш телефон:" },
+    { key: "validation", label: "Validation regex (optional)", type: "text", placeholder: "^\\+?\\d{10,12}$" },
+    { key: "errorMessage", label: "Error message", type: "text", placeholder: "Неверный формат, попробуйте ещё раз" },
+    { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
 };
 
 export function NodeInspector() {
