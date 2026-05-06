@@ -26,7 +26,7 @@ const PARAM_PREVIEW: Partial<Record<NodeKind, { key: string; prefix?: string }[]
   "keyboard.inline":  [{ key: "buttons" }],
   "keyboard.reply":   [{ key: "buttons" }],
   "miniapp.screen":   [{ key: "screenId", prefix: "#" }, { key: "url" }],
-  "logic.condition":  [{ key: "expression", prefix: "if " }],
+  "logic.condition":  [{ key: "condition", prefix: "if " }, { key: "expression", prefix: "if " }],
   "action.api":       [{ key: "method" }, { key: "url" }],
   "action.set_var":   [{ key: "variable", prefix: "var." }, { key: "value" }],
   "action.input":     [{ key: "variable", prefix: "→ var." }, { key: "prompt" }],
