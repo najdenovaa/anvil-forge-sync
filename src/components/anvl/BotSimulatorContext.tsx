@@ -10,6 +10,20 @@ import {
 import type { Edge, Node } from "reactflow";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import type { NodeKind } from "@/lib/anvl-types";
+import {
+  buildSystemContext,
+  renderTemplate,
+  type TemplateContext,
+} from "@/lib/template-shared";
+
+/** Hardcoded demo user used by the in-canvas simulator. Configurable later (Step 11). */
+const DEMO_USER: TemplateContext["user"] = {
+  first_name: "Саша",
+  last_name: "Тест",
+  username: "demo_user",
+  id: "12345",
+  language_code: "ru",
+};
 
 export interface SimButton {
   /** Stable id (handle id when present, else label-derived). */
@@ -165,7 +179,9 @@ function composeMessage(
   node: Node,
   nodes: Node[],
   edges: Edge[],
+  tplCtx: TemplateContext,
 ): { message: SimMessage; effectiveNodeId: string; effectiveKind: NodeKind | null } {
+  const tpl = (s: string | undefined | null) => renderTemplate(s ?? "", tplCtx);
   const visited = new Set<string>();
   let cursor: Node | undefined = node;
   const lines: string[] = [];
@@ -185,12 +201,12 @@ function composeMessage(
     const title = (cursor.data?.title as string) ?? "";
 
     if (k === "message.text") {
-      if (p.text) lines.push(p.text);
-      else if (cursor.data?.preview) lines.push(cursor.data.preview as string);
+      if (p.text) lines.push(tpl(p.text));
+      else if (cursor.data?.preview) lines.push(tpl(cursor.data.preview as string));
       else if (title) lines.push(title);
     } else if (k === "message.photo") {
       imageUrl = p.url || "placeholder";
-      imageCaption = p.caption;
+      imageCaption = p.caption ? tpl(p.caption) : undefined;
       stopKind = k;
       break;
     } else if (k === "message.document") {
@@ -212,7 +228,7 @@ function composeMessage(
         "A" + Math.floor(1000 + (cursor.id.length * 137 + visited.size * 4321) % 9000);
       apiCall = {
         method: (p.method || "POST").toUpperCase(),
-        url: p.url || "https://api.example.com",
+        url: tpl(p.url || "https://api.example.com"),
         pseudoId,
       };
       stopKind = k;
@@ -243,18 +259,21 @@ function composeMessage(
     if (parsed.length > 0) {
       buttons = parsed.map((b, i) => ({
         ...b,
+        label: tpl(b.label),
+        action: tpl(b.action),
         id: outgoing[i]?.sourceHandle ?? outgoing[i]?.id ?? `${buttonsNode!.id}:${i}`,
       }));
     } else {
       buttons = outgoing.slice(0, 6).map((e, i) => {
         const target = nodes.find((n) => n.id === e.target);
         const tParams = (target?.data?.params as Record<string, string>) ?? {};
-        const label =
+        const labelRaw =
           (target?.data?.title as string) ||
           tParams.text ||
           tParams.caption ||
           tParams.screenId ||
           `Шаг ${i + 1}`;
+        const label = tpl(labelRaw);
         const clipped = label.length > 28 ? label.slice(0, 27) + "…" : label;
         return {
           id: e.sourceHandle ?? e.id,
@@ -363,6 +382,10 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [lastBranch, setLastBranch] = useState<"yes" | "no" | null>(null);
   const [pendingBranch, setPendingBranch] = useState<"yes" | "no">("yes");
   const [cameraFollow, setCameraFollow] = useState(false);
+  // Local-only variable bag for the simulator. Step 2B (action.set_var) will
+  // populate this; for now it stays empty so {var.X} renders to "".
+  const [variables] = useState<Record<string, unknown>>({});
+  const [lastInputText, setLastInputText] = useState<string>("");
 
   useEffect(() => {
     if (!entryId) {
@@ -384,10 +407,20 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     [activeNodeId, nodes],
   );
 
+  const tplCtx = useMemo<TemplateContext>(
+    () => ({
+      user: DEMO_USER,
+      var: variables,
+      text: lastInputText,
+      system: buildSystemContext(),
+    }),
+    [variables, lastInputText],
+  );
+
   const composed = useMemo(() => {
     if (!activeNode) return null;
-    return composeMessage(activeNode, nodes, edges);
-  }, [activeNode, nodes, edges]);
+    return composeMessage(activeNode, nodes, edges, tplCtx);
+  }, [activeNode, nodes, edges, tplCtx]);
 
   const message = composed?.message ?? null;
   const effectiveKind = composed?.effectiveKind ?? null;
@@ -441,8 +474,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   );
 
   const submitInput = useCallback(
-    (_text: string) => {
+    (text: string) => {
       if (!activeNodeId) return;
+      setLastInputText(text);
       const out = edges.filter((e) => e.source === activeNodeId);
       const next = out[0]?.target;
       if (next) jumpTo(next);

@@ -52,6 +52,35 @@ export type Database = {
           },
         ]
       }
+      bot_globals: {
+        Row: {
+          bot_id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          bot_id: string
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          bot_id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_globals_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_sessions: {
         Row: {
           bot_id: string
@@ -196,6 +225,7 @@ export type Database = {
           slug: string
           title: string
           updated_at: string
+          variables: Json
         }
         Insert: {
           created_at?: string
@@ -211,6 +241,7 @@ export type Database = {
           slug: string
           title?: string
           updated_at?: string
+          variables?: Json
         }
         Update: {
           created_at?: string
@@ -226,6 +257,7 @@ export type Database = {
           slug?: string
           title?: string
           updated_at?: string
+          variables?: Json
         }
         Relationships: []
       }

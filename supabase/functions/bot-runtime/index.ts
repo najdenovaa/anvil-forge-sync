@@ -14,6 +14,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { decryptToken } from "../_shared/crypto.ts";
 import { evalExpr, type ExprContext } from "./expr.ts";
+import {
+  renderTemplate,
+  extractPlaceholders,
+  findMissingPlaceholders,
+  buildSystemContext,
+  type TemplateContext,
+} from "../../../src/lib/template-shared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -42,6 +49,7 @@ interface Bot {
   bot_token_encrypted: string;
   webhook_secret: string;
   status: string;
+  bot_username?: string | null;
 }
 interface Flow { id: string; nodes: FlowNode[]; edges: FlowEdge[] }
 
@@ -71,15 +79,31 @@ async function logEvent(
   }
 }
 
-function interpolate(tmpl: string, ctx: ExprContext): string {
-  return tmpl.replace(/\{([a-zA-Z0-9_.]+)\}/g, (_, path) => {
-    try {
-      const v = evalExpr(path, ctx);
-      return v == null ? "" : String(v);
-    } catch {
-      return "";
-    }
-  });
+function buildTplCtx(ctx: RunCtx): TemplateContext {
+  return {
+    user: ctx.user as TemplateContext["user"],
+    var: ctx.variables as Record<string, unknown>,
+    text: ctx.text,
+    system: buildSystemContext(ctx.bot.bot_username ?? undefined),
+  };
+}
+
+async function interpolateAndLog(
+  tpl: string,
+  ctx: RunCtx,
+  nodeId: string,
+): Promise<string> {
+  const tplCtx = buildTplCtx(ctx);
+  const used = extractPlaceholders(tpl);
+  if (used.length > 0) {
+    const missing = findMissingPlaceholders(tpl, tplCtx);
+    await logEvent(ctx.bot.id, ctx.chatId, "template_rendered", nodeId, {
+      node_id: nodeId,
+      used_vars: used,
+      missing_vars: missing,
+    });
+  }
+  return renderTemplate(tpl, tplCtx);
 }
 
 function parseButtons(raw: unknown): Array<{ label: string; action: string }> {
@@ -241,7 +265,11 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
 
     case "message.text": {
-      const text = interpolate(String(params.text ?? node.data?.preview ?? ""), exprCtx);
+      const text = await interpolateAndLog(
+        String(params.text ?? node.data?.preview ?? ""),
+        ctx,
+        node.id,
+      );
       const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
       ctx.pendingKeyboard = undefined;
       await sendAndLog("sendMessage", { chat_id: ctx.chatId, text, reply_markup });
@@ -249,7 +277,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "message.photo": {
-      const caption = interpolate(String(params.caption ?? ""), exprCtx);
+      const caption = await interpolateAndLog(String(params.caption ?? ""), ctx, node.id);
       const photo = String(params.url ?? params.photo ?? "");
       if (photo) {
         const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
@@ -268,12 +296,21 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "keyboard.inline": {
-      ctx.pendingKeyboard = { inline: parseButtons(params.buttons) };
+      const tplCtx = buildTplCtx(ctx);
+      const btns = parseButtons(params.buttons).map((b) => ({
+        label: renderTemplate(b.label, tplCtx),
+        action: renderTemplate(b.action, tplCtx),
+      }));
+      ctx.pendingKeyboard = { inline: btns };
       return goNext();
     }
 
     case "keyboard.reply": {
-      const buttons = parseButtons(params.buttons);
+      const tplCtx = buildTplCtx(ctx);
+      const buttons = parseButtons(params.buttons).map((b) => ({
+        label: renderTemplate(b.label, tplCtx),
+        action: renderTemplate(b.action, tplCtx),
+      }));
       ctx.pendingKeyboard = { reply: buttons };
       ctx.nextReplyKeyboardLabels = buttons.map((b) => b.label);
       return goNext();
@@ -292,9 +329,11 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
 
     case "action.api": {
       try {
-        const url = interpolate(String(params.url ?? ""), exprCtx);
+        const url = await interpolateAndLog(String(params.url ?? ""), ctx, node.id);
         const method = String(params.method ?? "GET").toUpperCase();
-        const body = params.body ? interpolate(String(params.body), exprCtx) : undefined;
+        const body = params.body
+          ? await interpolateAndLog(String(params.body), ctx, node.id)
+          : undefined;
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
