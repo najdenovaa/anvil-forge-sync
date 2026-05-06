@@ -286,7 +286,7 @@ export function LeftAIPanel() {
       try {
         if (name === "reset_canvas") resetAiCanvas();
         else if (name === "add_node") addAiNode(args.id, args.kind, args.title, args.preview);
-        else if (name === "connect") connectAiNodes(args.from, args.to);
+        else if (name === "connect") connectAiNodes(args.from, args.to, args.sourceHandle);
         else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
         else if (name === "set_preview") mergePreview(args);
         else if (name === "set_miniapp") mergeMiniApp(args);
