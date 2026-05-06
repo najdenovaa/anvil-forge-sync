@@ -567,10 +567,24 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const advance = useCallback(() => {
     if (!composed) return;
     const id = composed.effectiveNodeId;
+    const node = nodes.find((n) => n.id === id);
     const out = edges.filter((e) => e.source === id);
+
+    // For condition nodes with a structured (computed) result — auto-follow that branch.
+    if (node?.data?.kind === "logic.condition" && composed.message?.conditionResult) {
+      const handle = composed.message.conditionResult === "yes" ? "true" : "false";
+      const params = (node.data?.params as Record<string, string>) ?? {};
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      const fallback =
+        (composed.message.conditionResult === "yes" ? params.trueBranch : params.falseBranch) ?? null;
+      const target = byHandle?.target ?? fallback ?? out[0]?.target;
+      if (target) jumpTo(target, byHandle?.id ?? null);
+      return;
+    }
+
     const next = out[0];
     if (next) jumpTo(next.target, next.id);
-  }, [composed, edges, jumpTo]);
+  }, [composed, edges, nodes, jumpTo]);
 
   const breadcrumb = useMemo(() => {
     const raw = [...history, activeNodeId].filter(Boolean) as string[];
