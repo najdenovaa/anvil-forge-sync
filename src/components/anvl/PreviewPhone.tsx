@@ -386,7 +386,17 @@ function MiniAppView({
 
 type SimTurn =
   | { kind: "user"; text: string }
-  | { kind: "bot"; text: string; imageUrl?: string; buttons: SimButton[]; isLast: boolean };
+  | {
+      kind: "bot";
+      text: string;
+      imageUrl?: string;
+      imageCaption?: string;
+      buttons: SimButton[];
+      apiCall?: { method: string; url: string; pseudoId: string };
+      conditionExpr?: string;
+      warning?: string;
+      isLast: boolean;
+    };
 
 function SimulatorChatView({
   isTg,
@@ -408,9 +418,27 @@ function SimulatorChatView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [typing, setTyping] = useState(false);
+  const [apiStage, setApiStage] = useState<"sending" | "done" | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [userInputs, setUserInputs] = useState<Record<string, string>>({});
+
+  // Reset apiStage whenever active node changes.
+  useEffect(() => {
+    setApiStage(null);
+  }, [sim.activeNodeId]);
+
+  // Drive the action.api 2-stage animation: sending → done → advance.
+  useEffect(() => {
+    if (!sim.message?.apiCall) return;
+    setApiStage("sending");
+    const t1 = window.setTimeout(() => setApiStage("done"), 1500);
+    const t2 = window.setTimeout(() => sim.advance(), 2700);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [sim.message?.apiCall, sim]);
 
   const turns = useMemo<SimTurn[]>(() => {
     const out: SimTurn[] = [];
@@ -423,7 +451,11 @@ function SimulatorChatView({
         kind: "bot",
         text: sim.message.text,
         imageUrl: sim.message.imageUrl,
+        imageCaption: sim.message.imageCaption,
         buttons: sim.message.buttons,
+        apiCall: sim.message.apiCall,
+        conditionExpr: sim.message.conditionExpr,
+        warning: sim.message.warning,
         isLast: true,
       });
     }
@@ -433,7 +465,7 @@ function SimulatorChatView({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns, typing]);
+  }, [turns, typing, apiStage]);
 
   const isCondition = sim.effectiveKind === "logic.condition";
 
@@ -458,7 +490,7 @@ function SimulatorChatView({
     window.setTimeout(() => {
       setTyping(false);
       sim.press(btn);
-    }, 380);
+    }, 550);
   };
 
   const handleSubmit = () => {
