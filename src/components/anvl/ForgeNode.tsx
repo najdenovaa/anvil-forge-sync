@@ -140,7 +140,40 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
         );
       })()}
 
-      <Handle type="source" position={Position.Right} className="!h-2.5 !w-2.5" />
+      {data.kind === "logic.condition" ? (
+        <>
+          <Handle
+            type="source"
+            id="true"
+            position={Position.Right}
+            className="!h-2.5 !w-2.5"
+            style={{ top: "35%", background: "var(--status-ok, #22c55e)" }}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-3 text-[9px] font-bold tracking-wider text-status-ok"
+            style={{ top: "calc(35% - 14px)", color: "var(--status-ok, #22c55e)" }}
+          >
+            YES
+          </span>
+          <Handle
+            type="source"
+            id="false"
+            position={Position.Right}
+            className="!h-2.5 !w-2.5"
+            style={{ top: "70%", background: "var(--status-err, #ef4444)" }}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-3 text-[9px] font-bold tracking-wider"
+            style={{ top: "calc(70% + 4px)", color: "var(--status-err, #ef4444)" }}
+          >
+            NO
+          </span>
+        </>
+      ) : (
+        <Handle type="source" position={Position.Right} className="!h-2.5 !w-2.5" />
+      )}
     </motion.div>
   );
 }
