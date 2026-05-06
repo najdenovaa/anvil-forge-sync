@@ -474,8 +474,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   );
 
   const submitInput = useCallback(
-    (_text: string) => {
+    (text: string) => {
       if (!activeNodeId) return;
+      setLastInputText(text);
       const out = edges.filter((e) => e.source === activeNodeId);
       const next = out[0]?.target;
       if (next) jumpTo(next);
