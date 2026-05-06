@@ -9,6 +9,7 @@ import {
   type FlowSnapshot,
 } from "@/lib/anvl-flow-storage";
 import type { AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
+import type { VariableDef } from "@/lib/anvl-types";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -19,6 +20,7 @@ interface UseFlowPersistenceArgs {
   preview: Partial<AnvlPreviewState>;
   miniapp: Partial<AnvlMiniAppState>;
   generatedCode: string;
+  variables: VariableDef[];
   /** Called once after the initial load — used to hydrate the workspace state. */
   onHydrate: (snapshot: FlowSnapshot) => void;
   /** Disable persistence (e.g. while still on landing). */
@@ -35,6 +37,7 @@ export function useFlowPersistence({
   preview,
   miniapp,
   generatedCode,
+  variables,
   onHydrate,
   enabled = true,
 }: UseFlowPersistenceArgs) {

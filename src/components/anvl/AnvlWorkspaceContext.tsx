@@ -219,6 +219,7 @@ export function AnvlWorkspaceProvider({
     preview,
     miniapp: miniApp,
     generatedCode,
+    variables,
     onHydrate: hydrate,
     enabled: persist,
   });
@@ -227,13 +228,14 @@ export function AnvlWorkspaceProvider({
     () => ({
       nodes, edges, setNodes, setEdges,
       preview, miniApp, generatedCode, setGeneratedCode,
+      variables, setVariables,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
