@@ -96,7 +96,25 @@ const MINIAPP_RULES = `
 trigger.command, trigger.message, trigger.callback,
 message.text, message.photo, message.document,
 keyboard.inline, keyboard.reply,
-miniapp.screen, logic.condition, action.api.
+miniapp.screen, logic.condition, action.api,
+action.set_var, action.input.
+
+== ПЕРЕМЕННЫЕ ==
+Если бот должен помнить данные пользователя — объяви переменные через
+set_variables(variables=[...]) СРАЗУ после reset_canvas. Затем используй ноды
+action.set_var (записать значение) и action.input (спросить пользователя и
+сохранить ответ). Читай переменные через {var.X} в любом тексте, URL или
+кнопке. Системные плейсхолдеры: {first_name}, {last_name}, {username},
+{system.now}, {system.today}, {text}.
+
+Пример приветствия по имени:
+trigger.command(/start) → action.input(prompt="Как тебя зовут?",
+variable="user_name") → message.text(text="Привет, {var.user_name}!")
+
+ПРАВИЛА:
+- Все используемые в {var.X} ключи ОБЯЗАНЫ быть объявлены через set_variables.
+- Не дублируй ключи (даже в разных scope).
+- Без объявления — {var.X} рендерится в пустую строку.
 
 == MINI APP IS ENABLED ==
 Design a complete mini-app that maps 1:1 to the user's domain.
@@ -118,7 +136,8 @@ const NO_MINIAPP_RULES = `
 trigger.command, trigger.message, trigger.callback,
 message.text, message.photo, message.document,
 keyboard.inline, keyboard.reply,
-logic.condition, action.api.
+logic.condition, action.api,
+action.set_var, action.input.
 
 == MINI APP IS DISABLED ==
 Build a pure chat-only flow. Forbidden: miniapp.screen nodes, "miniapp" field,
