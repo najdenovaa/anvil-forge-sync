@@ -51,6 +51,23 @@ D. Do NOT add a trigger.callback node when the same callback is already
 E. action.api is NEVER terminal. Always connect() it to a message.text node
    that reports the result to the user (e.g. "✅ Заявка принята, с вами
    свяжется менеджер. Номер: #...").
+F. ПРАВИЛЬНЫЙ ПАТТЕРН «Назад в меню» (применяй ВСЕГДА для FAQ / меню-ботов):
+   1. add_node "menu" — keyboard.inline с кнопками меню (О компании, Цены,
+      Контакты, ...). Это ЕДИНСТВЕННАЯ нода главного меню.
+   2. add_node "about" — message.text с ответом + СВОЯ keyboard.inline-нода
+      "about_kb" с одной кнопкой «← Назад в меню» (callback_data="back_to_menu").
+   3. connect("menu", "about") — клик «О компании» в меню → ответ.
+   4. connect("about", "about_kb") — после ответа показать кнопку «Назад».
+   5. connect("about_kb", "menu") — клик «Назад» ВОЗВРАЩАЕТ на ту же самую
+      исходную ноду меню. НЕ создавай копию меню.
+   ЗАПРЕЩЕНО:
+   • создавать отдельную ноду «Кнопка Назад» — кнопка «Назад» это просто
+     ещё одна кнопка внутри keyboard.inline ноды ответа, не самостоятельная
+     нода;
+   • создавать ноды «Главное меню (повтор)», «Возврат в меню», «Меню v2» —
+     для возврата ВСЕГДА используется ИСХОДНАЯ нода главного меню;
+   • дублировать «menu» при каждом возврате — одна нода = одна точка входа
+     для всех обратных edges.
 
 == VALIDATION (do this mentally before the final summary) ==
 Walk the graph from each trigger and verify:
