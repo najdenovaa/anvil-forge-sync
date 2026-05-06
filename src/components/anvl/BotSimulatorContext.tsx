@@ -501,7 +501,10 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   }, [composed, edges, jumpTo]);
 
   const breadcrumb = useMemo(() => {
-    const ids = [...history, activeNodeId].filter(Boolean) as string[];
+    const raw = [...history, activeNodeId].filter(Boolean) as string[];
+    // Dedup consecutive identical node ids — a single node visited once
+    // should appear once in the breadcrumb, not twice.
+    const ids = raw.filter((nid, i) => i === 0 || raw[i - 1] !== nid);
     return ids
       .map((nid) => {
         const n = nodes.find((nn) => nn.id === nid);
