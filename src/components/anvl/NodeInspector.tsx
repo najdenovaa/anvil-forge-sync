@@ -6,6 +6,8 @@ import { useSelection } from "./SelectionContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useI18n } from "./I18nContext";
 import { TemplateInput } from "./TemplateInput";
+import { ConditionBuilder } from "./ConditionBuilder";
+import { tryParseCondition } from "@/lib/condition-eval-shared";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
