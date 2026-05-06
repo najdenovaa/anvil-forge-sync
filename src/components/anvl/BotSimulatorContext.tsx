@@ -179,7 +179,9 @@ function composeMessage(
   node: Node,
   nodes: Node[],
   edges: Edge[],
+  tplCtx: TemplateContext,
 ): { message: SimMessage; effectiveNodeId: string; effectiveKind: NodeKind | null } {
+  const tpl = (s: string | undefined | null) => renderTemplate(s ?? "", tplCtx);
   const visited = new Set<string>();
   let cursor: Node | undefined = node;
   const lines: string[] = [];
