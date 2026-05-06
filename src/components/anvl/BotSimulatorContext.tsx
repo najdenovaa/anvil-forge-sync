@@ -352,6 +352,7 @@ function composeMessage(
       buttons,
       apiCall,
       conditionExpr,
+      conditionResult: conditionResultLocal,
       warning,
     },
     effectiveNodeId: effectiveNode.id,
