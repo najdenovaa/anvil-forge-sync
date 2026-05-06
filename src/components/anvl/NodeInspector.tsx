@@ -137,10 +137,26 @@ export function NodeInspector() {
         </button>
       </div>
 
-      <Accordion.Root type="multiple" defaultValue={["general", "params"]} className="space-y-2">
+      <Accordion.Root type="multiple" defaultValue={["general", "condition", "params"]} className="space-y-2">
         <AccordionItem value="general" label="General">
           <FieldRow label="Title" value={titleVal} onChange={setTitle} />
         </AccordionItem>
+
+        {kind === "logic.condition" && (
+          <AccordionItem value="condition" label="Condition">
+            <ConditionBuilder
+              value={tryParseCondition(params.condition) ?? { kind: "group", combinator: "AND", children: [] }}
+              onChange={(c) => updateAiNodeParam(node.id, "condition", JSON.stringify(c))}
+              trueBranch={params.trueBranch}
+              falseBranch={params.falseBranch}
+              onTrueBranchChange={(v) => updateAiNodeParam(node.id, "trueBranch", v)}
+              onFalseBranchChange={(v) => updateAiNodeParam(node.id, "falseBranch", v)}
+              availableVars={variables}
+              availableNodes={nodes}
+              selfNodeId={node.id}
+            />
+          </AccordionItem>
+        )}
 
         <AccordionItem value="params" label="Parameters">
           {schema.length === 0 ? (
