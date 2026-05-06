@@ -5,8 +5,19 @@ import { motion } from "framer-motion";
 import { useSelection } from "./SelectionContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useI18n } from "./I18nContext";
+import { TemplateInput } from "./TemplateInput";
 import type { NodeKind } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
+
+/** Param keys per kind that are run through the template engine — they get
+ *  the TemplateInput editor with placeholder autocomplete + preview. */
+const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
+  "message.text": new Set(["text"]),
+  "message.photo": new Set(["caption"]),
+  "action.set_var": new Set(["value"]),
+  "action.input": new Set(["prompt"]),
+  "action.api": new Set(["url", "body"]),
+};
 
 /**
  * Per-kind parameter schema. Each entry describes which fields the inspector
@@ -73,7 +84,7 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
 export function NodeInspector() {
   const { t } = useI18n();
   const { selectedId, setSelectedId } = useSelection();
-  const { nodes, setNodes, setEdges, updateAiNodeParam } = useAnvlWorkspace();
+  const { nodes, setNodes, setEdges, updateAiNodeParam, variables } = useAnvlWorkspace();
 
   const node = useMemo(() => nodes.find((n) => n.id === selectedId) ?? null, [nodes, selectedId]);
 
