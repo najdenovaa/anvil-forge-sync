@@ -299,6 +299,33 @@ function buildTools(miniAppEnabled: boolean) {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "set_variables",
+        description: "Объявить список переменных flow. Вызывается ОДИН раз сразу после reset_canvas.",
+        parameters: {
+          type: "object",
+          properties: {
+            variables: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  key: { type: "string" },
+                  scope: { type: "string", enum: ["session", "user"] },
+                  type: { type: "string", enum: ["string", "number", "boolean", "json"] },
+                  defaultValue: { type: "string" },
+                  description: { type: "string" },
+                },
+                required: ["key", "scope", "type"],
+              },
+            },
+          },
+          required: ["variables"],
+        },
+      },
+    },
   ];
 
   if (miniAppEnabled) {
