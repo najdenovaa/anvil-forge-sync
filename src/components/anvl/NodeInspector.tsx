@@ -144,8 +144,22 @@ export function NodeInspector() {
           {schema.length === 0 ? (
             <div className="px-1 py-1 text-[11px] text-muted-foreground">No parameters for this node kind.</div>
           ) : (
-            schema.map((f) =>
-              f.type === "textarea" ? (
+            schema.map((f) => {
+              const isTpl = f.type === "textarea" && TEMPLATE_FIELDS[kind]?.has(f.key);
+              if (isTpl) {
+                return (
+                  <label key={f.key} className="block">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{f.label}</div>
+                    <TemplateInput
+                      value={params[f.key] ?? ""}
+                      placeholder={f.placeholder}
+                      onChange={(v) => updateAiNodeParam(node.id, f.key, v)}
+                      availableVars={variables}
+                    />
+                  </label>
+                );
+              }
+              return f.type === "textarea" ? (
                 <FieldArea
                   key={f.key}
                   label={f.label}
@@ -169,8 +183,8 @@ export function NodeInspector() {
                   placeholder={f.placeholder}
                   onChange={(v) => updateAiNodeParam(node.id, f.key, v)}
                 />
-              ),
-            )
+              );
+            })
           )}
         </AccordionItem>
 
