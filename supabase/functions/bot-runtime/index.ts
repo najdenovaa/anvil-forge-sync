@@ -265,7 +265,11 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
 
     case "message.text": {
-      const text = interpolate(String(params.text ?? node.data?.preview ?? ""), exprCtx);
+      const text = await interpolateAndLog(
+        String(params.text ?? node.data?.preview ?? ""),
+        ctx,
+        node.id,
+      );
       const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
       ctx.pendingKeyboard = undefined;
       await sendAndLog("sendMessage", { chat_id: ctx.chatId, text, reply_markup });
@@ -273,7 +277,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "message.photo": {
-      const caption = interpolate(String(params.caption ?? ""), exprCtx);
+      const caption = await interpolateAndLog(String(params.caption ?? ""), ctx, node.id);
       const photo = String(params.url ?? params.photo ?? "");
       if (photo) {
         const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
@@ -292,12 +296,21 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "keyboard.inline": {
-      ctx.pendingKeyboard = { inline: parseButtons(params.buttons) };
+      const tplCtx = buildTplCtx(ctx);
+      const btns = parseButtons(params.buttons).map((b) => ({
+        label: renderTemplate(b.label, tplCtx),
+        action: renderTemplate(b.action, tplCtx),
+      }));
+      ctx.pendingKeyboard = { inline: btns };
       return goNext();
     }
 
     case "keyboard.reply": {
-      const buttons = parseButtons(params.buttons);
+      const tplCtx = buildTplCtx(ctx);
+      const buttons = parseButtons(params.buttons).map((b) => ({
+        label: renderTemplate(b.label, tplCtx),
+        action: renderTemplate(b.action, tplCtx),
+      }));
       ctx.pendingKeyboard = { reply: buttons };
       ctx.nextReplyKeyboardLabels = buttons.map((b) => b.label);
       return goNext();
@@ -316,9 +329,11 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
 
     case "action.api": {
       try {
-        const url = interpolate(String(params.url ?? ""), exprCtx);
+        const url = await interpolateAndLog(String(params.url ?? ""), ctx, node.id);
         const method = String(params.method ?? "GET").toUpperCase();
-        const body = params.body ? interpolate(String(params.body), exprCtx) : undefined;
+        const body = params.body
+          ? await interpolateAndLog(String(params.body), ctx, node.id)
+          : undefined;
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
