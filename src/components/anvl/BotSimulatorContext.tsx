@@ -484,11 +484,22 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       if (!activeNodeId) return;
       setLastInputText(text);
+      const node = nodes.find((n) => n.id === activeNodeId);
+      const kind = node?.data?.kind as NodeKind | undefined;
+      if (kind === "action.input") {
+        const p = (node?.data?.params as Record<string, string>) ?? {};
+        const validation = (p.validation ?? "").trim();
+        if (validation) {
+          try { if (!new RegExp(validation).test(text)) return; } catch { /* */ }
+        }
+        const variable = (p.variable ?? "").trim();
+        if (variable) setVariables((vs) => ({ ...vs, [variable]: text }));
+      }
       const out = edges.filter((e) => e.source === activeNodeId);
       const next = out[0]?.target;
       if (next) jumpTo(next);
     },
-    [activeNodeId, edges, jumpTo],
+    [activeNodeId, edges, nodes, jumpTo],
   );
 
   const setBranch = useCallback(
