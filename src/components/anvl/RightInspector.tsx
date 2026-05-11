@@ -13,7 +13,7 @@ import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "node" | "variables" | "settings" | "code";
+type Tab = "components" | "node" | "variables" | "settings" | "code" | "logs";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
