@@ -25,6 +25,14 @@ interface UseFlowPersistenceArgs {
   onHydrate: (snapshot: FlowSnapshot) => void;
   /** Disable persistence (e.g. while still on landing). */
   enabled?: boolean;
+  /**
+   * Auto-create mode: treat the very first state as the baseline and only
+   * save once it has actually changed. After the first successful save, the
+   * `onFlowCreated(slug)` callback fires exactly once so the host can
+   * navigate to the canonical /flows/$slug URL.
+   */
+  autoCreate?: boolean;
+  onFlowCreated?: (slug: string) => void;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
