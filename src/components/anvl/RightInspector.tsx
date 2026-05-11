@@ -18,6 +18,8 @@ export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
   const { t } = useI18n();
   const { selectedId } = useSelection();
+  const { lintIssues } = useAnvlWorkspace();
+  const showIssues = !selectedId && lintIssues.length > 0;
 
   // Auto-switch to "Node" tab when a node is selected on the canvas.
   useEffect(() => {
