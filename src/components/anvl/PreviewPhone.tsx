@@ -505,9 +505,7 @@ function SimulatorChatView({
     }, 380);
   };
 
-  // Branch picking is fully automatic now (Step 5) — kept as a no-op shim
-  // in case any debug surface still calls it.
-  const handleBranch = (_b: "yes" | "no") => { void _b; };
+  // Step 5: branch picking is fully automatic; no manual handler needed.
 
   const handleRestart = () => {
     setUserInputs({});
