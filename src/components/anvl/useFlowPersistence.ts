@@ -117,6 +117,11 @@ export function useFlowPersistence({
       setStatus("saved");
       setLastSavedAt(new Date());
       queryClient.setQueryData(queryKey, saved);
+      // Auto-create: notify host exactly once after the row exists.
+      if (autoCreate && !createdFiredRef.current) {
+        createdFiredRef.current = true;
+        onFlowCreatedRef.current?.(saved.slug);
+      }
     },
     onError: (err) => {
       console.error("Flow autosave failed:", err);
