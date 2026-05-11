@@ -232,6 +232,8 @@ export function AnvlWorkspaceProvider({
     variables,
     onHydrate: hydrate,
     enabled: persist,
+    autoCreate,
+    onFlowCreated,
   });
 
   const lintIssues = useMemo<LintIssue[]>(() => {
