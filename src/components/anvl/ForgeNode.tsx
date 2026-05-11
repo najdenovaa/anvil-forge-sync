@@ -104,6 +104,8 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
           {nodeIssues.length > 1 ? nodeIssues.length : ""}
         </div>
       )}
+
+      {!isTrigger && (
         <Handle type="target" position={Position.Left} className="!h-2.5 !w-2.5" />
       )}
 
