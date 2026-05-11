@@ -668,6 +668,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       effectiveKind,
       lastBranch: lastBranch ?? (pendingBranch === "yes" ? null : "no"),
       awaitingInput,
+      inputError,
       press,
       submitInput,
       setBranch,
