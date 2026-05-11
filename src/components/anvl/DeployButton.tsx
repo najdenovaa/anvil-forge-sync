@@ -37,7 +37,9 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
 export function DeployButton() {
   const { t } = useI18n();
-  const { flowId } = useAnvlWorkspace();
+  const { flowId, lintIssues } = useAnvlWorkspace();
+  const lintErrors = lintIssues.filter((i) => i.severity === "error");
+  const blocked = lintErrors.length > 0;
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
