@@ -690,6 +690,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       lastBranch,
       pendingBranch,
       awaitingInput,
+      inputError,
       press,
       submitInput,
       setBranch,
