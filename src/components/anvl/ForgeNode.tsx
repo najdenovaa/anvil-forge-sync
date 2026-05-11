@@ -4,6 +4,7 @@ import { NODE_CATALOG, type NodeGroup } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { useI18n } from "./I18nContext";
 import { useBotSimulator } from "./BotSimulatorContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { cn } from "@/lib/utils";
 
 interface AnvlNodeData {
@@ -51,8 +52,16 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
   const isTrigger = meta.group === "Triggers";
   const { t } = useI18n();
   const { activeNodeId } = useBotSimulator();
+  const { lintIssues } = useAnvlWorkspace();
   const isActive = activeNodeId === id;
   const accent = GROUP_ACCENT[meta.group];
+  const nodeIssues = lintIssues.filter((i) => i.nodeId === id);
+  const nodeErrors = nodeIssues.filter((i) => i.severity === "error");
+  const nodeWarns = nodeIssues.filter((i) => i.severity === "warning");
+  const issueColor = nodeErrors.length > 0
+    ? "var(--status-err, #ef4444)"
+    : nodeWarns.length > 0 ? "var(--status-warn, #eab308)" : null;
+  const firstIssue = nodeErrors[0] ?? nodeWarns[0];
 
   const title = data.titleKey ? t(data.titleKey) : (data.title ?? t(meta.labelKey));
   const preview = data.previewKey ? t(data.previewKey) : (data.preview ?? t(meta.descKey));
@@ -85,6 +94,16 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
           background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
         }}
       />
+
+      {issueColor && (
+        <div
+          className="absolute right-1.5 top-1.5 z-10 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white shadow"
+          style={{ background: issueColor }}
+          title={firstIssue?.message}
+        >
+          {nodeIssues.length > 1 ? nodeIssues.length : ""}
+        </div>
+      )}
 
       {!isTrigger && (
         <Handle type="target" position={Position.Left} className="!h-2.5 !w-2.5" />

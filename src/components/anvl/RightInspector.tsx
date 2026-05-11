@@ -7,6 +7,7 @@ import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
+import { IssuesPanel } from "./IssuesPanel";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
   const { t } = useI18n();
   const { selectedId } = useSelection();
+  const { lintIssues } = useAnvlWorkspace();
+  const showIssues = !selectedId && lintIssues.length > 0;
 
   // Auto-switch to "Node" tab when a node is selected on the canvas.
   useEffect(() => {
@@ -52,7 +55,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? <NodeInspector /> : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>

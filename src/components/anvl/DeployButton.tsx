@@ -37,7 +37,9 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
 export function DeployButton() {
   const { t } = useI18n();
-  const { flowId } = useAnvlWorkspace();
+  const { flowId, lintIssues } = useAnvlWorkspace();
+  const lintErrors = lintIssues.filter((i) => i.severity === "error");
+  const blocked = lintErrors.length > 0;
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -140,8 +142,10 @@ export function DeployButton() {
     if (status === "not_deployed") {
       return (
         <button
-          onClick={() => setDialogOpen(true)}
-          className="group flex items-center gap-2 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition hover:bg-foreground/90"
+          onClick={() => !blocked && setDialogOpen(true)}
+          disabled={blocked}
+          title={blocked ? `Во флоу ${lintErrors.length} ошибок — посмотрите правую панель` : undefined}
+          className="group flex items-center gap-2 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Rocket className="h-3.5 w-3.5" />
           {t("topbar.deploy")}
