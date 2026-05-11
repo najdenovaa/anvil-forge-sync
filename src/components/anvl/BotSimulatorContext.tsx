@@ -606,6 +606,43 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (next) jumpTo(next.target, next.id);
   }, [composed, edges, nodes, jumpTo]);
 
+  // Auto-advance through logic.condition nodes — the simulator should behave
+  // like the real runtime: when a condition has a structured config we evaluate
+  // it from `variables` and silently follow the matching branch. When the
+  // config is missing/invalid we log a debug warning and follow the first
+  // outgoing edge (matches the runtime's 3rd fallback). No "Yes / No" prompt.
+  const autoAdvancedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!composed) return;
+    if (effectiveKind !== "logic.condition") {
+      autoAdvancedRef.current = null;
+      return;
+    }
+    const eid = composed.effectiveNodeId;
+    if (autoAdvancedRef.current === eid) return;
+    const node = nodes.find((n) => n.id === eid);
+    if (!node) return;
+    const out = edges.filter((e) => e.source === eid);
+    const params = (node.data?.params as Record<string, string>) ?? {};
+    const result = composed.message?.conditionResult ?? null;
+    let target: string | undefined;
+    let edgeId: string | null = null;
+    if (result) {
+      const handle = result === "yes" ? "true" : "false";
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      target = byHandle?.target ?? (result === "yes" ? params.trueBranch : params.falseBranch) ?? out[0]?.target;
+      edgeId = byHandle?.id ?? out[0]?.id ?? null;
+    } else {
+      console.warn("[sim] condition skipped: no structured config", eid);
+      target = out[0]?.target;
+      edgeId = out[0]?.id ?? null;
+    }
+    if (!target) return;
+    autoAdvancedRef.current = eid;
+    const handle = window.setTimeout(() => jumpTo(target!, edgeId), 280);
+    return () => window.clearTimeout(handle);
+  }, [composed, effectiveKind, nodes, edges, jumpTo]);
+
   const breadcrumb = useMemo(() => {
     const raw = [...history, activeNodeId].filter(Boolean) as string[];
     // Dedup consecutive identical node ids — a single node visited once
