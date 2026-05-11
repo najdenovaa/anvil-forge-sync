@@ -505,17 +505,9 @@ function SimulatorChatView({
     }, 380);
   };
 
-  const handleBranch = (b: "yes" | "no") => {
-    setUserInputs((prev) => ({
-      ...prev,
-      [sim.activeNodeId!]: b === "yes" ? "✓ Simulate Success" : "✕ Simulate Fail",
-    }));
-    setTyping(true);
-    window.setTimeout(() => {
-      setTyping(false);
-      sim.setBranch(b);
-    }, 380);
-  };
+  // Branch picking is fully automatic now (Step 5) — kept as a no-op shim
+  // in case any debug surface still calls it.
+  const handleBranch = (_b: "yes" | "no") => { void _b; };
 
   const handleRestart = () => {
     setUserInputs({});
