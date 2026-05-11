@@ -473,6 +473,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     setActiveNodeId(nodeId);
     setActiveEdgeId(edgeId ?? null);
     setLastBranch(null);
+    setInputError(null);
   }, [activeNodeId]);
 
   const press = useCallback(
