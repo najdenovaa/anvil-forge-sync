@@ -141,6 +141,14 @@ export function useFlowPersistence({
     const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode, variables });
     if (hash === lastSavedHashRef.current) return;
 
+    // Auto-create mode: treat the first observed state as the baseline so the
+    // default Welcome Bot canvas isn't persisted on landing. The first real
+    // user/AI mutation will produce a different hash and trigger the save.
+    if (autoCreate && !createdFiredRef.current && lastSavedHashRef.current === null) {
+      lastSavedHashRef.current = hash;
+      return;
+    }
+
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
     }
