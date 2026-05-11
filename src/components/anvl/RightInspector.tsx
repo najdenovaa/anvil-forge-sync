@@ -45,6 +45,9 @@ export function RightInspector() {
         <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />}>
           {t("inspector.code")}
         </TabBtn>
+        <TabBtn active={tab === "logs"} onClick={() => setTab("logs")} icon={<ScrollText className="h-3.5 w-3.5" />}>
+          Logs
+        </TabBtn>
       </div>
       <div className="relative flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -56,7 +59,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : tab === "logs" ? <DebugLogPanel /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
