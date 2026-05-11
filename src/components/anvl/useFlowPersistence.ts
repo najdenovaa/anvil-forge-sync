@@ -48,6 +48,8 @@ export function useFlowPersistence({
   variables,
   onHydrate,
   enabled = true,
+  autoCreate = false,
+  onFlowCreated,
 }: UseFlowPersistenceArgs) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -56,6 +58,9 @@ export function useFlowPersistence({
   const lastVersionAtRef = useRef<number>(0);
   const debounceRef = useRef<number | null>(null);
   const flowIdRef = useRef<string | null>(null);
+  const createdFiredRef = useRef<boolean>(false);
+  const onFlowCreatedRef = useRef(onFlowCreated);
+  useEffect(() => { onFlowCreatedRef.current = onFlowCreated; }, [onFlowCreated]);
 
   const queryKey = useMemo(() => ["anvl-flow", slug] as const, [slug]);
 
