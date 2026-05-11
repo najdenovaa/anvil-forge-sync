@@ -230,6 +230,11 @@ export function AnvlWorkspaceProvider({
     enabled: persist,
   });
 
+  const lintIssues = useMemo<LintIssue[]>(() => {
+    try { return lintFlow(nodes, edges, variables); }
+    catch { return []; }
+  }, [nodes, edges, variables]);
+
   const value = useMemo(
     () => ({
       nodes, edges, setNodes, setEdges,
@@ -240,8 +245,9 @@ export function AnvlWorkspaceProvider({
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
+      lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
