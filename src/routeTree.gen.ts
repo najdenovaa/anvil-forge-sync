@@ -24,9 +24,9 @@ const FlowsIndexRoute = FlowsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const FlowsSlugRoute = FlowsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => FlowsRoute,
+  id: '/flows/$slug',
+  path: '/flows/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -55,6 +55,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FlowsSlugRoute: typeof FlowsSlugRoute
   FlowsIndexRoute: typeof FlowsIndexRoute
 }
 
@@ -76,27 +77,19 @@ declare module '@tanstack/react-router' {
     }
     '/flows/$slug': {
       id: '/flows/$slug'
-      path: '/$slug'
+      path: '/flows/$slug'
       fullPath: '/flows/$slug'
       preLoaderRoute: typeof FlowsSlugRouteImport
-      parentRoute: typeof FlowsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FlowsSlugRoute: FlowsSlugRoute,
   FlowsIndexRoute: FlowsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
