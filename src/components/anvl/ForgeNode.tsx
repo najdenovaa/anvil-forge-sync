@@ -95,7 +95,15 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
         }}
       />
 
-      {!isTrigger && (
+      {issueColor && (
+        <div
+          className="absolute right-1.5 top-1.5 z-10 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white shadow"
+          style={{ background: issueColor }}
+          title={firstIssue?.message}
+        >
+          {nodeIssues.length > 1 ? nodeIssues.length : ""}
+        </div>
+      )}
         <Handle type="target" position={Position.Left} className="!h-2.5 !w-2.5" />
       )}
 
