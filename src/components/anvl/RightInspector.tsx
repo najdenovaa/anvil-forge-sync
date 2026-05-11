@@ -59,25 +59,28 @@ function TabBtn({
   active,
   onClick,
   icon,
-  children,
+  label,
+  title,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
-  children: React.ReactNode;
+  label: string;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      title={title ?? label}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium transition",
+        "flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] font-medium leading-none transition",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
       {icon}
-      {children}
+      <span className="truncate">{label}</span>
     </button>
   );
 }
