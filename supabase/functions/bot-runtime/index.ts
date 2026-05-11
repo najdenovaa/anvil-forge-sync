@@ -182,6 +182,10 @@ interface RunCtx {
   replyKeyboardLabels: string[];
   /** Mutated by keyboard.reply nodes during this turn; flushed to session at the end. */
   nextReplyKeyboardLabels: string[];
+  /** action.input node ids visited in this turn (for re-entry detection). */
+  visitedInputs: Set<string>;
+  /** Per-input re-entry count in this turn (loop guard). */
+  reentryCount: Map<string, number>;
 }
 
 function findNode(flow: Flow, id: string | null | undefined): FlowNode | undefined {
@@ -408,7 +412,13 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     case "action.input": {
       const variable = String(params.variable ?? "").trim();
       const awaitingFlag = `__awaiting_${node.id}`;
-      const isResuming = !!ctx.variables[awaitingFlag] && ctx.text;
+      const awaiting = !!ctx.variables[awaitingFlag];
+      const alreadyVisitedThisTurn = ctx.visitedInputs.has(node.id);
+      ctx.visitedInputs.add(node.id);
+
+      const isResuming = awaiting && !!ctx.text && !alreadyVisitedThisTurn;
+      const isReEntry = awaiting && (alreadyVisitedThisTurn || !ctx.text);
+
       if (isResuming) {
         const validation = String(params.validation ?? "").trim();
         if (validation) {
@@ -429,6 +439,22 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
         await logEvent(ctx.bot.id, ctx.chatId, "input_received", node.id, { variable });
         return goNext();
       }
+
+      if (isReEntry) {
+        const count = (ctx.reentryCount.get(node.id) ?? 0) + 1;
+        ctx.reentryCount.set(node.id, count);
+        if (count > 2) {
+          await logEvent(ctx.bot.id, ctx.chatId, "input_reentry_loop", node.id, { count });
+          return "PAUSE";
+        }
+        await logEvent(ctx.bot.id, ctx.chatId, "input_reentry", node.id, { reason: "no_new_text" });
+        const prompt = await interpolateAndLog(String(params.prompt ?? ""), ctx, node.id);
+        if (prompt) await sendAndLog("sendMessage", { chat_id: ctx.chatId, text: prompt });
+        ctx.variables[awaitingFlag] = true;
+        return "PAUSE";
+      }
+
+      // FRESH ENTRY
       const prompt = await interpolateAndLog(String(params.prompt ?? ""), ctx, node.id);
       if (prompt) await sendAndLog("sendMessage", { chat_id: ctx.chatId, text: prompt });
       ctx.variables[awaitingFlag] = true;
@@ -526,6 +552,8 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     text: effectiveText,
     replyKeyboardLabels,
     nextReplyKeyboardLabels: replyKeyboardLabels, // carry forward unless overwritten
+    visitedInputs: new Set<string>(),
+    reentryCount: new Map<string, number>(),
   };
 
   // Decide entry point:

@@ -110,7 +110,30 @@ operator: eq, neq, gt, lt, gte, lte, contains, not_contains, starts_with, ends_w
 2. connect(from=cond_id, to=node_yes, sourceHandle="true") — ветка YES.
 3. connect(from=cond_id, to=node_no, sourceHandle="false") — ветка NO.
 
-set_param trueBranch/falseBranch тоже допустим как fallback, но connect с sourceHandle — основной способ.`;
+set_param trueBranch/falseBranch тоже допустим как fallback, но connect с sourceHandle — основной способ.
+
+== ВАЛИДАЦИЯ ВВОДА (action.input) ==
+action.input имеет встроенные параметры:
+- validation: regex для проверки введённого текста
+- errorMessage: что сказать юзеру при ошибке (бот сам переспросит и подождёт повторного ответа)
+
+ИСПОЛЬЗУЙ ЭТИ ПАРАМЕТРЫ. НЕ создавай logic.condition сразу после action.input
+для повторной regex-проверки того же поля — это создаёт циклы и ломает поток
+(runtime пере-входит в input без нового текста и бот замолкает).
+
+Пример КАК НАДО:
+  action.input(prompt="Введи возраст", variable="age",
+               validation="^[0-9]+$", errorMessage="Возраст должен быть числом")
+  → message.text("Тебе {var.age} лет")
+
+Пример КАК НЕ НАДО (запрещено):
+  action.input(variable="age")
+  → logic.condition(var.age matches_regex "^[0-9]+$")   ← дубль валидации
+
+logic.condition после action.input допустима ТОЛЬКО для:
+- сравнения с порогом (var.age >= 18);
+- проверки членства (var.goal == "Похудеть");
+- бизнес-логики, которая не сводится к regex на формат введённого значения.`;
 
 const MINIAPP_RULES = `
 
