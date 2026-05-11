@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X } from "lucide-react";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X, ScrollText } from "lucide-react";
+import { DebugLogPanel } from "./DebugLogPanel";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
