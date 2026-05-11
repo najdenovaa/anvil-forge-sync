@@ -509,8 +509,6 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       if (!activeNodeId) return;
       setLastInputText(text);
-      // Resolve the actual input node: it might be the activeNode OR a node
-      // we silently walked to via composeMessage.
       const inputNodeId = composed?.effectiveKind === "action.input"
         ? composed.effectiveNodeId
         : activeNodeId;
@@ -520,12 +518,17 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
         const p = (inputNode?.data?.params as Record<string, string>) ?? {};
         const validation = (p.validation ?? "").trim();
         if (validation) {
-          try { if (!new RegExp(validation).test(text)) return; } catch { /* */ }
+          let ok = true;
+          try { ok = new RegExp(validation).test(text); } catch { ok = true; }
+          if (!ok) {
+            setInputError((p.errorMessage ?? "").trim() || "Введённое значение не подходит. Попробуйте ещё раз.");
+            return;
+          }
         }
         const variable = (p.variable ?? "").trim();
         if (variable) setVariables((vs) => ({ ...vs, [variable]: text }));
       }
-      // Advance from the input node (not the original activeNode).
+      setInputError(null);
       const out = edges.filter((e) => e.source === inputNodeId);
       const next = out[0]?.target;
       if (next) jumpTo(next, out[0]?.id ?? null);
