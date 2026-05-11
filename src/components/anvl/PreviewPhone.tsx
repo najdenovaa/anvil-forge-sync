@@ -634,18 +634,11 @@ function SimulatorChatView({
                 <BotBubble theme={theme}>
                   <ApiCallBubble call={turn.apiCall} stage={apiStage ?? "sending"} />
                 </BotBubble>
-              ) : turn.conditionExpr ? (
-                <BotBubble theme={theme}>
-                  <ConditionPrompt expr={turn.conditionExpr} onChoose={handleBranch} />
-                </BotBubble>
               ) : (
                 <BotBubble theme={theme}>
                   <div className="space-y-1.5">
                     {turn.imageUrl && <PhotoBlock url={turn.imageUrl} caption={turn.imageCaption} />}
                     {turn.text && <span className="whitespace-pre-wrap">{turn.text}</span>}
-                    {turn.isLast && isCondition && !turn.conditionExpr && (
-                      <ConditionToggle onChoose={handleBranch} />
-                    )}
                     {turn.isLast && turn.buttons.length > 0 && (
                       <SimInlineKb items={turn.buttons} onAction={handlePress} />
                     )}
