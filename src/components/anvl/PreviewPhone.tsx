@@ -467,7 +467,7 @@ function SimulatorChatView({
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns, typing, apiStage]);
 
-  const isCondition = sim.effectiveKind === "logic.condition";
+  // Note: `isCondition` was removed in Step 5 — condition nodes auto-advance.
 
   const triggerMiniAppIfNeeded = (btn: SimButton) => {
     if (!miniOn) return;
@@ -505,17 +505,7 @@ function SimulatorChatView({
     }, 380);
   };
 
-  const handleBranch = (b: "yes" | "no") => {
-    setUserInputs((prev) => ({
-      ...prev,
-      [sim.activeNodeId!]: b === "yes" ? "✓ Simulate Success" : "✕ Simulate Fail",
-    }));
-    setTyping(true);
-    window.setTimeout(() => {
-      setTyping(false);
-      sim.setBranch(b);
-    }, 380);
-  };
+  // Step 5: branch picking is fully automatic; no manual handler needed.
 
   const handleRestart = () => {
     setUserInputs({});
@@ -642,18 +632,11 @@ function SimulatorChatView({
                 <BotBubble theme={theme}>
                   <ApiCallBubble call={turn.apiCall} stage={apiStage ?? "sending"} />
                 </BotBubble>
-              ) : turn.conditionExpr ? (
-                <BotBubble theme={theme}>
-                  <ConditionPrompt expr={turn.conditionExpr} onChoose={handleBranch} />
-                </BotBubble>
               ) : (
                 <BotBubble theme={theme}>
                   <div className="space-y-1.5">
                     {turn.imageUrl && <PhotoBlock url={turn.imageUrl} caption={turn.imageCaption} />}
                     {turn.text && <span className="whitespace-pre-wrap">{turn.text}</span>}
-                    {turn.isLast && isCondition && !turn.conditionExpr && (
-                      <ConditionToggle onChoose={handleBranch} />
-                    )}
                     {turn.isLast && turn.buttons.length > 0 && (
                       <SimInlineKb items={turn.buttons} onAction={handlePress} />
                     )}
@@ -733,6 +716,20 @@ function SimulatorChatView({
           title={sim.breadcrumb.join(" → ")}
         >
           {sim.breadcrumb.join(" → ")}
+        </div>
+      )}
+
+      {/* ───── Inline validation error from action.input ───── */}
+      {sim.inputError && (
+        <div
+          className="border-t px-3 py-1.5 text-[10.5px] leading-snug"
+          style={{
+            background: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 14%, transparent)",
+            borderColor: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 30%, transparent)",
+            color: "var(--tg-theme-destructive-text-color)",
+          }}
+        >
+          ⚠️ {sim.inputError}
         </div>
       )}
 

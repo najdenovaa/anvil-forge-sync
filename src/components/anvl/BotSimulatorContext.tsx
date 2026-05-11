@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -73,6 +74,9 @@ interface SimulatorCtx {
   lastBranch: "yes" | "no" | null;
   /** Whether the current node is awaiting user text input. */
   awaitingInput: boolean;
+  /** Validation error message for the current input node (set when the
+   *  user-typed text fails the input's regex). Cleared on next jump. */
+  inputError: string | null;
   /** Press a button on the current node. */
   press: (btn: SimButton) => void;
   /** Submit a free-text reply (used by input-aware nodes). */
@@ -406,6 +410,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   // and action.input nodes during the walk.
   const [variables, setVariables] = useState<Record<string, unknown>>({});
   const [lastInputText, setLastInputText] = useState<string>("");
+  const [inputError, setInputError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!entryId) {
@@ -468,6 +473,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     setActiveNodeId(nodeId);
     setActiveEdgeId(edgeId ?? null);
     setLastBranch(null);
+    setInputError(null);
   }, [activeNodeId]);
 
   const press = useCallback(
@@ -503,8 +509,6 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       if (!activeNodeId) return;
       setLastInputText(text);
-      // Resolve the actual input node: it might be the activeNode OR a node
-      // we silently walked to via composeMessage.
       const inputNodeId = composed?.effectiveKind === "action.input"
         ? composed.effectiveNodeId
         : activeNodeId;
@@ -514,12 +518,17 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
         const p = (inputNode?.data?.params as Record<string, string>) ?? {};
         const validation = (p.validation ?? "").trim();
         if (validation) {
-          try { if (!new RegExp(validation).test(text)) return; } catch { /* */ }
+          let ok = true;
+          try { ok = new RegExp(validation).test(text); } catch { ok = true; }
+          if (!ok) {
+            setInputError((p.errorMessage ?? "").trim() || "Введённое значение не подходит. Попробуйте ещё раз.");
+            return;
+          }
         }
         const variable = (p.variable ?? "").trim();
         if (variable) setVariables((vs) => ({ ...vs, [variable]: text }));
       }
-      // Advance from the input node (not the original activeNode).
+      setInputError(null);
       const out = edges.filter((e) => e.source === inputNodeId);
       const next = out[0]?.target;
       if (next) jumpTo(next, out[0]?.id ?? null);
@@ -597,6 +606,43 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (next) jumpTo(next.target, next.id);
   }, [composed, edges, nodes, jumpTo]);
 
+  // Auto-advance through logic.condition nodes — the simulator should behave
+  // like the real runtime: when a condition has a structured config we evaluate
+  // it from `variables` and silently follow the matching branch. When the
+  // config is missing/invalid we log a debug warning and follow the first
+  // outgoing edge (matches the runtime's 3rd fallback). No "Yes / No" prompt.
+  const autoAdvancedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!composed) return;
+    if (effectiveKind !== "logic.condition") {
+      autoAdvancedRef.current = null;
+      return;
+    }
+    const eid = composed.effectiveNodeId;
+    if (autoAdvancedRef.current === eid) return;
+    const node = nodes.find((n) => n.id === eid);
+    if (!node) return;
+    const out = edges.filter((e) => e.source === eid);
+    const params = (node.data?.params as Record<string, string>) ?? {};
+    const result = composed.message?.conditionResult ?? null;
+    let target: string | undefined;
+    let edgeId: string | null = null;
+    if (result) {
+      const handle = result === "yes" ? "true" : "false";
+      const byHandle = out.find((e) => e.sourceHandle === handle);
+      target = byHandle?.target ?? (result === "yes" ? params.trueBranch : params.falseBranch) ?? out[0]?.target;
+      edgeId = byHandle?.id ?? out[0]?.id ?? null;
+    } else {
+      console.warn("[sim] condition skipped: no structured config", eid);
+      target = out[0]?.target;
+      edgeId = out[0]?.id ?? null;
+    }
+    if (!target) return;
+    autoAdvancedRef.current = eid;
+    const handle = window.setTimeout(() => jumpTo(target!, edgeId), 280);
+    return () => window.clearTimeout(handle);
+  }, [composed, effectiveKind, nodes, edges, jumpTo]);
+
   const breadcrumb = useMemo(() => {
     const raw = [...history, activeNodeId].filter(Boolean) as string[];
     // Dedup consecutive identical node ids — a single node visited once
@@ -622,6 +668,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       effectiveKind,
       lastBranch: lastBranch ?? (pendingBranch === "yes" ? null : "no"),
       awaitingInput,
+      inputError,
       press,
       submitInput,
       setBranch,
@@ -643,6 +690,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       lastBranch,
       pendingBranch,
       awaitingInput,
+      inputError,
       press,
       submitInput,
       setBranch,
