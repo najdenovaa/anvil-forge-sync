@@ -719,6 +719,20 @@ function SimulatorChatView({
         </div>
       )}
 
+      {/* ───── Inline validation error from action.input ───── */}
+      {sim.inputError && (
+        <div
+          className="border-t px-3 py-1.5 text-[10.5px] leading-snug"
+          style={{
+            background: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 14%, transparent)",
+            borderColor: "color-mix(in oklab, var(--tg-theme-destructive-text-color) 30%, transparent)",
+            color: "var(--tg-theme-destructive-text-color)",
+          }}
+        >
+          ⚠️ {sim.inputError}
+        </div>
+      )}
+
       {/* ───── Composer ───── */}
       <div
         className="flex items-center gap-2 border-t px-2 py-2"
