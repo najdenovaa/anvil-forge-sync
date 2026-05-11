@@ -7,6 +7,7 @@ import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
+import { IssuesPanel } from "./IssuesPanel";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
 import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
