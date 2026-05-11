@@ -22,5 +22,5 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <AnvlApp persist={false} />;
+  return <AnvlApp autoCreate />;
 }

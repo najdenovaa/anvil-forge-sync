@@ -25,6 +25,14 @@ interface UseFlowPersistenceArgs {
   onHydrate: (snapshot: FlowSnapshot) => void;
   /** Disable persistence (e.g. while still on landing). */
   enabled?: boolean;
+  /**
+   * Auto-create mode: treat the very first state as the baseline and only
+   * save once it has actually changed. After the first successful save, the
+   * `onFlowCreated(slug)` callback fires exactly once so the host can
+   * navigate to the canonical /flows/$slug URL.
+   */
+  autoCreate?: boolean;
+  onFlowCreated?: (slug: string) => void;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -40,6 +48,8 @@ export function useFlowPersistence({
   variables,
   onHydrate,
   enabled = true,
+  autoCreate = false,
+  onFlowCreated,
 }: UseFlowPersistenceArgs) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -48,6 +58,9 @@ export function useFlowPersistence({
   const lastVersionAtRef = useRef<number>(0);
   const debounceRef = useRef<number | null>(null);
   const flowIdRef = useRef<string | null>(null);
+  const createdFiredRef = useRef<boolean>(false);
+  const onFlowCreatedRef = useRef(onFlowCreated);
+  useEffect(() => { onFlowCreatedRef.current = onFlowCreated; }, [onFlowCreated]);
 
   const queryKey = useMemo(() => ["anvl-flow", slug] as const, [slug]);
 
@@ -104,6 +117,11 @@ export function useFlowPersistence({
       setStatus("saved");
       setLastSavedAt(new Date());
       queryClient.setQueryData(queryKey, saved);
+      // Auto-create: notify host exactly once after the row exists.
+      if (autoCreate && !createdFiredRef.current) {
+        createdFiredRef.current = true;
+        onFlowCreatedRef.current?.(saved.slug);
+      }
     },
     onError: (err) => {
       console.error("Flow autosave failed:", err);
@@ -122,6 +140,14 @@ export function useFlowPersistence({
 
     const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode, variables });
     if (hash === lastSavedHashRef.current) return;
+
+    // Auto-create mode: treat the first observed state as the baseline so the
+    // default Welcome Bot canvas isn't persisted on landing. The first real
+    // user/AI mutation will produce a different hash and trigger the save.
+    if (autoCreate && !createdFiredRef.current && lastSavedHashRef.current === null) {
+      lastSavedHashRef.current = hash;
+      return;
+    }
 
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);

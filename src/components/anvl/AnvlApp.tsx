@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { I18nProvider } from "./I18nContext";
 import { PlatformProvider } from "./PlatformContext";
 import { MiniAppProvider } from "./MiniAppContext";
@@ -31,13 +33,53 @@ function Shell() {
   );
 }
 
-export function AnvlApp({ slug, persist = true }: { slug?: string; persist?: boolean } = {}) {
+function generateSlug(): string {
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `flow-${rand}`;
+}
+
+interface AnvlAppProps {
+  slug?: string;
+  persist?: boolean;
+  /**
+   * Landing mode: persist=true with a freshly-generated slug; the flow row is
+   * created on the first significant edit and the URL is replaced with
+   * /flows/$slug without a full page reload.
+   */
+  autoCreate?: boolean;
+}
+
+export function AnvlApp({ slug, persist = true, autoCreate = false }: AnvlAppProps = {}) {
+  // For autoCreate (landing), generate a stable slug once per mount so the
+  // first save targets a deterministic row and the navigate() URL matches.
+  const [generatedSlug] = useState(() => (autoCreate && !slug ? generateSlug() : null));
+  const effectiveSlug = slug ?? generatedSlug ?? undefined;
+
+  const navigate = useNavigate();
+  const handleFlowCreated = useCallback(
+    (createdSlug: string) => {
+      navigate({
+        to: "/flows/$slug",
+        params: { slug: createdSlug },
+        replace: true,
+      });
+    },
+    [navigate],
+  );
+
   return (
     <I18nProvider>
       <PlatformProvider>
         <MiniAppProvider>
           <TelegramWebAppProvider>
-            <AnvlWorkspaceProvider slug={slug} persist={persist}>
+            <AnvlWorkspaceProvider
+              slug={effectiveSlug}
+              persist={persist}
+              autoCreate={autoCreate}
+              onFlowCreated={autoCreate ? handleFlowCreated : undefined}
+            >
               <SelectionProvider>
                 <BotSimulatorProvider>
                   <AnvlAppShellProvider>
