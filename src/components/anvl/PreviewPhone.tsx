@@ -467,7 +467,7 @@ function SimulatorChatView({
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns, typing, apiStage]);
 
-  const isCondition = sim.effectiveKind === "logic.condition";
+  // Note: `isCondition` was removed in Step 5 — condition nodes auto-advance.
 
   const triggerMiniAppIfNeeded = (btn: SimButton) => {
     if (!miniOn) return;
