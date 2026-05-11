@@ -410,6 +410,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   // and action.input nodes during the walk.
   const [variables, setVariables] = useState<Record<string, unknown>>({});
   const [lastInputText, setLastInputText] = useState<string>("");
+  const [inputError, setInputError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!entryId) {
