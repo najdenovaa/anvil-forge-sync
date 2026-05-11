@@ -449,8 +449,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (!activeNode) return false;
     const kind = activeNode.data?.kind as NodeKind | undefined;
     if (kind === "action.input") return true;
+    // composeMessage may have walked silently THROUGH the activeNode and stopped
+    // at an action.input further down the graph — honor that too, otherwise the
+    // composer stays in regular chat mode and submit just hops one step without
+    // recording the variable.
+    if (effectiveKind === "action.input") return true;
     return kind === "trigger.message" && (message?.buttons.length ?? 0) === 0;
-  }, [activeNode, message]);
+  }, [activeNode, effectiveKind, message]);
 
   // NOTE: do NOT call setHistory inside a setActiveNodeId updater — under
   // React StrictMode the updater runs twice, which previously pushed the same
@@ -498,10 +503,15 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       if (!activeNodeId) return;
       setLastInputText(text);
-      const node = nodes.find((n) => n.id === activeNodeId);
-      const kind = node?.data?.kind as NodeKind | undefined;
+      // Resolve the actual input node: it might be the activeNode OR a node
+      // we silently walked to via composeMessage.
+      const inputNodeId = composed?.effectiveKind === "action.input"
+        ? composed.effectiveNodeId
+        : activeNodeId;
+      const inputNode = nodes.find((n) => n.id === inputNodeId);
+      const kind = inputNode?.data?.kind as NodeKind | undefined;
       if (kind === "action.input") {
-        const p = (node?.data?.params as Record<string, string>) ?? {};
+        const p = (inputNode?.data?.params as Record<string, string>) ?? {};
         const validation = (p.validation ?? "").trim();
         if (validation) {
           try { if (!new RegExp(validation).test(text)) return; } catch { /* */ }
@@ -509,11 +519,12 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
         const variable = (p.variable ?? "").trim();
         if (variable) setVariables((vs) => ({ ...vs, [variable]: text }));
       }
-      const out = edges.filter((e) => e.source === activeNodeId);
+      // Advance from the input node (not the original activeNode).
+      const out = edges.filter((e) => e.source === inputNodeId);
       const next = out[0]?.target;
-      if (next) jumpTo(next);
+      if (next) jumpTo(next, out[0]?.id ?? null);
     },
-    [activeNodeId, edges, nodes, jumpTo],
+    [activeNodeId, composed, edges, nodes, jumpTo],
   );
 
   const setBranch = useCallback(
