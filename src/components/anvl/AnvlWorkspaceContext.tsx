@@ -81,6 +81,7 @@ interface WorkspaceCtx {
   flowId: string | null;
   slug: string;
   rollbackToVersion: (version: FlowVersionFull) => void;
+  lintIssues: LintIssue[];
 }
 
 const Ctx = createContext<WorkspaceCtx | null>(null);
