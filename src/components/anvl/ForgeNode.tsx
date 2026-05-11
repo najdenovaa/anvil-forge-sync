@@ -4,6 +4,7 @@ import { NODE_CATALOG, type NodeGroup } from "@/lib/anvl-catalog";
 import type { NodeKind } from "@/lib/anvl-types";
 import { useI18n } from "./I18nContext";
 import { useBotSimulator } from "./BotSimulatorContext";
+import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { cn } from "@/lib/utils";
 
 interface AnvlNodeData {
