@@ -29,25 +29,13 @@ export function RightInspector() {
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-l border-hairline bg-sidebar">
-      <div className="flex items-center gap-1 border-b border-hairline px-2 py-2">
-        <TabBtn active={tab === "components"} onClick={() => setTab("components")} icon={<LayoutGrid className="h-3.5 w-3.5" />}>
-          {t("inspector.components")}
-        </TabBtn>
-        <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />}>
-          Node
-        </TabBtn>
-        <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />}>
-          Vars
-        </TabBtn>
-        <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />}>
-          {t("inspector.settings")}
-        </TabBtn>
-        <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />}>
-          {t("inspector.code")}
-        </TabBtn>
-        <TabBtn active={tab === "logs"} onClick={() => setTab("logs")} icon={<ScrollText className="h-3.5 w-3.5" />}>
-          Logs
-        </TabBtn>
+      <div className="grid grid-cols-6 gap-0.5 border-b border-hairline px-1.5 py-2">
+        <TabBtn active={tab === "components"} onClick={() => setTab("components")} icon={<LayoutGrid className="h-3.5 w-3.5" />} label="Comp" title={t("inspector.components")} />
+        <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />} label="Node" title="Node" />
+        <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />} label="Vars" title="Variables" />
+        <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />} label="Set" title={t("inspector.settings")} />
+        <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />} label="Code" title={t("inspector.code")} />
+        <TabBtn active={tab === "logs"} onClick={() => setTab("logs")} icon={<ScrollText className="h-3.5 w-3.5" />} label="Logs" title="Logs" />
       </div>
       <div className="relative flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -71,25 +59,28 @@ function TabBtn({
   active,
   onClick,
   icon,
-  children,
+  label,
+  title,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
-  children: React.ReactNode;
+  label: string;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      title={title ?? label}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium transition",
+        "flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[10px] font-medium leading-none transition",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
       {icon}
-      {children}
+      <span className="truncate">{label}</span>
     </button>
   );
 }
