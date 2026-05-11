@@ -182,6 +182,10 @@ interface RunCtx {
   replyKeyboardLabels: string[];
   /** Mutated by keyboard.reply nodes during this turn; flushed to session at the end. */
   nextReplyKeyboardLabels: string[];
+  /** action.input node ids visited in this turn (for re-entry detection). */
+  visitedInputs: Set<string>;
+  /** Per-input re-entry count in this turn (loop guard). */
+  reentryCount: Map<string, number>;
 }
 
 function findNode(flow: Flow, id: string | null | undefined): FlowNode | undefined {
