@@ -74,6 +74,9 @@ interface SimulatorCtx {
   lastBranch: "yes" | "no" | null;
   /** Whether the current node is awaiting user text input. */
   awaitingInput: boolean;
+  /** Validation error message for the current input node (set when the
+   *  user-typed text fails the input's regex). Cleared on next jump. */
+  inputError: string | null;
   /** Press a button on the current node. */
   press: (btn: SimButton) => void;
   /** Submit a free-text reply (used by input-aware nodes). */
