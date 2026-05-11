@@ -449,8 +449,13 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (!activeNode) return false;
     const kind = activeNode.data?.kind as NodeKind | undefined;
     if (kind === "action.input") return true;
+    // composeMessage may have walked silently THROUGH the activeNode and stopped
+    // at an action.input further down the graph — honor that too, otherwise the
+    // composer stays in regular chat mode and submit just hops one step without
+    // recording the variable.
+    if (effectiveKind === "action.input") return true;
     return kind === "trigger.message" && (message?.buttons.length ?? 0) === 0;
-  }, [activeNode, message]);
+  }, [activeNode, effectiveKind, message]);
 
   // NOTE: do NOT call setHistory inside a setActiveNodeId updater — under
   // React StrictMode the updater runs twice, which previously pushed the same
