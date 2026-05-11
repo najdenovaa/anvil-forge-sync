@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FlowsList } from "@/components/anvl/FlowsList";
 
-export const Route = createFileRoute("/flows")({
+export const Route = createFileRoute("/flows/")({
   head: () => ({
     meta: [
       { title: "Your flows — ANVL" },

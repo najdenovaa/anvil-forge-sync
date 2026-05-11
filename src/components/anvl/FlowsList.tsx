@@ -187,7 +187,7 @@ function FlowCard({ flow, onDelete }: { flow: FlowSnapshot; onDelete: () => void
           e.stopPropagation();
           onDelete();
         }}
-        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-status-err/10 hover:text-status-err group-hover:opacity-100"
+        className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-surface/80 text-muted-foreground opacity-0 backdrop-blur transition hover:bg-status-err/10 hover:text-status-err group-hover:opacity-100"
         title="Delete flow"
       >
         <Trash2 className="h-3.5 w-3.5" />
