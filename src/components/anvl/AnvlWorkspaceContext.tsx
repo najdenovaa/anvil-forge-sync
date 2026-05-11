@@ -90,10 +90,14 @@ export function AnvlWorkspaceProvider({
   children,
   slug = DEFAULT_FLOW_SLUG,
   persist = true,
+  autoCreate = false,
+  onFlowCreated,
 }: {
   children: ReactNode;
   slug?: string;
   persist?: boolean;
+  autoCreate?: boolean;
+  onFlowCreated?: (slug: string) => void;
 }) {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
