@@ -552,6 +552,8 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     text: effectiveText,
     replyKeyboardLabels,
     nextReplyKeyboardLabels: replyKeyboardLabels, // carry forward unless overwritten
+    visitedInputs: new Set<string>(),
+    reentryCount: new Map<string, number>(),
   };
 
   // Decide entry point:
