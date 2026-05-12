@@ -201,12 +201,13 @@ export function LeftAIPanel() {
     setVariables,
     nodes,
     edges,
+    slug,
   } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
+  const [messages, setMessages] = useState<Msg[]>(() => loadPersistedMessages(slug, t("ai.msg.intro")));
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
