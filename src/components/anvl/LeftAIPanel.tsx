@@ -91,6 +91,14 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return "Настраиваю Mini App";
     case "set_code":
       return `Пишу рабочий код: ${args.filename ?? args.language ?? "bot"}`;
+    case "get_canvas":
+      return "Читаю текущий канвас";
+    case "remove_node":
+      return `Удаляю ноду ${args.id}`;
+    case "remove_edge":
+      return `Разрываю связь ${args.from} → ${args.to}${args.sourceHandle ? ` (${args.sourceHandle})` : ""}`;
+    case "rename_node":
+      return `Переименовываю ${args.id}: ${args.label}`;
     default:
       return name;
   }
