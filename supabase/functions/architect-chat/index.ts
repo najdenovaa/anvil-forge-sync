@@ -491,6 +491,65 @@ function buildTools(miniAppEnabled: boolean) {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "get_canvas",
+        description: "Получить текущее состояние канваса: список нод и рёбер. Read-only, не меняет состояние. Используй перед инкрементальными правками чтобы знать какие ID существуют.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_node",
+        description: "Удалить ноду по ID. Все входящие и исходящие рёбра этой ноды тоже удалятся. Используй чтобы убрать ненужный узел из существующего флоу.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID ноды для удаления" },
+          },
+          required: ["id"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_edge",
+        description: "Удалить ребро между нодами. Для logic.condition обязательно указывай sourceHandle (\"true\" или \"false\") чтобы удалить конкретную ветку.",
+        parameters: {
+          type: "object",
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            sourceHandle: {
+              type: "string",
+              description: "Опционально для обычных нод. Для logic.condition — \"true\" или \"false\".",
+            },
+          },
+          required: ["from", "to"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "rename_node",
+        description: "Изменить подпись (label) существующей ноды. Не меняет тип и ID.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+          },
+          required: ["id", "label"],
+          additionalProperties: false,
+        },
+      },
+    },
   ];
 
   if (miniAppEnabled) {
