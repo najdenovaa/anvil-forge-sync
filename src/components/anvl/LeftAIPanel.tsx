@@ -56,6 +56,27 @@ interface Msg {
   liveSteps?: string[];
 }
 
+const CHAT_STORAGE_KEY_PREFIX = "anvl:chat:";
+const MAX_PERSISTED_MESSAGES = 50;
+
+function loadPersistedMessages(slug: string | undefined, introMsg: string): Msg[] {
+  const fallback: Msg[] = [{ role: "assistant", content: introMsg }];
+  if (!slug || typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY_PREFIX + slug);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
+    const ok = parsed.every(
+      (m: any) =>
+        m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+    );
+    return ok ? (parsed as Msg[]) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Turn a tool call into a short human-readable plan line. */
 function describeToolStep(name: string, args: Record<string, any>): string {
   switch (name) {
@@ -201,12 +222,13 @@ export function LeftAIPanel() {
     setVariables,
     nodes,
     edges,
+    slug,
   } = useAnvlWorkspace();
   const { platform, miniAppEnabled } = usePlatform();
   const { consumeInitialPrompt } = useAnvlShell();
   const [model, setModel] = useState<ModelId>("auto");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: t("ai.msg.intro") }]);
+  const [messages, setMessages] = useState<Msg[]>(() => loadPersistedMessages(slug, t("ai.msg.intro")));
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -224,6 +246,23 @@ export function LeftAIPanel() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isStreaming]);
+
+  // Persist chat history per flow slug.
+  useEffect(() => {
+    if (!slug || typeof window === "undefined") return;
+    try {
+      const toSave = messages.slice(-MAX_PERSISTED_MESSAGES);
+      window.localStorage.setItem(CHAT_STORAGE_KEY_PREFIX + slug, JSON.stringify(toSave));
+    } catch (err) {
+      console.warn("Failed to persist chat history:", err);
+    }
+  }, [messages, slug]);
+
+  // Reload history when switching between flows.
+  useEffect(() => {
+    setMessages(loadPersistedMessages(slug, t("ai.msg.intro")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
 
   /** Run a single round against the architect-chat edge function. Returns the
    *  collected liveSteps so the caller can request a follow-up summary. */
