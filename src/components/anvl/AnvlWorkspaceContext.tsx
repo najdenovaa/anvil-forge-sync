@@ -71,6 +71,14 @@ interface WorkspaceCtx {
   addAiNode: (id: string, kind: string, title: string, preview: string) => void;
   connectAiNodes: (from: string, to: string, sourceHandle?: string) => void;
   updateAiNodeParam: (id: string, key: string, value: string) => void;
+  removeAiNode: (id: string) => void;
+  removeAiEdge: (from: string, to: string, sourceHandle?: string) => void;
+  renameAiNode: (id: string, label: string) => void;
+  serializeCanvas: () => {
+    nodes: { id: string; kind: string; label: string; params: Record<string, string> }[];
+    edges: { from: string; to: string; sourceHandle: string | null }[];
+    variables: VariableDef[];
+  };
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
   resetAiCanvas: () => void;
