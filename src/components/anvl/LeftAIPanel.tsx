@@ -193,6 +193,7 @@ export function LeftAIPanel() {
     removeAiNode,
     removeAiEdge,
     renameAiNode,
+    serializeCanvas,
     mergePreview,
     mergeMiniApp,
     resetAiCanvas,
