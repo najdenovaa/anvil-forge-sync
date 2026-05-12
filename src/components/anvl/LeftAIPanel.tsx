@@ -244,6 +244,8 @@ export function LeftAIPanel() {
       edges: edges.map((e) => ({ from: e.source, to: e.target })),
     };
 
+    const canvasSnapshot = serializeCanvas();
+
     const resp = await fetch(url, {
       method: "POST",
       headers: {
@@ -256,6 +258,7 @@ export function LeftAIPanel() {
         miniApp: miniAppEnabled,
         platform,
         flowSnapshot,
+        canvasSnapshot,
         summaryOnly: opts.summaryOnly,
         executedSteps: opts.executedSteps,
       }),
