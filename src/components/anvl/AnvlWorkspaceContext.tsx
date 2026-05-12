@@ -266,6 +266,8 @@ export function AnvlWorkspaceProvider({
       variables,
     };
   }, [nodes, edges, variables]);
+
+  const mergePreview = useCallback((patch: Partial<AnvlPreviewState>) => {
     setPreview((cur) => ({ ...cur, ...patch }));
   }, []);
 
