@@ -301,12 +301,13 @@ export function AnvlWorkspaceProvider({
       variables, setVariables,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
+      removeAiNode, removeAiEdge, renameAiNode, serializeCanvas,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
       lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
