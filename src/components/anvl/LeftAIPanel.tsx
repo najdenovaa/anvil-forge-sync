@@ -56,6 +56,27 @@ interface Msg {
   liveSteps?: string[];
 }
 
+const CHAT_STORAGE_KEY_PREFIX = "anvl:chat:";
+const MAX_PERSISTED_MESSAGES = 50;
+
+function loadPersistedMessages(slug: string | undefined, introMsg: string): Msg[] {
+  const fallback: Msg[] = [{ role: "assistant", content: introMsg }];
+  if (!slug || typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY_PREFIX + slug);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
+    const ok = parsed.every(
+      (m: any) =>
+        m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+    );
+    return ok ? (parsed as Msg[]) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Turn a tool call into a short human-readable plan line. */
 function describeToolStep(name: string, args: Record<string, any>): string {
   switch (name) {
