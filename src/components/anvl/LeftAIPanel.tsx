@@ -570,11 +570,42 @@ export function LeftAIPanel() {
       // follow-up round asking for a short summary in the user's language.
       // This guarantees the chat ALWAYS has a real assistant message.
       if (usedTools && !finalAnswer.trim()) {
-        // The placeholder message stays the same; just stream new text into
-        // its `content` field via runRound's flush() updates.
-        await runRound(baseHistory, {
+        const summary = await runRound(baseHistory, {
           summaryOnly: true,
           executedSteps: liveSteps,
+        });
+        if (!summary.finalAnswer.trim()) {
+          setMessages((prev) => {
+            const copy = prev.slice();
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") {
+              copy[copy.length - 1] = {
+                ...last,
+                content:
+                  "Я начал собирать бот, но запрос слишком большой — поток ответа был обрезан. " +
+                  "Канвас содержит частичную сборку. Давай разделим: скажи, какую ОДНУ фичу " +
+                  "собрать первой (например «регистрация + профиль» или «турниры»), и я добавлю остальное по шагам.",
+                pending: false,
+              };
+            }
+            return copy;
+          });
+        }
+      } else if (!usedTools && !finalAnswer.trim()) {
+        setMessages((prev) => {
+          const copy = prev.slice();
+          const last = copy[copy.length - 1];
+          if (last?.role === "assistant") {
+            copy[copy.length - 1] = {
+              ...last,
+              content:
+                "Не получилось собрать бот за один проход — запрос слишком большой. " +
+                "Опиши, пожалуйста, ОДНУ фичу для старта (например «регистрация и главное меню»), " +
+                "и я добавлю остальное следующими сообщениями.",
+              pending: false,
+            };
+          }
+          return copy;
         });
       }
     } catch (e) {
