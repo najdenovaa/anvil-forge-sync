@@ -247,6 +247,23 @@ export function LeftAIPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isStreaming]);
 
+  // Persist chat history per flow slug.
+  useEffect(() => {
+    if (!slug || typeof window === "undefined") return;
+    try {
+      const toSave = messages.slice(-MAX_PERSISTED_MESSAGES);
+      window.localStorage.setItem(CHAT_STORAGE_KEY_PREFIX + slug, JSON.stringify(toSave));
+    } catch (err) {
+      console.warn("Failed to persist chat history:", err);
+    }
+  }, [messages, slug]);
+
+  // Reload history when switching between flows.
+  useEffect(() => {
+    setMessages(loadPersistedMessages(slug, t("ai.msg.intro")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
   /** Run a single round against the architect-chat edge function. Returns the
    *  collected liveSteps so the caller can request a follow-up summary. */
   const runRound = async (
