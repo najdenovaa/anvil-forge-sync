@@ -12,8 +12,8 @@ interface Ctx {
 
 const ShellCtx = createContext<Ctx | null>(null);
 
-export function AnvlAppShellProvider({ children }: { children: ReactNode }) {
-  const [stage, setStage] = useState<Stage>("landing");
+export function AnvlAppShellProvider({ children, defaultStage = "landing" }: { children: ReactNode; defaultStage?: Stage }) {
+  const [stage, setStage] = useState<Stage>(defaultStage);
   const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
 
   const enterWorkspace = (prompt: string) => {

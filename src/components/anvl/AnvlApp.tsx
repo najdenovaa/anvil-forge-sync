@@ -82,7 +82,7 @@ export function AnvlApp({ slug, persist = true, autoCreate = false }: AnvlAppPro
             >
               <SelectionProvider>
                 <BotSimulatorProvider>
-                  <AnvlAppShellProvider>
+                  <AnvlAppShellProvider defaultStage={slug ? "workspace" : "landing"}>
                     <Shell />
                   </AnvlAppShellProvider>
                 </BotSimulatorProvider>
