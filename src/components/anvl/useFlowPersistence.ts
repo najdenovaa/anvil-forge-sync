@@ -135,8 +135,10 @@ export function useFlowPersistence({
   // Debounced autosave whenever inputs change (after hydration)
   useEffect(() => {
     if (!enabled) return;
-    // Wait until initial hydration completes (or we know there's no row to hydrate)
-    if (hydratedSlugRef.current !== slug && snapshot !== undefined && snapshot !== null) return;
+    // Пока query загружается — никаких сохранений вообще.
+    if (snapshot === undefined) return;
+    // Если в БД есть данные, но мы их ещё не гидрировали — ждём гидрацию.
+    if (snapshot !== null && hydratedSlugRef.current !== slug) return;
 
     const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode, variables });
     if (hash === lastSavedHashRef.current) return;
