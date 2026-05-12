@@ -222,7 +222,50 @@ export function AnvlWorkspaceProvider({
     );
   }, []);
 
-  const mergePreview = useCallback((patch: Partial<AnvlPreviewState>) => {
+  const removeAiNode = useCallback((id: string) => {
+    setNodes((prev) => prev.filter((n) => n.id !== id));
+    setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
+  }, []);
+
+  const removeAiEdge = useCallback((from: string, to: string, sourceHandle?: string) => {
+    setEdges((prev) =>
+      prev.filter(
+        (e) =>
+          !(
+            e.source === from &&
+            e.target === to &&
+            (sourceHandle === undefined || (e.sourceHandle ?? undefined) === sourceHandle)
+          ),
+      ),
+    );
+  }, []);
+
+  const renameAiNode = useCallback((id: string, label: string) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, data: { ...n.data, title: label, label } } : n)),
+    );
+  }, []);
+
+  const serializeCanvas = useCallback(() => {
+    const abbreviate = (kind: string, params: Record<string, string>) => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(params ?? {})) {
+        const s = String(v ?? "");
+        out[k] = s.length > 80 ? s.slice(0, 80) + "…" : s;
+      }
+      return out;
+    };
+    return {
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        kind: (n.data?.kind as string) ?? "",
+        label: (n.data?.title as string) ?? (n.data?.label as string) ?? (n.data?.titleKey as string) ?? "",
+        params: abbreviate((n.data?.kind as string) ?? "", (n.data?.params as Record<string, string>) ?? {}),
+      })),
+      edges: edges.map((e) => ({ from: e.source, to: e.target, sourceHandle: e.sourceHandle ?? null })),
+      variables,
+    };
+  }, [nodes, edges, variables]);
     setPreview((cur) => ({ ...cur, ...patch }));
   }, []);
 
