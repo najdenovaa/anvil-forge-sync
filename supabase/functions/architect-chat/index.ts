@@ -585,6 +585,8 @@ Deno.serve(async (req: Request) => {
       platform?: string;
       tools?: boolean;
       flowSnapshot?: FlowSnapshotIn;
+      /** Live serialized canvas — fed back to Architect when it calls get_canvas. */
+      canvasSnapshot?: { nodes?: unknown[]; edges?: unknown[]; variables?: unknown[] } | null;
       /** When true, skip tool definitions and ask for a short text-only summary
        *  of what was just built. Used for the auto follow-up call. */
       summaryOnly?: boolean;
@@ -598,6 +600,7 @@ Deno.serve(async (req: Request) => {
       platform = "telegram",
       tools: enableTools = true,
       flowSnapshot,
+      canvasSnapshot,
       summaryOnly = false,
       executedSteps = [],
     } = body;
@@ -616,8 +619,6 @@ Deno.serve(async (req: Request) => {
     let toolDefs: any[] | undefined;
 
     if (summaryOnly) {
-      // Second-round call: just turn the executed steps into a short, friendly
-      // human-readable summary that the user sees as the assistant's reply.
       systemPrompt = `You are **Anvl**. You JUST built a bot for the user by calling these tools:
 
 ${executedSteps.map((s) => "• " + s).join("\n")}
@@ -632,35 +633,169 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
       toolDefs = enableTools ? buildTools(miniApp) : undefined;
     }
 
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const canvasResult = JSON.stringify(
+      canvasSnapshot && typeof canvasSnapshot === "object"
+        ? {
+            nodes: Array.isArray(canvasSnapshot.nodes) ? canvasSnapshot.nodes : [],
+            edges: Array.isArray(canvasSnapshot.edges) ? canvasSnapshot.edges : [],
+            variables: Array.isArray(canvasSnapshot.variables) ? canvasSnapshot.variables : [],
+          }
+        : { nodes: [], edges: [], variables: [] },
+    );
+
+    // Conversation we mutate across multi-turn rounds (for get_canvas tool loop).
+    const conversation: any[] = [
+      { role: "system", content: systemPrompt },
+      ...messages.slice(-12),
+    ];
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        let indexOffset = 0; // shift tool_call indexes across rounds so client buffers don't collide
+
+        try {
+          for (let round = 0; round < 4; round++) {
+            const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: aiModel,
+                messages: conversation,
+                stream: true,
+                max_tokens: summaryOnly ? 700 : 8192,
+                ...(toolDefs ? { tools: toolDefs, tool_choice: "required" } : {}),
+              }),
+            });
+
+            if (!upstream.ok || !upstream.body) {
+              const text = await upstream.text().catch(() => "");
+              console.error("AI gateway error:", upstream.status, text);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ error: "gateway_error", status: upstream.status })}\n\n`,
+                ),
+              );
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              return;
+            }
+
+            const reader = upstream.body.getReader();
+            let buffer = "";
+            let assistantContent = "";
+            // Tool calls collected in this round, keyed by upstream index.
+            const roundCalls = new Map<number, { id: string; name: string; args: string }>();
+            let maxLocalIndex = -1;
+
+            // Pump SSE events: forward to client (with re-indexed tool_calls)
+            // and capture content + tool_calls for the next round.
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+
+              let nl: number;
+              while ((nl = buffer.indexOf("\n")) !== -1) {
+                let line = buffer.slice(0, nl);
+                buffer = buffer.slice(nl + 1);
+                if (line.endsWith("\r")) line = line.slice(0, -1);
+                if (!line.startsWith("data: ")) {
+                  if (line) controller.enqueue(encoder.encode(line + "\n"));
+                  continue;
+                }
+                const payload = line.slice(6).trim();
+                if (payload === "[DONE]") {
+                  // Swallow — we may need another round; only emit at the very end.
+                  continue;
+                }
+                try {
+                  const parsed = JSON.parse(payload);
+                  const choice = parsed.choices?.[0];
+                  const delta = choice?.delta;
+                  if (typeof delta?.content === "string") {
+                    assistantContent += delta.content;
+                  }
+                  if (Array.isArray(delta?.tool_calls)) {
+                    for (const tc of delta.tool_calls) {
+                      const localIdx = tc.index ?? 0;
+                      maxLocalIndex = Math.max(maxLocalIndex, localIdx);
+                      const slot = roundCalls.get(localIdx) ?? { id: "", name: "", args: "" };
+                      if (tc.id) slot.id = tc.id;
+                      if (tc.function?.name) slot.name = tc.function.name;
+                      if (typeof tc.function?.arguments === "string") slot.args += tc.function.arguments;
+                      roundCalls.set(localIdx, slot);
+                      // Re-index for the client so buffers across rounds don't collide.
+                      tc.index = localIdx + indexOffset;
+                    }
+                  }
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+                } catch {
+                  // Forward un-parseable lines verbatim — better than dropping.
+                  controller.enqueue(encoder.encode(line + "\n"));
+                }
+              }
+            }
+
+            // Decide: any get_canvas calls? If so, satisfy ALL collected tool_calls
+            // with synthetic results and run another round. Otherwise — finalize.
+            const hasGetCanvas = Array.from(roundCalls.values()).some(
+              (c) => c.name === "get_canvas",
+            );
+
+            if (!hasGetCanvas || roundCalls.size === 0) {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              return;
+            }
+
+            // Append assistant turn (with tool_calls) + one tool result per call.
+            const orderedCalls = Array.from(roundCalls.entries())
+              .sort(([a], [b]) => a - b)
+              .map(([, c], i) => ({
+                id: c.id || `call_${round}_${i}`,
+                type: "function" as const,
+                function: { name: c.name, arguments: c.args || "{}" },
+              }));
+
+            conversation.push({
+              role: "assistant",
+              content: assistantContent || "",
+              tool_calls: orderedCalls,
+            });
+
+            for (const call of orderedCalls) {
+              conversation.push({
+                role: "tool",
+                tool_call_id: call.id,
+                content: call.function.name === "get_canvas" ? canvasResult : `{"ok":true}`,
+              });
+            }
+
+            indexOffset += maxLocalIndex + 1;
+            // Loop back for another round.
+          }
+
+          // Safety cap reached.
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch (err) {
+          console.error("architect-chat stream error:", err);
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "stream_error" })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          } catch { /* ignore */ }
+          controller.close();
+        }
       },
-      body: JSON.stringify({
-        model: aiModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages.slice(-12),
-        ],
-        stream: true,
-        // Bigger budget so the model can finish all tool calls + write the
-        // summary in one go without truncation.
-        max_tokens: summaryOnly ? 700 : 8192,
-        ...(toolDefs ? { tools: toolDefs, tool_choice: "required" } : {}),
-      }),
     });
 
-    if (!upstream.ok) {
-      if (upstream.status === 429) return json({ error: "rate_limit" }, 429);
-      if (upstream.status === 402) return json({ error: "payment" }, 402);
-      const text = await upstream.text();
-      console.error("AI gateway error:", upstream.status, text);
-      return json({ error: "gateway_error" }, 500);
-    }
-
-    return new Response(upstream.body, {
+    return new Response(stream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
