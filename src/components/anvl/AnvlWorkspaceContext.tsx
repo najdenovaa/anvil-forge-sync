@@ -71,6 +71,14 @@ interface WorkspaceCtx {
   addAiNode: (id: string, kind: string, title: string, preview: string) => void;
   connectAiNodes: (from: string, to: string, sourceHandle?: string) => void;
   updateAiNodeParam: (id: string, key: string, value: string) => void;
+  removeAiNode: (id: string) => void;
+  removeAiEdge: (from: string, to: string, sourceHandle?: string) => void;
+  renameAiNode: (id: string, label: string) => void;
+  serializeCanvas: () => {
+    nodes: { id: string; kind: string; label: string; params: Record<string, string> }[];
+    edges: { from: string; to: string; sourceHandle: string | null }[];
+    variables: VariableDef[];
+  };
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
   resetAiCanvas: () => void;
@@ -214,6 +222,51 @@ export function AnvlWorkspaceProvider({
     );
   }, []);
 
+  const removeAiNode = useCallback((id: string) => {
+    setNodes((prev) => prev.filter((n) => n.id !== id));
+    setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
+  }, []);
+
+  const removeAiEdge = useCallback((from: string, to: string, sourceHandle?: string) => {
+    setEdges((prev) =>
+      prev.filter(
+        (e) =>
+          !(
+            e.source === from &&
+            e.target === to &&
+            (sourceHandle === undefined || (e.sourceHandle ?? undefined) === sourceHandle)
+          ),
+      ),
+    );
+  }, []);
+
+  const renameAiNode = useCallback((id: string, label: string) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, data: { ...n.data, title: label, label } } : n)),
+    );
+  }, []);
+
+  const serializeCanvas = useCallback(() => {
+    const abbreviate = (kind: string, params: Record<string, string>) => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(params ?? {})) {
+        const s = String(v ?? "");
+        out[k] = s.length > 80 ? s.slice(0, 80) + "…" : s;
+      }
+      return out;
+    };
+    return {
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        kind: (n.data?.kind as string) ?? "",
+        label: (n.data?.title as string) ?? (n.data?.label as string) ?? (n.data?.titleKey as string) ?? "",
+        params: abbreviate((n.data?.kind as string) ?? "", (n.data?.params as Record<string, string>) ?? {}),
+      })),
+      edges: edges.map((e) => ({ from: e.source, to: e.target, sourceHandle: e.sourceHandle ?? null })),
+      variables,
+    };
+  }, [nodes, edges, variables]);
+
   const mergePreview = useCallback((patch: Partial<AnvlPreviewState>) => {
     setPreview((cur) => ({ ...cur, ...patch }));
   }, []);
@@ -248,12 +301,13 @@ export function AnvlWorkspaceProvider({
       variables, setVariables,
       applyBlueprint,
       addAiNode, connectAiNodes, updateAiNodeParam,
+      removeAiNode, removeAiEdge, renameAiNode, serializeCanvas,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
       lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

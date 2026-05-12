@@ -91,6 +91,14 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return "Настраиваю Mini App";
     case "set_code":
       return `Пишу рабочий код: ${args.filename ?? args.language ?? "bot"}`;
+    case "get_canvas":
+      return "Читаю текущий канвас";
+    case "remove_node":
+      return `Удаляю ноду ${args.id}`;
+    case "remove_edge":
+      return `Разрываю связь ${args.from} → ${args.to}${args.sourceHandle ? ` (${args.sourceHandle})` : ""}`;
+    case "rename_node":
+      return `Переименовываю ${args.id}: ${args.label}`;
     default:
       return name;
   }
@@ -182,6 +190,9 @@ export function LeftAIPanel() {
     addAiNode,
     connectAiNodes,
     updateAiNodeParam,
+    removeAiNode,
+    removeAiEdge,
+    renameAiNode,
     mergePreview,
     mergeMiniApp,
     resetAiCanvas,
@@ -297,6 +308,11 @@ export function LeftAIPanel() {
         else if (name === "set_variables") {
           if (Array.isArray(args.variables)) setVariables(args.variables);
         }
+        else if (name === "remove_node") removeAiNode(args.id);
+        else if (name === "remove_edge") removeAiEdge(args.from, args.to, args.sourceHandle);
+        else if (name === "rename_node") renameAiNode(args.id, args.label);
+        // get_canvas is read-only here — Architect uses a server-side snapshot
+        // injected via flowSnapshot. The tool name is logged for UX only.
       } catch (err) { console.warn("tool apply failed", name, err); }
     };
 
