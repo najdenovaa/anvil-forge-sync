@@ -308,6 +308,11 @@ export function LeftAIPanel() {
         else if (name === "set_variables") {
           if (Array.isArray(args.variables)) setVariables(args.variables);
         }
+        else if (name === "remove_node") removeAiNode(args.id);
+        else if (name === "remove_edge") removeAiEdge(args.from, args.to, args.sourceHandle);
+        else if (name === "rename_node") renameAiNode(args.id, args.label);
+        // get_canvas is read-only here — Architect uses a server-side snapshot
+        // injected via flowSnapshot. The tool name is logged for UX only.
       } catch (err) { console.warn("tool apply failed", name, err); }
     };
 
