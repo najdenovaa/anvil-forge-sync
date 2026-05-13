@@ -45,6 +45,7 @@ export function useFlowPersistence({
   edges,
   preview,
   miniapp,
+  miniappEnabled = false,
   generatedCode,
   variables,
   onHydrate,
