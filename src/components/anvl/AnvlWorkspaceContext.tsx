@@ -509,12 +509,19 @@ export function AnvlWorkspaceProvider({
       new_button_label?: string;
       new_content?: string;
     }) => {
-      const buttonAction = `screen:${args.section_msg_id}`;
+      const sectionId = args.section_msg_id.replace(/_msg$/, "");
+      const sectionTrig = nodesRef.current.find((n) => n.id === `${sectionId}_trig`);
+      const callbackData =
+        (sectionTrig?.data?.params as Record<string, string> | undefined)?.data ?? null;
+      const legacyAction = `screen:${args.section_msg_id}`;
+
       setNodes((prev) =>
         prev.map((n) => {
           if (n.id === args.menu_id && n.data?.kind === "keyboard.inline" && args.new_button_label) {
             const updated = parseMenuButtons((n.data?.params as any)?.buttons).map((b) =>
-              b.action === buttonAction ? { ...b, label: args.new_button_label! } : b,
+              b.action === callbackData || b.action === legacyAction
+                ? { ...b, label: args.new_button_label! }
+                : b,
             );
             return {
               ...n,
@@ -529,7 +536,7 @@ export function AnvlWorkspaceProvider({
           }
           if (n.id === args.section_msg_id && args.new_content !== undefined) {
             const kind = (n.data?.kind as string) ?? "message.text";
-            const key = kind === "message.photo" ? "photoUrl" : "text";
+            const key = kind === "message.photo" ? "url" : "text";
             return {
               ...n,
               data: {
