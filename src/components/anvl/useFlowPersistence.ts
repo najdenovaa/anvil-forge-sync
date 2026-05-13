@@ -19,6 +19,7 @@ interface UseFlowPersistenceArgs {
   edges: Edge[];
   preview: Partial<AnvlPreviewState>;
   miniapp: Partial<AnvlMiniAppState>;
+  miniappEnabled?: boolean;
   generatedCode: string;
   variables: VariableDef[];
   /** Called once after the initial load — used to hydrate the workspace state. */
@@ -44,6 +45,7 @@ export function useFlowPersistence({
   edges,
   preview,
   miniapp,
+  miniappEnabled = false,
   generatedCode,
   variables,
   onHydrate,
@@ -140,7 +142,7 @@ export function useFlowPersistence({
     // Если в БД есть данные, но мы их ещё не гидрировали — ждём гидрацию.
     if (snapshot !== null && hydratedSlugRef.current !== slug) return;
 
-    const hash = JSON.stringify({ nodes, edges, preview, miniapp, generatedCode, variables });
+    const hash = JSON.stringify({ nodes, edges, preview, miniapp, miniappEnabled, generatedCode, variables });
     if (hash === lastSavedHashRef.current) return;
 
     // Auto-create mode: treat the first observed state as the baseline so the
@@ -162,6 +164,7 @@ export function useFlowPersistence({
         edges,
         preview,
         miniapp,
+        miniappEnabled,
         generatedCode,
         variables,
       });
@@ -173,7 +176,7 @@ export function useFlowPersistence({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, slug, nodes, edges, preview, miniapp, generatedCode, variables]);
+  }, [enabled, slug, nodes, edges, preview, miniapp, miniappEnabled, generatedCode, variables]);
 
   return {
     status,

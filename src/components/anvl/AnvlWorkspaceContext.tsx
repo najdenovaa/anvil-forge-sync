@@ -15,6 +15,7 @@ import { lintFlow, type LintIssue } from "@/lib/flow-linter";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
 import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
 import { autoLayout } from "@/lib/anvl-autolayout";
+import { usePlatform } from "./PlatformContext";
 
 const DEFAULT_FLOW_SLUG = "default";
 
@@ -166,6 +167,7 @@ export function AnvlWorkspaceProvider({
   const [miniApp, setMiniApp] = useState<Partial<AnvlMiniAppState>>({});
   const [generatedCode, setGeneratedCode] = useState("");
   const [variables, setVariables] = useState<VariableDef[]>([]);
+  const { miniAppEnabled, setMiniAppEnabled } = usePlatform();
   const hydratedSlugRef = useRef<string | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -220,7 +222,10 @@ export function AnvlWorkspaceProvider({
     setMiniApp(snap.miniapp ?? {});
     setGeneratedCode(snap.generatedCode ?? "");
     setVariables(snap.variables ?? []);
-  }, []);
+    // Sync the workspace-level Mini App toggle with what's stored in the DB
+    // so the Architect knows whether to keep building Mini App content.
+    setMiniAppEnabled(!!snap.miniappEnabled);
+  }, [setMiniAppEnabled]);
 
   const rollbackToVersion = useCallback((version: FlowVersionFull) => {
     setNodes(version.nodes ?? []);
@@ -579,7 +584,9 @@ export function AnvlWorkspaceProvider({
 
   const mergeMiniApp = useCallback((patch: Partial<AnvlMiniAppState>) => {
     setMiniApp((cur) => ({ ...cur, ...patch }));
-  }, []);
+    // Any architect-driven Mini App update implies the user wants Mini App mode.
+    setMiniAppEnabled(true);
+  }, [setMiniAppEnabled]);
 
   const { status: saveStatus, lastSavedAt, snapshotNow, flowId } = useFlowPersistence({
     slug,
@@ -587,6 +594,7 @@ export function AnvlWorkspaceProvider({
     edges,
     preview,
     miniapp: miniApp,
+    miniappEnabled: miniAppEnabled,
     generatedCode,
     variables,
     onHydrate: hydrate,
