@@ -1,0 +1,1 @@
+DELETE FROM bot_sessions WHERE bot_id IN (SELECT id FROM bots WHERE flow_id=(SELECT id FROM flows WHERE slug='flow-34b84919'));
