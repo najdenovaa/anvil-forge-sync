@@ -279,21 +279,34 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
         ctx,
         node.id,
       );
-      const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
+      const adj = lookaheadKeyboard(ctx, node);
+      const reply_markup =
+        buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
       ctx.pendingKeyboard = undefined;
+      if (adj?.kb?.reply) {
+        ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
+      }
       await sendAndLog("sendMessage", { chat_id: ctx.chatId, text, reply_markup });
-      return goNext();
+      // If we attached a keyboard via lookahead, this turn ends here —
+      // the user must tap a button (handled by trigger.callback / synthetic
+      // callback for reply keyboards) to advance the flow.
+      return adj ? null : goNext();
     }
 
     case "message.photo": {
       const caption = await interpolateAndLog(String(params.caption ?? ""), ctx, node.id);
       const photo = String(params.url ?? params.photo ?? "");
+      const adj = lookaheadKeyboard(ctx, node);
       if (photo) {
-        const reply_markup = buildReplyMarkup(ctx.pendingKeyboard);
+        const reply_markup =
+          buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
         ctx.pendingKeyboard = undefined;
+        if (adj?.kb?.reply) {
+          ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
+        }
         await sendAndLog("sendPhoto", { chat_id: ctx.chatId, photo, caption, reply_markup });
       }
-      return goNext();
+      return adj ? null : goNext();
     }
 
     case "message.document": {
@@ -304,26 +317,12 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
     }
 
-    case "keyboard.inline": {
-      const tplCtx = buildTplCtx(ctx);
-      const btns = parseButtons(params.buttons).map((b) => ({
-        label: renderTemplate(b.label, tplCtx),
-        action: renderTemplate(b.action, tplCtx),
-      }));
-      ctx.pendingKeyboard = { inline: btns };
-      return goNext();
-    }
-
-    case "keyboard.reply": {
-      const tplCtx = buildTplCtx(ctx);
-      const buttons = parseButtons(params.buttons).map((b) => ({
-        label: renderTemplate(b.label, tplCtx),
-        action: renderTemplate(b.action, tplCtx),
-      }));
-      ctx.pendingKeyboard = { reply: buttons };
-      ctx.nextReplyKeyboardLabels = buttons.map((b) => b.label);
-      return goNext();
-    }
+    case "keyboard.inline":
+    case "keyboard.reply":
+      // Terminal: keyboards are attached to the preceding message via
+      // lookahead. Reaching one stand-alone means the flow ends here and we
+      // wait for a user tap (routed back in via trigger.callback).
+      return null;
 
     case "logic.condition": {
       let result = false;
