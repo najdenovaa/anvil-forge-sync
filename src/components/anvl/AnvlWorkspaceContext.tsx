@@ -167,6 +167,7 @@ export function AnvlWorkspaceProvider({
   const [miniApp, setMiniApp] = useState<Partial<AnvlMiniAppState>>({});
   const [generatedCode, setGeneratedCode] = useState("");
   const [variables, setVariables] = useState<VariableDef[]>([]);
+  const { miniAppEnabled, setMiniAppEnabled } = usePlatform();
   const hydratedSlugRef = useRef<string | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
