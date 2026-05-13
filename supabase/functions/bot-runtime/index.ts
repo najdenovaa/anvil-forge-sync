@@ -56,7 +56,7 @@ interface Bot {
   status: string;
   bot_username?: string | null;
 }
-interface Flow { id: string; nodes: FlowNode[]; edges: FlowEdge[] }
+interface Flow { id: string; slug?: string; nodes: FlowNode[]; edges: FlowEdge[] }
 
 // --- helpers -------------------------------------------------------------
 
@@ -151,11 +151,20 @@ interface OutgoingKeyboard {
   reply?: Array<{ label: string; action: string }>;
 }
 
-function buildReplyMarkup(kb: OutgoingKeyboard | undefined) {
+function miniAppUrl(ctx: RunCtx) {
+  const baseUrl = Deno.env.get("PUBLIC_BASE_URL") ?? "https://anvil-forge-sync.lovable.app";
+  return `${baseUrl}/m/${encodeURIComponent(ctx.flow.slug ?? ctx.flow.id)}`;
+}
+
+function buildReplyMarkup(kb: OutgoingKeyboard | undefined, ctx?: RunCtx) {
   if (!kb) return undefined;
   if (kb.inline?.length) {
     return {
-      inline_keyboard: kb.inline.map((b) => [{ text: b.label, callback_data: b.action.slice(0, 64) }]),
+      inline_keyboard: kb.inline.map((b) => [
+        b.action === "open_miniapp" && ctx
+          ? { text: b.label, web_app: { url: miniAppUrl(ctx) } }
+          : { text: b.label, callback_data: b.action.slice(0, 64) },
+      ]),
     };
   }
   if (kb.reply?.length) {
