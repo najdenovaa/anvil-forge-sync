@@ -487,6 +487,26 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return "PAUSE";
     }
 
+    case "miniapp.screen": {
+      const baseUrl =
+        Deno.env.get("PUBLIC_BASE_URL") ?? "https://anvil-forge-sync.lovable.app";
+      const url = String(params.url ?? `${baseUrl}/m/${ctx.flow.id}`);
+      const text = await interpolateAndLog(
+        String(params.text ?? "Откройте Mini App, чтобы продолжить."),
+        ctx,
+        node.id,
+      );
+      const buttonLabel = String(params.button_label ?? "Открыть Mini App");
+      await sendAndLog("sendMessage", {
+        chat_id: ctx.chatId,
+        text,
+        reply_markup: {
+          inline_keyboard: [[{ text: buttonLabel, web_app: { url } }]],
+        },
+      });
+      return null;
+    }
+
     default:
       // Unknown / unsupported nodes — just walk through.
       return goNext();

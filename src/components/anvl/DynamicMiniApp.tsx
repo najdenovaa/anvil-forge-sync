@@ -112,10 +112,14 @@ const ACCENT_HEX: Record<MiniAppAccent, string> = {
 };
 
 export function DynamicMiniApp() {
+  const { miniApp } = useAnvlWorkspace();
+  return <DynamicMiniAppView miniApp={miniApp} />;
+}
+
+export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib/anvl-blueprint").AnvlMiniAppState> }) {
   const { t } = useI18n();
   const { view, targetTab, close } = useMiniApp();
   const { platform } = usePlatform();
-  const { miniApp } = useAnvlWorkspace();
   const isTg = platform === "telegram";
 
   const accent = miniApp.accent ?? "blue";
