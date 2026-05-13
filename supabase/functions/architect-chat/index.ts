@@ -172,7 +172,22 @@ Design a complete mini-app that maps 1:1 to the user's domain.
 - tabs: 3-4 entries; first is "home", include one tab whose label = itemsLabel.
 - Add EXACTLY ONE miniapp.screen node and a primary chat button with action
   "open_miniapp" labelled in the user's language ("Открыть меню", "Open shop").
-Keep 4-6 nodes max.`;
+Keep 4-6 nodes max.
+
+== set_miniapp ОБЯЗАТЕЛЕН ==
+КАЖДЫЙ раз когда пользователь описывает Mini App (контент, фото, услуги,
+карточки, цены, разделы, дизайн, фон, тему) — ВЫ ОБЯЗАНЫ вызвать set_miniapp
+с ПОЛНЫМ patch-ом, отражающим описание ДОСЛОВНО:
+- Если упомянуты фото/изображения — добавьте hero.image (URL или
+  data-описание), и items[].image где уместно.
+- Если упомянут «светлый фон / тёмная тема» — set_miniapp({ theme: "light" })
+  или "dark".
+- Если перечислены конкретные услуги, мастера, товары — items должны
+  содержать ИХ ИМЕНА И ОПИСАНИЯ из реплики пользователя, а не выдуманные.
+- Если описана структура вкладок — tabs должны соответствовать.
+Не уклоняйтесь и НЕ ограничивайтесь словами «обновил Mini App» — реально
+вызовите set_miniapp с конкретными полями. Без этого вызова изменения НЕ
+сохранятся в базу и пользователь увидит пустой экран.`;
 
 const NO_MINIAPP_RULES = `
 
