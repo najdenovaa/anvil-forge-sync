@@ -112,6 +112,7 @@ interface WorkspaceCtx {
   renameAiNode: (id: string, label: string) => void;
   addMenuSection: (args: {
     menu_id: string;
+    menu_msg_id: string;
     button_label: string;
     callback_data: string;
     content_kind: "text" | "photo";
