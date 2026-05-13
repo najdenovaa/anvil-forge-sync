@@ -166,6 +166,10 @@ export function AnvlWorkspaceProvider({
   const [generatedCode, setGeneratedCode] = useState("");
   const [variables, setVariables] = useState<VariableDef[]>([]);
   const hydratedSlugRef = useRef<string | null>(null);
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
 
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
     if (blueprint.nodes?.length) {
