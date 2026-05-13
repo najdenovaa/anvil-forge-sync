@@ -121,6 +121,7 @@ export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib
   const { view, targetTab, close } = useMiniApp();
   const { platform } = usePlatform();
   const isTg = platform === "telegram";
+  const useDarkTheme = isTg && (miniApp as { theme?: string }).theme !== "light";
 
   const accent = miniApp.accent ?? "blue";
   const accentColor = ACCENT_HEX[accent];
@@ -195,7 +196,7 @@ export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib
     <div
       className={cn(
         "flex h-full flex-col text-[12px]",
-        isTg
+        useDarkTheme
           ? "bg-[oklch(0.18_0.03_260)] text-white"
           : "bg-[oklch(0.97_0_0)] text-[oklch(0.16_0_0)]",
       )}
@@ -204,14 +205,14 @@ export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib
       <div
         className={cn(
           "flex items-center justify-between border-b px-3 py-2",
-          isTg ? "border-white/5 bg-[oklch(0.22_0.03_260)]" : "border-black/5 bg-white",
+          useDarkTheme ? "border-white/5 bg-[oklch(0.22_0.03_260)]" : "border-black/5 bg-white",
         )}
       >
         <button
           onClick={close}
           className={cn(
             "text-[10.5px] font-medium",
-            isTg ? "text-white/70 hover:text-white" : "text-black/60 hover:text-black",
+            useDarkTheme ? "text-white/70 hover:text-white" : "text-black/60 hover:text-black",
           )}
         >
           {t("vpn.back_to_chat")}
@@ -255,7 +256,7 @@ export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib
       <div
         className={cn(
           "grid border-t",
-          isTg ? "border-white/5 bg-[oklch(0.22_0.03_260)]" : "border-black/5 bg-white",
+          useDarkTheme ? "border-white/5 bg-[oklch(0.22_0.03_260)]" : "border-black/5 bg-white",
         )}
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
@@ -268,7 +269,7 @@ export function DynamicMiniAppView({ miniApp }: { miniApp: Partial<import("@/lib
               onClick={() => setTabId(tab.id)}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 py-2 text-[9px] font-medium transition",
-                active ? "" : isTg ? "text-white/45 hover:text-white/70" : "text-black/45 hover:text-black/70",
+                active ? "" : useDarkTheme ? "text-white/45 hover:text-white/70" : "text-black/45 hover:text-black/70",
               )}
               style={active ? { color: accentColor } : undefined}
             >

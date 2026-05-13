@@ -56,7 +56,7 @@ interface Bot {
   status: string;
   bot_username?: string | null;
 }
-interface Flow { id: string; nodes: FlowNode[]; edges: FlowEdge[] }
+interface Flow { id: string; slug?: string; nodes: FlowNode[]; edges: FlowEdge[] }
 
 // --- helpers -------------------------------------------------------------
 
@@ -151,11 +151,20 @@ interface OutgoingKeyboard {
   reply?: Array<{ label: string; action: string }>;
 }
 
-function buildReplyMarkup(kb: OutgoingKeyboard | undefined) {
+function miniAppUrl(ctx: RunCtx) {
+  const baseUrl = Deno.env.get("PUBLIC_BASE_URL") ?? "https://anvil-forge-sync.lovable.app";
+  return `${baseUrl}/m/${encodeURIComponent(ctx.flow.slug ?? ctx.flow.id)}`;
+}
+
+function buildReplyMarkup(kb: OutgoingKeyboard | undefined, ctx?: RunCtx) {
   if (!kb) return undefined;
   if (kb.inline?.length) {
     return {
-      inline_keyboard: kb.inline.map((b) => [{ text: b.label, callback_data: b.action.slice(0, 64) }]),
+      inline_keyboard: kb.inline.map((b) => [
+        b.action === "open_miniapp" && ctx
+          ? { text: b.label, web_app: { url: miniAppUrl(ctx) } }
+          : { text: b.label, callback_data: b.action.slice(0, 64) },
+      ]),
     };
   }
   if (kb.reply?.length) {
@@ -308,7 +317,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       );
       const adj = lookaheadKeyboard(ctx, node);
       const reply_markup =
-        buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
+        buildReplyMarkup(adj?.kb, ctx) ?? buildReplyMarkup(ctx.pendingKeyboard, ctx);
       ctx.pendingKeyboard = undefined;
       if (adj?.kb?.reply) {
         ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
@@ -326,7 +335,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       const adj = lookaheadKeyboard(ctx, node);
       if (photo) {
         const reply_markup =
-          buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
+          buildReplyMarkup(adj?.kb, ctx) ?? buildReplyMarkup(ctx.pendingKeyboard, ctx);
         ctx.pendingKeyboard = undefined;
         if (adj?.kb?.reply) {
           ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
@@ -488,9 +497,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "miniapp.screen": {
-      const baseUrl =
-        Deno.env.get("PUBLIC_BASE_URL") ?? "https://anvil-forge-sync.lovable.app";
-      const url = String(params.url ?? `${baseUrl}/m/${ctx.flow.id}`);
+      const url = String(params.url ?? miniAppUrl(ctx));
       const text = await interpolateAndLog(
         String(params.text ?? "Откройте Mini App, чтобы продолжить."),
         ctx,
@@ -522,12 +529,12 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   if (!secret || secret !== bot.webhook_secret) return new Response("bad secret", { status: 401 });
   if (bot.status === "paused") return new Response("paused", { status: 200 });
 
-  const { data: flowRow } = await supa.from("flows").select("id, nodes, edges").eq("id", bot.flow_id).maybeSingle();
+  const { data: flowRow } = await supa.from("flows").select("id, slug, nodes, edges").eq("id", bot.flow_id).maybeSingle();
   if (!flowRow) {
     await supa.from("bots").update({ status: "error", last_error: "flow missing" }).eq("id", botId);
     return new Response("flow missing", { status: 200 });
   }
-  const flow: Flow = { id: flowRow.id, nodes: flowRow.nodes ?? [], edges: flowRow.edges ?? [] };
+  const flow: Flow = { id: flowRow.id, slug: flowRow.slug, nodes: flowRow.nodes ?? [], edges: flowRow.edges ?? [] };
 
   const message = update.message;
   const callback = update.callback_query;
