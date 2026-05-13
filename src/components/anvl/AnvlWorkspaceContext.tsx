@@ -304,12 +304,16 @@ export function AnvlWorkspaceProvider({
   }, []);
 
   // ── Composite menu-section helpers ────────────────────────────────────
-  // Buttons are stored as a JSON-serialized array of {label, action} so that
-  // both legacy add_node-built menus (JSON) and composite-built menus stay
-  // compatible. parseMenuButtons handles either format on read.
+  // Architecture: keyboard.inline is TERMINAL in bot-runtime. Routing on tap
+  // happens via trigger.callback nodes whose params.data matches the button's
+  // action/callback_data. addMenuSection therefore creates:
+  //   trigger.callback(data=callback_data) → section_msg → back_kb
+  //   trigger.callback(data="back_to_menu") → menu_msg → menu_kb  [shared]
+  // and adds {label, action: callback_data} to the menu's buttons.
   const addMenuSection = useCallback(
     (args: {
       menu_id: string;
+      menu_msg_id: string;
       button_label: string;
       callback_data: string;
       content_kind: "text" | "photo";
@@ -319,10 +323,12 @@ export function AnvlWorkspaceProvider({
     }) => {
       const msgId = `${args.section_id}_msg`;
       const backKbId = `${args.section_id}_back_kb`;
+      const sectionTrigId = `${args.section_id}_trig`;
+      const backTrigId = `${args.menu_id}_back_trig`;
       const backLabel = args.back_label ?? "« Назад в меню";
-      const buttonAction = `screen:${msgId}`;
+      const cb = args.callback_data.slice(0, 64);
       const msgKind = args.content_kind === "photo" ? "message.photo" : "message.text";
-      const contentKey = args.content_kind === "photo" ? "photoUrl" : "text";
+      const contentKey = args.content_kind === "photo" ? "url" : "text";
 
       setNodes((prev) => {
         const menu = prev.find((n) => n.id === args.menu_id);
@@ -330,56 +336,91 @@ export function AnvlWorkspaceProvider({
           console.warn("addMenuSection: menu_id not found or not keyboard.inline", args.menu_id);
           return prev;
         }
+        const menuMsg = prev.find((n) => n.id === args.menu_msg_id);
+        if (!menuMsg) {
+          console.warn("addMenuSection: menu_msg_id not found", args.menu_msg_id);
+          return prev;
+        }
         if (prev.some((n) => n.id === msgId) || prev.some((n) => n.id === backKbId)) {
-          console.warn("addMenuSection: nodes already exist", msgId, backKbId);
+          console.warn("addMenuSection: section nodes already exist", msgId);
           return prev;
         }
         const baseIdx = prev.length;
         const existing = parseMenuButtons((menu.data?.params as any)?.buttons);
         const nextButtons = serializeMenuButtons([
           ...existing,
-          { label: args.button_label, action: buttonAction },
+          { label: args.button_label, action: cb },
         ]);
         const backButtons = serializeMenuButtons([
           { label: backLabel, action: "back_to_menu" },
         ]);
 
-        return prev
-          .map((n) =>
-            n.id === args.menu_id
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: nextButtons },
+        const updated = prev.map((n) =>
+          n.id === args.menu_id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  params: {
+                    ...((n.data?.params as Record<string, string>) ?? {}),
+                    buttons: nextButtons,
                   },
-                }
-              : n,
-          )
-          .concat([
-            {
-              id: msgId,
-              type: "anvl",
-              position: { x: 40 + Math.floor(baseIdx / 2) * 280, y: 90 + (baseIdx % 2) * 170 },
-              data: {
-                kind: msgKind,
-                title: args.button_label,
-                preview: args.content.slice(0, 80),
-                params: { [contentKey]: args.content },
-              },
+                },
+              }
+            : n,
+        );
+
+        const newNodes: Node[] = [
+          {
+            id: sectionTrigId,
+            type: "anvl",
+            position: { x: 40 + Math.floor(baseIdx / 2) * 280, y: 90 + (baseIdx % 2) * 170 },
+            data: {
+              kind: "trigger.callback",
+              title: `Тап «${args.button_label}»`,
+              preview: `data: ${cb}`,
+              params: { data: cb },
             },
-            {
-              id: backKbId,
-              type: "anvl",
-              position: { x: 40 + Math.floor((baseIdx + 1) / 2) * 280, y: 90 + ((baseIdx + 1) % 2) * 170 },
-              data: {
-                kind: "keyboard.inline",
-                title: `Назад → ${args.menu_id}`,
-                preview: backLabel,
-                params: { buttons: backButtons },
-              },
+          },
+          {
+            id: msgId,
+            type: "anvl",
+            position: { x: 40 + Math.floor((baseIdx + 1) / 2) * 280, y: 90 + ((baseIdx + 1) % 2) * 170 },
+            data: {
+              kind: msgKind,
+              title: args.button_label,
+              preview: args.content.slice(0, 80),
+              params: { [contentKey]: args.content },
             },
-          ]);
+          },
+          {
+            id: backKbId,
+            type: "anvl",
+            position: { x: 40 + Math.floor((baseIdx + 2) / 2) * 280, y: 90 + ((baseIdx + 2) % 2) * 170 },
+            data: {
+              kind: "keyboard.inline",
+              title: `Назад → ${args.menu_id}`,
+              preview: backLabel,
+              params: { buttons: backButtons },
+            },
+          },
+        ];
+        // Shared back-trigger: only add once per menu.
+        if (!updated.some((n) => n.id === backTrigId)) {
+          newNodes.push({
+            id: backTrigId,
+            type: "anvl",
+            position: { x: 40 + Math.floor((baseIdx + 3) / 2) * 280, y: 90 + ((baseIdx + 3) % 2) * 170 },
+            data: {
+              kind: "trigger.callback",
+              title: "Тап «Назад в меню»",
+              preview: "data: back_to_menu",
+              params: { data: "back_to_menu" },
+            },
+          });
+        }
+
+        return [...updated, ...newNodes];
       });
 
       setEdges((prev) => {
@@ -390,9 +431,12 @@ export function AnvlWorkspaceProvider({
             next.push({ id: eid, source: from, target: to, animated: true });
           }
         };
-        add(args.menu_id, msgId);
+        add(sectionTrigId, msgId);
         add(msgId, backKbId);
-        add(backKbId, args.menu_id);
+        // Shared back wiring (idempotent).
+        add(backTrigId, args.menu_msg_id);
+        // Ensure menu_msg → menu_kb edge exists so lookahead picks the menu.
+        add(args.menu_msg_id, args.menu_id);
         return next;
       });
     },
