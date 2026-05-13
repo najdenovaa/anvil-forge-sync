@@ -19,6 +19,7 @@ interface UseFlowPersistenceArgs {
   edges: Edge[];
   preview: Partial<AnvlPreviewState>;
   miniapp: Partial<AnvlMiniAppState>;
+  miniappEnabled?: boolean;
   generatedCode: string;
   variables: VariableDef[];
   /** Called once after the initial load — used to hydrate the workspace state. */
