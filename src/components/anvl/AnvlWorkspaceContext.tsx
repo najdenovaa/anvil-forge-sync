@@ -222,7 +222,10 @@ export function AnvlWorkspaceProvider({
     setMiniApp(snap.miniapp ?? {});
     setGeneratedCode(snap.generatedCode ?? "");
     setVariables(snap.variables ?? []);
-  }, []);
+    // Sync the workspace-level Mini App toggle with what's stored in the DB
+    // so the Architect knows whether to keep building Mini App content.
+    setMiniAppEnabled(!!snap.miniappEnabled);
+  }, [setMiniAppEnabled]);
 
   const rollbackToVersion = useCallback((version: FlowVersionFull) => {
     setNodes(version.nodes ?? []);
