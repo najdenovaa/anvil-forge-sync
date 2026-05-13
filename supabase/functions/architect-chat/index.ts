@@ -625,6 +625,61 @@ function buildTools(miniAppEnabled: boolean) {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "add_menu_section",
+        description: "Атомарно создать раздел FAQ-меню: кнопка в существующем главном меню + нода-ответ (message.text/message.photo) + нода keyboard.inline с кнопкой возврата + все три связи (menu → answer через новую кнопку, answer → back_kb, back_kb → menu). ИСПОЛЬЗУЙ это вместо серии add_node+connect+set_param для типовых разделов FAQ-ботов.",
+        parameters: {
+          type: "object",
+          properties: {
+            menu_id: { type: "string", description: "ID существующей keyboard.inline ноды главного меню" },
+            button_label: { type: "string", description: "Лейбл новой кнопки в меню (например '💰 Цены')" },
+            callback_data: { type: "string", description: "Уникальный callback (например 'prices')" },
+            content_kind: { type: "string", enum: ["text", "photo"] },
+            content: { type: "string", description: "Текст ответа или URL фото" },
+            section_id: { type: "string", description: "Префикс для создаваемых нод (создадутся ${section_id}_msg и ${section_id}_back_kb)" },
+            back_label: { type: "string", description: "По умолчанию '« Назад в меню'" },
+          },
+          required: ["menu_id", "button_label", "callback_data", "content_kind", "content", "section_id"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_menu_section",
+        description: "Атомарно удалить раздел FAQ-меню: убирает соответствующую кнопку из main menu, удаляет ноду-ответ и связанную с ней keyboard.inline-ноду возврата, удаляет все связанные edges. Кнопка в меню определяется по callback_data, который ведёт на section_msg_id.",
+        parameters: {
+          type: "object",
+          properties: {
+            menu_id: { type: "string" },
+            section_msg_id: { type: "string" },
+          },
+          required: ["menu_id", "section_msg_id"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "update_menu_section",
+        description: "Атомарно обновить раздел FAQ: меняет лейбл кнопки в меню (если new_button_label задан) и/или текст ноды-ответа (если new_content задан). Связи не трогает.",
+        parameters: {
+          type: "object",
+          properties: {
+            menu_id: { type: "string" },
+            section_msg_id: { type: "string" },
+            new_button_label: { type: "string" },
+            new_content: { type: "string" },
+          },
+          required: ["menu_id", "section_msg_id"],
+          additionalProperties: false,
+        },
+      },
+    },
   ];
 
   if (miniAppEnabled) {
