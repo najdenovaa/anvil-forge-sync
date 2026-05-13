@@ -74,6 +74,22 @@ interface WorkspaceCtx {
   removeAiNode: (id: string) => void;
   removeAiEdge: (from: string, to: string, sourceHandle?: string) => void;
   renameAiNode: (id: string, label: string) => void;
+  addMenuSection: (args: {
+    menu_id: string;
+    button_label: string;
+    callback_data: string;
+    content_kind: "text" | "photo";
+    content: string;
+    section_id: string;
+    back_label?: string;
+  }) => void;
+  removeMenuSection: (args: { menu_id: string; section_msg_id: string }) => void;
+  updateMenuSection: (args: {
+    menu_id: string;
+    section_msg_id: string;
+    new_button_label?: string;
+    new_content?: string;
+  }) => void;
   serializeCanvas: () => {
     nodes: { id: string; kind: string; label: string; params: Record<string, string> }[];
     edges: { from: string; to: string; sourceHandle: string | null }[];
