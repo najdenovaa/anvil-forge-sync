@@ -497,9 +497,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
     }
 
     case "miniapp.screen": {
-      const baseUrl =
-        Deno.env.get("PUBLIC_BASE_URL") ?? "https://anvil-forge-sync.lovable.app";
-      const url = String(params.url ?? `${baseUrl}/m/${ctx.flow.id}`);
+      const url = String(params.url ?? miniAppUrl(ctx));
       const text = await interpolateAndLog(
         String(params.text ?? "Откройте Mini App, чтобы продолжить."),
         ctx,
@@ -531,12 +529,12 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   if (!secret || secret !== bot.webhook_secret) return new Response("bad secret", { status: 401 });
   if (bot.status === "paused") return new Response("paused", { status: 200 });
 
-  const { data: flowRow } = await supa.from("flows").select("id, nodes, edges").eq("id", bot.flow_id).maybeSingle();
+  const { data: flowRow } = await supa.from("flows").select("id, slug, nodes, edges").eq("id", bot.flow_id).maybeSingle();
   if (!flowRow) {
     await supa.from("bots").update({ status: "error", last_error: "flow missing" }).eq("id", botId);
     return new Response("flow missing", { status: 200 });
   }
-  const flow: Flow = { id: flowRow.id, nodes: flowRow.nodes ?? [], edges: flowRow.edges ?? [] };
+  const flow: Flow = { id: flowRow.id, slug: flowRow.slug, nodes: flowRow.nodes ?? [], edges: flowRow.edges ?? [] };
 
   const message = update.message;
   const callback = update.callback_query;
