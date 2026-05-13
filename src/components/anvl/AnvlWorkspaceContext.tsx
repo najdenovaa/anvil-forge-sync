@@ -303,9 +303,9 @@ export function AnvlWorkspaceProvider({
   }, []);
 
   // ── Composite menu-section helpers ────────────────────────────────────
-  // Buttons in keyboard.inline params are stored as text lines "label|action".
-  // We pick action = `screen:${section_msg_id}` so removeMenuSection can
-  // identify the menu button by string match (reliable hint).
+  // Buttons are stored as a JSON-serialized array of {label, action} so that
+  // both legacy add_node-built menus (JSON) and composite-built menus stay
+  // compatible. parseMenuButtons handles either format on read.
   const addMenuSection = useCallback(
     (args: {
       menu_id: string;
@@ -334,9 +334,14 @@ export function AnvlWorkspaceProvider({
           return prev;
         }
         const baseIdx = prev.length;
-        const existingButtons = String((menu.data?.params as any)?.buttons ?? "").trim();
-        const newButtonLine = `${args.button_label}|${buttonAction}`;
-        const nextButtons = existingButtons ? `${existingButtons}\n${newButtonLine}` : newButtonLine;
+        const existing = parseMenuButtons((menu.data?.params as any)?.buttons);
+        const nextButtons = serializeMenuButtons([
+          ...existing,
+          { label: args.button_label, action: buttonAction },
+        ]);
+        const backButtons = serializeMenuButtons([
+          { label: backLabel, action: "back_to_menu" },
+        ]);
 
         return prev
           .map((n) =>
@@ -370,7 +375,7 @@ export function AnvlWorkspaceProvider({
                 kind: "keyboard.inline",
                 title: `Назад → ${args.menu_id}`,
                 preview: backLabel,
-                params: { buttons: `${backLabel}|back_to_menu` },
+                params: { buttons: backButtons },
               },
             },
           ]);
@@ -397,37 +402,32 @@ export function AnvlWorkspaceProvider({
     (args: { menu_id: string; section_msg_id: string }) => {
       const buttonAction = `screen:${args.section_msg_id}`;
 
-      // Find back_kb: any keyboard.inline node that section_msg_id has an edge to.
-      let backKbId: string | null = null;
-      let snapshotNodes: Node[] = [];
-      let snapshotEdges: Edge[] = [];
-      setNodes((ns) => { snapshotNodes = ns; return ns; });
-      setEdges((es) => { snapshotEdges = es; return es; });
-      const backEdge = snapshotEdges.find(
+      // Find back_kb synchronously from refs BEFORE any state updates.
+      const currentNodes = nodesRef.current;
+      const currentEdges = edgesRef.current;
+      const backEdge = currentEdges.find(
         (e) =>
           e.source === args.section_msg_id &&
-          snapshotNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
+          currentNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
       );
-      backKbId = backEdge?.target ?? null;
+      const backKbId: string | null = backEdge?.target ?? null;
 
       setNodes((prev) =>
         prev
           .filter((n) => n.id !== args.section_msg_id && n.id !== backKbId)
           .map((n) => {
             if (n.id !== args.menu_id || n.data?.kind !== "keyboard.inline") return n;
-            const buttonsStr = String((n.data?.params as any)?.buttons ?? "");
-            const filtered = buttonsStr
-              .split(/\r?\n/)
-              .filter((line) => {
-                const [, action] = line.split("|").map((p) => p.trim());
-                return action !== buttonAction;
-              })
-              .join("\n");
+            const filtered = parseMenuButtons((n.data?.params as any)?.buttons).filter(
+              (b) => b.action !== buttonAction,
+            );
             return {
               ...n,
               data: {
                 ...n.data,
-                params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: filtered },
+                params: {
+                  ...((n.data?.params as Record<string, string>) ?? {}),
+                  buttons: serializeMenuButtons(filtered),
+                },
               },
             };
           }),
@@ -456,20 +456,17 @@ export function AnvlWorkspaceProvider({
       setNodes((prev) =>
         prev.map((n) => {
           if (n.id === args.menu_id && n.data?.kind === "keyboard.inline" && args.new_button_label) {
-            const buttonsStr = String((n.data?.params as any)?.buttons ?? "");
-            const updated = buttonsStr
-              .split(/\r?\n/)
-              .map((line) => {
-                const [, action] = line.split("|").map((p) => p.trim());
-                if (action === buttonAction) return `${args.new_button_label}|${buttonAction}`;
-                return line;
-              })
-              .join("\n");
+            const updated = parseMenuButtons((n.data?.params as any)?.buttons).map((b) =>
+              b.action === buttonAction ? { ...b, label: args.new_button_label! } : b,
+            );
             return {
               ...n,
               data: {
                 ...n.data,
-                params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: updated },
+                params: {
+                  ...((n.data?.params as Record<string, string>) ?? {}),
+                  buttons: serializeMenuButtons(updated),
+                },
               },
             };
           }
@@ -490,8 +487,6 @@ export function AnvlWorkspaceProvider({
     },
     [],
   );
-
-  const serializeCanvas = useCallback(() => {
     const abbreviate = (kind: string, params: Record<string, string>) => {
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(params ?? {})) {
