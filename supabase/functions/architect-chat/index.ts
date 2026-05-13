@@ -495,16 +495,21 @@ function buildTools(miniAppEnabled: boolean) {
     },
   ];
 
-  if (miniAppEnabled) {
-    tools.push({
-      type: "function",
-      function: {
-        name: "set_miniapp",
-        description: "Merge a patch into the mini-app spec (title, accent, hero, items, plans, tabs, stats).",
-        parameters: { type: "object", additionalProperties: true },
-      },
-    });
-  }
+  // set_miniapp is ALWAYS available — the architect is required to populate
+  // mini-app content whenever the canvas contains a miniapp.screen node.
+  tools.push({
+    type: "function",
+    function: {
+      name: "set_miniapp",
+      description:
+        "REQUIRED whenever the flow contains a miniapp.screen node. Merges a patch into flows.miniapp. " +
+        "Provide a complete spec: { title, subtitle, accent, itemsLabel, hero:{title,subtitle,cta,icon}, " +
+        "stats:[{label,value,unit?}], items:[{title,subtitle?,meta?,emoji?,badge?}], " +
+        "plans:[{id,name,price,unit?,description?,highlight?,features?[]}], tabs:[{id,label,icon?}] }. " +
+        "Domain-specific values only — never leave it empty.",
+      parameters: { type: "object", additionalProperties: true },
+    },
+  });
 
   return tools;
 }
