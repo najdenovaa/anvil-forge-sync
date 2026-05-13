@@ -487,6 +487,8 @@ export function AnvlWorkspaceProvider({
     },
     [],
   );
+
+  const serializeCanvas = useCallback(() => {
     const abbreviate = (kind: string, params: Record<string, string>) => {
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(params ?? {})) {
