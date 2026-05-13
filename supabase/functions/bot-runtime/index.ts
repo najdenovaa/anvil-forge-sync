@@ -245,6 +245,33 @@ async function executeFrom(ctx: RunCtx, startId: string, depth = 0): Promise<str
   return lastVisited;
 }
 
+/**
+ * If `node` has an outgoing edge to a keyboard.* node, render its buttons
+ * with the current template context and return them. Used so message.* nodes
+ * attach the adjacent keyboard to their own send call instead of relying on
+ * a separate auto-walk step (which used to cause infinite loops).
+ */
+function lookaheadKeyboard(
+  ctx: RunCtx,
+  node: FlowNode,
+): { kb: OutgoingKeyboard } | null {
+  const edges = nextEdges(ctx.flow, node.id);
+  for (const e of edges) {
+    const tgt = findNode(ctx.flow, e.target);
+    const k = tgt?.data?.kind;
+    if (k !== "keyboard.inline" && k !== "keyboard.reply") continue;
+    const tplCtx = buildTplCtx(ctx);
+    const raw = (tgt!.data!.params as Record<string, any> | undefined)?.buttons;
+    const buttons = parseButtons(raw).map((b) => ({
+      label: renderTemplate(b.label, tplCtx),
+      action: renderTemplate(b.action, tplCtx),
+    }));
+    if (k === "keyboard.inline") return { kb: { inline: buttons } };
+    return { kb: { reply: buttons } };
+  }
+  return null;
+}
+
 async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PAUSE"> {
   const kind = node.data?.kind ?? "";
   const params = (node.data?.params ?? {}) as Record<string, any>;
