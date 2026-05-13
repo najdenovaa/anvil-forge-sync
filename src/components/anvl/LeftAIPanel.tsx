@@ -363,6 +363,9 @@ export function LeftAIPanel() {
         else if (name === "remove_node") removeAiNode(args.id);
         else if (name === "remove_edge") removeAiEdge(args.from, args.to, args.sourceHandle);
         else if (name === "rename_node") renameAiNode(args.id, args.label);
+        else if (name === "add_menu_section") addMenuSection(args);
+        else if (name === "remove_menu_section") removeMenuSection(args);
+        else if (name === "update_menu_section") updateMenuSection(args);
         // get_canvas is fulfilled server-side: the edge function injects a
         // tool_result with the live canvasSnapshot before continuing the
         // conversation. Nothing to apply on the client.
