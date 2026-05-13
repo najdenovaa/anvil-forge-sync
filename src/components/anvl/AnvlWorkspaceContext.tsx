@@ -594,7 +594,7 @@ export function AnvlWorkspaceProvider({
     edges,
     preview,
     miniapp: miniApp,
-    miniappEnabled,
+    miniappEnabled: miniAppEnabled,
     generatedCode,
     variables,
     onHydrate: hydrate,
