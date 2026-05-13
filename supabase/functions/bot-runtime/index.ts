@@ -317,7 +317,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       );
       const adj = lookaheadKeyboard(ctx, node);
       const reply_markup =
-        buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
+        buildReplyMarkup(adj?.kb, ctx) ?? buildReplyMarkup(ctx.pendingKeyboard, ctx);
       ctx.pendingKeyboard = undefined;
       if (adj?.kb?.reply) {
         ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
@@ -335,7 +335,7 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       const adj = lookaheadKeyboard(ctx, node);
       if (photo) {
         const reply_markup =
-          buildReplyMarkup(adj?.kb) ?? buildReplyMarkup(ctx.pendingKeyboard);
+          buildReplyMarkup(adj?.kb, ctx) ?? buildReplyMarkup(ctx.pendingKeyboard, ctx);
         ctx.pendingKeyboard = undefined;
         if (adj?.kb?.reply) {
           ctx.nextReplyKeyboardLabels = adj.kb.reply.map((b) => b.label);
