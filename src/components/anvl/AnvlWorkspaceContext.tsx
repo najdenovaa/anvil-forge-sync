@@ -445,25 +445,42 @@ export function AnvlWorkspaceProvider({
 
   const removeMenuSection = useCallback(
     (args: { menu_id: string; section_msg_id: string }) => {
-      const buttonAction = `screen:${args.section_msg_id}`;
-
-      // Find back_kb synchronously from refs BEFORE any state updates.
       const currentNodes = nodesRef.current;
       const currentEdges = edgesRef.current;
-      const backEdge = currentEdges.find(
-        (e) =>
-          e.source === args.section_msg_id &&
-          currentNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
+
+      // Derive sibling ids by convention; fall back to edge walk if missing.
+      const sectionId = args.section_msg_id.replace(/_msg$/, "");
+      const sectionTrigId = `${sectionId}_trig`;
+      const backKbByConv = `${sectionId}_back_kb`;
+
+      const backKbId =
+        (currentNodes.find((n) => n.id === backKbByConv) ? backKbByConv : null) ??
+        currentEdges.find(
+          (e) =>
+            e.source === args.section_msg_id &&
+            currentNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
+        )?.target ??
+        null;
+
+      // Find the callback_data this section is bound to (params.data on its
+      // trigger.callback node, if present) so we can drop the matching button.
+      const sectionTrig = currentNodes.find((n) => n.id === sectionTrigId);
+      const callbackData =
+        (sectionTrig?.data?.params as Record<string, string> | undefined)?.data ?? null;
+
+      const dropIds = new Set(
+        [args.section_msg_id, backKbId, sectionTrigId].filter(
+          (x): x is string => !!x,
+        ),
       );
-      const backKbId: string | null = backEdge?.target ?? null;
 
       setNodes((prev) =>
         prev
-          .filter((n) => n.id !== args.section_msg_id && n.id !== backKbId)
+          .filter((n) => !dropIds.has(n.id))
           .map((n) => {
             if (n.id !== args.menu_id || n.data?.kind !== "keyboard.inline") return n;
             const filtered = parseMenuButtons((n.data?.params as any)?.buttons).filter(
-              (b) => b.action !== buttonAction,
+              (b) => b.action !== callbackData && b.action !== `screen:${args.section_msg_id}`,
             );
             return {
               ...n,
@@ -479,12 +496,7 @@ export function AnvlWorkspaceProvider({
       );
 
       setEdges((prev) =>
-        prev.filter(
-          (e) =>
-            e.source !== args.section_msg_id &&
-            e.target !== args.section_msg_id &&
-            (backKbId === null || (e.source !== backKbId && e.target !== backKbId)),
-        ),
+        prev.filter((e) => !dropIds.has(e.source) && !dropIds.has(e.target)),
       );
     },
     [],
