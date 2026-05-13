@@ -15,6 +15,7 @@ import { lintFlow, type LintIssue } from "@/lib/flow-linter";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
 import type { FlowSnapshot, FlowVersionFull } from "@/lib/anvl-flow-storage";
 import { autoLayout } from "@/lib/anvl-autolayout";
+import { usePlatform } from "./PlatformContext";
 
 const DEFAULT_FLOW_SLUG = "default";
 
