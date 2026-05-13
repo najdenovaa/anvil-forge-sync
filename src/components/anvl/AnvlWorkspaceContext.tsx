@@ -584,7 +584,9 @@ export function AnvlWorkspaceProvider({
 
   const mergeMiniApp = useCallback((patch: Partial<AnvlMiniAppState>) => {
     setMiniApp((cur) => ({ ...cur, ...patch }));
-  }, []);
+    // Any architect-driven Mini App update implies the user wants Mini App mode.
+    setMiniAppEnabled(true);
+  }, [setMiniAppEnabled]);
 
   const { status: saveStatus, lastSavedAt, snapshotNow, flowId } = useFlowPersistence({
     slug,
@@ -592,6 +594,7 @@ export function AnvlWorkspaceProvider({
     edges,
     preview,
     miniapp: miniApp,
+    miniappEnabled,
     generatedCode,
     variables,
     onHydrate: hydrate,
