@@ -74,6 +74,22 @@ interface WorkspaceCtx {
   removeAiNode: (id: string) => void;
   removeAiEdge: (from: string, to: string, sourceHandle?: string) => void;
   renameAiNode: (id: string, label: string) => void;
+  addMenuSection: (args: {
+    menu_id: string;
+    button_label: string;
+    callback_data: string;
+    content_kind: "text" | "photo";
+    content: string;
+    section_id: string;
+    back_label?: string;
+  }) => void;
+  removeMenuSection: (args: { menu_id: string; section_msg_id: string }) => void;
+  updateMenuSection: (args: {
+    menu_id: string;
+    section_msg_id: string;
+    new_button_label?: string;
+    new_content?: string;
+  }) => void;
   serializeCanvas: () => {
     nodes: { id: string; kind: string; label: string; params: Record<string, string> }[];
     edges: { from: string; to: string; sourceHandle: string | null }[];
@@ -246,6 +262,195 @@ export function AnvlWorkspaceProvider({
     );
   }, []);
 
+  // ── Composite menu-section helpers ────────────────────────────────────
+  // Buttons in keyboard.inline params are stored as text lines "label|action".
+  // We pick action = `screen:${section_msg_id}` so removeMenuSection can
+  // identify the menu button by string match (reliable hint).
+  const addMenuSection = useCallback(
+    (args: {
+      menu_id: string;
+      button_label: string;
+      callback_data: string;
+      content_kind: "text" | "photo";
+      content: string;
+      section_id: string;
+      back_label?: string;
+    }) => {
+      const msgId = `${args.section_id}_msg`;
+      const backKbId = `${args.section_id}_back_kb`;
+      const backLabel = args.back_label ?? "« Назад в меню";
+      const buttonAction = `screen:${msgId}`;
+      const msgKind = args.content_kind === "photo" ? "message.photo" : "message.text";
+      const contentKey = args.content_kind === "photo" ? "photoUrl" : "text";
+
+      setNodes((prev) => {
+        const menu = prev.find((n) => n.id === args.menu_id);
+        if (!menu || menu.data?.kind !== "keyboard.inline") {
+          console.warn("addMenuSection: menu_id not found or not keyboard.inline", args.menu_id);
+          return prev;
+        }
+        if (prev.some((n) => n.id === msgId) || prev.some((n) => n.id === backKbId)) {
+          console.warn("addMenuSection: nodes already exist", msgId, backKbId);
+          return prev;
+        }
+        const baseIdx = prev.length;
+        const existingButtons = String((menu.data?.params as any)?.buttons ?? "").trim();
+        const newButtonLine = `${args.button_label}|${buttonAction}`;
+        const nextButtons = existingButtons ? `${existingButtons}\n${newButtonLine}` : newButtonLine;
+
+        return prev
+          .map((n) =>
+            n.id === args.menu_id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: nextButtons },
+                  },
+                }
+              : n,
+          )
+          .concat([
+            {
+              id: msgId,
+              type: "anvl",
+              position: { x: 40 + Math.floor(baseIdx / 2) * 280, y: 90 + (baseIdx % 2) * 170 },
+              data: {
+                kind: msgKind,
+                title: args.button_label,
+                preview: args.content.slice(0, 80),
+                params: { [contentKey]: args.content },
+              },
+            },
+            {
+              id: backKbId,
+              type: "anvl",
+              position: { x: 40 + Math.floor((baseIdx + 1) / 2) * 280, y: 90 + ((baseIdx + 1) % 2) * 170 },
+              data: {
+                kind: "keyboard.inline",
+                title: `Назад → ${args.menu_id}`,
+                preview: backLabel,
+                params: { buttons: `${backLabel}|back_to_menu` },
+              },
+            },
+          ]);
+      });
+
+      setEdges((prev) => {
+        const next = [...prev];
+        const add = (from: string, to: string) => {
+          const eid = `ai-${from}-${to}`;
+          if (!next.some((e) => e.id === eid)) {
+            next.push({ id: eid, source: from, target: to, animated: true });
+          }
+        };
+        add(args.menu_id, msgId);
+        add(msgId, backKbId);
+        add(backKbId, args.menu_id);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const removeMenuSection = useCallback(
+    (args: { menu_id: string; section_msg_id: string }) => {
+      const buttonAction = `screen:${args.section_msg_id}`;
+
+      // Find back_kb: any keyboard.inline node that section_msg_id has an edge to.
+      let backKbId: string | null = null;
+      let snapshotNodes: Node[] = [];
+      let snapshotEdges: Edge[] = [];
+      setNodes((ns) => { snapshotNodes = ns; return ns; });
+      setEdges((es) => { snapshotEdges = es; return es; });
+      const backEdge = snapshotEdges.find(
+        (e) =>
+          e.source === args.section_msg_id &&
+          snapshotNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
+      );
+      backKbId = backEdge?.target ?? null;
+
+      setNodes((prev) =>
+        prev
+          .filter((n) => n.id !== args.section_msg_id && n.id !== backKbId)
+          .map((n) => {
+            if (n.id !== args.menu_id || n.data?.kind !== "keyboard.inline") return n;
+            const buttonsStr = String((n.data?.params as any)?.buttons ?? "");
+            const filtered = buttonsStr
+              .split(/\r?\n/)
+              .filter((line) => {
+                const [, action] = line.split("|").map((p) => p.trim());
+                return action !== buttonAction;
+              })
+              .join("\n");
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: filtered },
+              },
+            };
+          }),
+      );
+
+      setEdges((prev) =>
+        prev.filter(
+          (e) =>
+            e.source !== args.section_msg_id &&
+            e.target !== args.section_msg_id &&
+            (backKbId === null || (e.source !== backKbId && e.target !== backKbId)),
+        ),
+      );
+    },
+    [],
+  );
+
+  const updateMenuSection = useCallback(
+    (args: {
+      menu_id: string;
+      section_msg_id: string;
+      new_button_label?: string;
+      new_content?: string;
+    }) => {
+      const buttonAction = `screen:${args.section_msg_id}`;
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (n.id === args.menu_id && n.data?.kind === "keyboard.inline" && args.new_button_label) {
+            const buttonsStr = String((n.data?.params as any)?.buttons ?? "");
+            const updated = buttonsStr
+              .split(/\r?\n/)
+              .map((line) => {
+                const [, action] = line.split("|").map((p) => p.trim());
+                if (action === buttonAction) return `${args.new_button_label}|${buttonAction}`;
+                return line;
+              })
+              .join("\n");
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                params: { ...((n.data?.params as Record<string, string>) ?? {}), buttons: updated },
+              },
+            };
+          }
+          if (n.id === args.section_msg_id && args.new_content !== undefined) {
+            const kind = (n.data?.kind as string) ?? "message.text";
+            const key = kind === "message.photo" ? "photoUrl" : "text";
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                params: { ...((n.data?.params as Record<string, string>) ?? {}), [key]: args.new_content },
+              },
+            };
+          }
+          return n;
+        }),
+      );
+    },
+    [],
+  );
+
   const serializeCanvas = useCallback(() => {
     const abbreviate = (kind: string, params: Record<string, string>) => {
       const out: Record<string, string> = {};
@@ -303,11 +508,12 @@ export function AnvlWorkspaceProvider({
       addAiNode, connectAiNodes, updateAiNodeParam,
       removeAiNode, removeAiEdge, renameAiNode, serializeCanvas,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
+      addMenuSection, removeMenuSection, updateMenuSection,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
       lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, addMenuSection, removeMenuSection, updateMenuSection, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

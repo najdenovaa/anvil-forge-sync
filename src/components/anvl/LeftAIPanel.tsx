@@ -120,6 +120,12 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Разрываю связь ${args.from} → ${args.to}${args.sourceHandle ? ` (${args.sourceHandle})` : ""}`;
     case "rename_node":
       return `Переименовываю ${args.id}: ${args.label}`;
+    case "add_menu_section":
+      return `Добавил раздел «${args.button_label ?? args.section_id}» в меню`;
+    case "remove_menu_section":
+      return `Удалил раздел ${args.section_msg_id}`;
+    case "update_menu_section":
+      return `Обновил раздел ${args.section_msg_id}${args.new_button_label ? ` → «${args.new_button_label}»` : ""}`;
     default:
       return name;
   }
@@ -220,6 +226,9 @@ export function LeftAIPanel() {
     resetAiCanvas,
     relayoutCanvas,
     setVariables,
+    addMenuSection,
+    removeMenuSection,
+    updateMenuSection,
     nodes,
     edges,
     slug,
@@ -354,6 +363,9 @@ export function LeftAIPanel() {
         else if (name === "remove_node") removeAiNode(args.id);
         else if (name === "remove_edge") removeAiEdge(args.from, args.to, args.sourceHandle);
         else if (name === "rename_node") renameAiNode(args.id, args.label);
+        else if (name === "add_menu_section") addMenuSection(args);
+        else if (name === "remove_menu_section") removeMenuSection(args);
+        else if (name === "update_menu_section") updateMenuSection(args);
         // get_canvas is fulfilled server-side: the edge function injects a
         // tool_result with the live canvasSnapshot before continuing the
         // conversation. Nothing to apply on the client.
