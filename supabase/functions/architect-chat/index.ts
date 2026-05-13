@@ -495,16 +495,21 @@ function buildTools(miniAppEnabled: boolean) {
     },
   ];
 
-  if (miniAppEnabled) {
-    tools.push({
-      type: "function",
-      function: {
-        name: "set_miniapp",
-        description: "Merge a patch into the mini-app spec (title, accent, hero, items, plans, tabs, stats).",
-        parameters: { type: "object", additionalProperties: true },
-      },
-    });
-  }
+  // set_miniapp is ALWAYS available — the architect is required to populate
+  // mini-app content whenever the canvas contains a miniapp.screen node.
+  tools.push({
+    type: "function",
+    function: {
+      name: "set_miniapp",
+      description:
+        "REQUIRED whenever the flow contains a miniapp.screen node. Merges a patch into flows.miniapp. " +
+        "Provide a complete spec: { title, subtitle, accent, itemsLabel, hero:{title,subtitle,cta,icon}, " +
+        "stats:[{label,value,unit?}], items:[{title,subtitle?,meta?,emoji?,badge?}], " +
+        "plans:[{id,name,price,unit?,description?,highlight?,features?[]}], tabs:[{id,label,icon?}] }. " +
+        "Domain-specific values only — never leave it empty.",
+      parameters: { type: "object", additionalProperties: true },
+    },
+  });
 
   return tools;
 }
@@ -593,8 +598,19 @@ the user can try it. Be specific to the domain. Do NOT call any tools.
 Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
       toolDefs = undefined;
     } else {
-      systemPrompt = buildPrompt(miniApp, platform) + describeSnapshot(flowSnapshot);
-      toolDefs = enableTools ? buildTools(miniApp) : undefined;
+      // Auto-enable miniapp mode if the canvas already has a miniapp.screen
+      // node (architect must keep building/refining its content) or the user
+      // mentions "mini app" / "мини апп" / "webapp" in the latest message.
+      const canvasNodes = Array.isArray(canvasSnapshot?.nodes) ? canvasSnapshot!.nodes : [];
+      const hasMiniAppNode = canvasNodes.some(
+        (n: any) => typeof n?.kind === "string" && n.kind === "miniapp.screen",
+      );
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+      const wantsMiniApp = /mini\s*app|мини[-\s]?апп|web[-\s]?app|вебап/i.test(lastUserMsg);
+      const effectiveMiniApp = miniApp || hasMiniAppNode || wantsMiniApp;
+
+      systemPrompt = buildPrompt(effectiveMiniApp, platform) + describeSnapshot(flowSnapshot);
+      toolDefs = enableTools ? buildTools(effectiveMiniApp) : undefined;
     }
 
     const canvasResult = JSON.stringify(
