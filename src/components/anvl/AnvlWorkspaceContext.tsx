@@ -56,6 +56,41 @@ const initialEdges: Edge[] = [
   { id: "e1-3", source: "1", target: "3", animated: true },
 ];
 
+type MenuButton = { label: string; action: string };
+
+function parseMenuButtons(raw: unknown): MenuButton[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((b: any) => ({
+        label: String(b?.label ?? b?.text ?? b?.title ?? "").trim(),
+        action: String(b?.action ?? b?.callback_data ?? b?.value ?? "").trim(),
+      }))
+      .filter((b) => b.label);
+  }
+  const s = String(raw).trim();
+  if (!s) return [];
+  if (s.startsWith("[")) {
+    try {
+      return parseMenuButtons(JSON.parse(s));
+    } catch {
+      /* fallthrough */
+    }
+  }
+  return s
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, action] = line.split("|").map((p) => p.trim());
+      return { label, action: action || label };
+    });
+}
+
+function serializeMenuButtons(buttons: MenuButton[]): string {
+  return JSON.stringify(buttons);
+}
+
 interface WorkspaceCtx {
   nodes: Node[];
   edges: Edge[];
