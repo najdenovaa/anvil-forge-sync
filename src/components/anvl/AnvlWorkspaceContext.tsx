@@ -13,6 +13,7 @@ import type {
   AnvlBlueprint,
   AnvlMiniAppState,
   AnvlPreviewState,
+  MiniAppCart,
   MiniAppHero,
   MiniAppItem,
   MiniAppPlanCard,
@@ -160,6 +161,7 @@ interface WorkspaceCtx {
   addMiniAppPlan: (plan: MiniAppPlanCard) => void;
   clearMiniAppItems: () => void;
   clearMiniAppPlans: () => void;
+  setMiniAppCart: (cart: Partial<MiniAppCart>) => void;
   resetAiCanvas: () => void;
   relayoutCanvas: () => void;
   saveStatus: SaveStatus;
@@ -713,6 +715,29 @@ export function AnvlWorkspaceProvider({
     mergeMiniApp({ plans: [] });
     setMiniAppEnabled(true);
   }, [mergeMiniApp, setMiniAppEnabled]);
+  const setMiniAppCart = useCallback(
+    (cart: Partial<MiniAppCart>) => {
+      // Normalize: ensure all four fields are present with sane defaults.
+      // Architect can call set_miniapp_cart({enabled: true}) and get a
+      // working order flow without specifying every knob.
+      const normalized: MiniAppCart = {
+        enabled: !!cart.enabled,
+        sendAction:
+          typeof cart.sendAction === "string" && cart.sendAction.trim()
+            ? cart.sendAction.trim()
+            : "order",
+        currency:
+          typeof cart.currency === "string" && cart.currency.trim() ? cart.currency.trim() : "₽",
+        ctaLabel:
+          typeof cart.ctaLabel === "string" && cart.ctaLabel.trim()
+            ? cart.ctaLabel.trim()
+            : "Оформить заказ",
+      };
+      mergeMiniApp({ cart: normalized });
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
 
   const {
     status: saveStatus,
@@ -774,6 +799,7 @@ export function AnvlWorkspaceProvider({
       addMiniAppPlan,
       clearMiniAppItems,
       clearMiniAppPlans,
+      setMiniAppCart,
       addMenuSection,
       removeMenuSection,
       updateMenuSection,
@@ -812,6 +838,7 @@ export function AnvlWorkspaceProvider({
       addMiniAppPlan,
       clearMiniAppItems,
       clearMiniAppPlans,
+      setMiniAppCart,
       addMenuSection,
       removeMenuSection,
       updateMenuSection,
