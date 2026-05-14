@@ -144,7 +144,7 @@ interface WorkspaceCtx {
   };
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
-  initMiniApp: (args: { title: string; subtitle?: string; accent?: AnvlMiniAppState["accent"]; itemsLabel?: string; theme?: AnvlMiniAppState["theme"] }) => void;
+  initMiniApp: (args: { title: string; subtitle?: string; accent?: AnvlMiniAppState["accent"]; itemsLabel?: string; theme?: "light" | "dark" }) => void;
   setMiniAppHero: (hero: MiniAppHero) => void;
   setMiniAppStats: (stats: MiniAppStat[]) => void;
   setMiniAppTabs: (tabs: MiniAppTabSpec[]) => void;
