@@ -581,7 +581,18 @@ function buildTools(miniAppEnabled: boolean) {
         name: "init_miniapp",
         description:
           "Инициализировать или обновить верхнеуровневые поля Mini App (title, subtitle, accent, itemsLabel, theme: 'light'|'dark'). Вызывай ПЕРВЫМ при сборке Mini App. theme по умолчанию 'dark'. accent — цвет акцента ('orange', 'blue', 'green', 'purple' и т.д.).",
-        parameters: { type: "object", additionalProperties: true, required: ["title"] },
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            subtitle: { type: "string" },
+            accent: { type: "string" },
+            itemsLabel: { type: "string" },
+            theme: { type: "string" },
+          },
+          required: ["title"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -590,7 +601,18 @@ function buildTools(miniAppEnabled: boolean) {
         name: "set_miniapp_hero",
         description:
           "Установить hero-карточку Mini App (большая карточка вверху с CTA-кнопкой). title — заголовок, subtitle — подзаголовок, cta — текст основной кнопки, icon — короткий emoji или имя icon-key, image — URL картинки (опционально).",
-        parameters: { type: "object", additionalProperties: true, required: ["title", "cta"] },
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            subtitle: { type: "string" },
+            cta: { type: "string" },
+            icon: { type: "string" },
+            image: { type: "string" },
+          },
+          required: ["title", "cta"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -599,7 +621,26 @@ function buildTools(miniAppEnabled: boolean) {
         name: "set_miniapp_stats",
         description:
           "Установить блок статистики (3-4 показателя в шапке). Перезаписывает массив целиком. unit опционален (например '/5', '%').",
-        parameters: { type: "object", additionalProperties: true, required: ["stats"] },
+        parameters: {
+          type: "object",
+          properties: {
+            stats: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  value: { type: "string" },
+                  unit: { type: "string" },
+                },
+                required: ["label", "value"],
+                additionalProperties: true,
+              },
+            },
+          },
+          required: ["stats"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -608,7 +649,26 @@ function buildTools(miniAppEnabled: boolean) {
         name: "set_miniapp_tabs",
         description:
           "Установить нижние табы Mini App. Перезаписывает массив целиком. id — латиницей короткий ключ, label — видимая подпись. Обычно 3-4 таба: 'home', 'items', 'plans', 'profile'.",
-        parameters: { type: "object", additionalProperties: true, required: ["tabs"] },
+        parameters: {
+          type: "object",
+          properties: {
+            tabs: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  label: { type: "string" },
+                  icon: { type: "string" },
+                },
+                required: ["id", "label"],
+                additionalProperties: true,
+              },
+            },
+          },
+          required: ["tabs"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -617,7 +677,19 @@ function buildTools(miniAppEnabled: boolean) {
         name: "add_miniapp_item",
         description:
           "Добавить ОДИН элемент в список items Mini App (товар, услуга, локация). title — обязателен, subtitle — описание, meta — цена / длительность / любое мета-поле, emoji — короткий эмодзи в левом углу карточки, badge — текст бейджа ('Хит', 'Новинка'), image — URL картинки. Вызывай ОТДЕЛЬНО для каждого элемента.",
-        parameters: { type: "object", additionalProperties: true, required: ["title"] },
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            subtitle: { type: "string" },
+            meta: { type: "string" },
+            emoji: { type: "string" },
+            badge: { type: "string" },
+            image: { type: "string" },
+          },
+          required: ["title"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -626,7 +698,20 @@ function buildTools(miniAppEnabled: boolean) {
         name: "add_miniapp_plan",
         description:
           "Добавить ОДИН тариф/план в список plans Mini App. id — короткий латинский ключ, name — отображаемое имя, price — цена строкой ('990', 'от 1500'), unit — '₽', '$/мес' и т.д., description — описание, highlight: true помечает план как рекомендуемый, features — массив строк-преимуществ. Вызывай ОТДЕЛЬНО для каждого плана.",
-        parameters: { type: "object", additionalProperties: true, required: ["id", "name", "price"] },
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            price: { type: "string" },
+            unit: { type: "string" },
+            description: { type: "string" },
+            highlight: { type: "boolean" },
+            features: { type: "array", items: { type: "string" } },
+          },
+          required: ["id", "name", "price"],
+          additionalProperties: true,
+        },
       },
     },
     {
@@ -635,7 +720,7 @@ function buildTools(miniAppEnabled: boolean) {
         name: "clear_miniapp_items",
         description:
           "Очистить список items в Mini App (items = []). Вызывай перед серией add_miniapp_item при редактировании, чтобы не накапливать дубли.",
-        parameters: { type: "object", additionalProperties: true },
+        parameters: { type: "object", properties: {}, additionalProperties: true },
       },
     },
     {
@@ -644,10 +729,9 @@ function buildTools(miniAppEnabled: boolean) {
         name: "clear_miniapp_plans",
         description:
           "Очистить список plans в Mini App (plans = []). Вызывай перед серией add_miniapp_plan при редактировании.",
-        parameters: { type: "object", additionalProperties: true },
+        parameters: { type: "object", properties: {}, additionalProperties: true },
       },
     },
-  );
 
   return tools;
 }
