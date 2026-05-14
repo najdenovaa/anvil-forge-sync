@@ -815,13 +815,11 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               }
             }
 
-            // Decide: any get_canvas calls? If so, satisfy ALL collected tool_calls
-            // with synthetic results and run another round. Otherwise — finalize.
-            const hasGetCanvas = Array.from(roundCalls.values()).some(
-              (c) => c.name === "get_canvas",
-            );
-
-            if (!hasGetCanvas || roundCalls.size === 0) {
+            // End the conversation ONLY when the model stopped calling tools.
+            // While the model keeps making tool_calls, we feed synthetic results
+            // back and run another round — this gives it room to break a big task
+            // into multiple turns instead of hedging with "task too big" text.
+            if (roundCalls.size === 0) {
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
