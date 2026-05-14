@@ -887,6 +887,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           }
 
           // Safety cap reached.
+          console.log(`[architect-chat] FINISHED at safety cap (8 rounds), exit_reason=cap`);
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (err) {
