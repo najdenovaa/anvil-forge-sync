@@ -302,7 +302,7 @@ function resolveModel(input?: string): string {
 
 function convertMessagesToAnthropic(
   messages: Array<{ role: string; content: any; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
-): { system: string; messages: any[] } {
+): { system: any; messages: any[] } {
   let systemText = "";
   const out: any[] = [];
 
@@ -370,12 +370,21 @@ function convertMessagesToAnthropic(
   }
   flushPendingUser();
 
-  return { system: systemText, messages: out };
+  // Return system as a cacheable content-block array. Anthropic prompt caching
+  // marks the system prompt as a cache breakpoint with cache_control: ephemeral
+  // (5-min TTL). Cached input tokens are billed at 10% AND don't count against
+  // the ITPM rate limit — which is critical for staying under the Tier 1 cap
+  // of 30K input tokens/min on Sonnet 4.6.
+  const system = systemText
+    ? [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }]
+    : undefined;
+
+  return { system, messages: out };
 }
 
 function convertToolsToAnthropic(toolDefs: any[] | undefined): any[] | undefined {
   if (!toolDefs || toolDefs.length === 0) return undefined;
-  return toolDefs.map((t) => {
+  const out = toolDefs.map((t) => {
     const fn = t.function ?? t;
     const params = fn.parameters ?? { type: "object", properties: {} };
     // Anthropic accepts standard JSON Schema and does NOT reject
@@ -386,6 +395,15 @@ function convertToolsToAnthropic(toolDefs: any[] | undefined): any[] | undefined
       input_schema: params,
     };
   });
+  // Mark the LAST tool with cache_control: ephemeral. This caches the entire
+  // tools[] array (Anthropic caches contiguous prefix from start through this
+  // marker). Together with system-prompt caching, this removes ~17K tokens
+  // (BASE_PROMPT + 14 tool schemas) from the ITPM rate-limit counter on
+  // every subsequent request within the 5-min cache window.
+  if (out.length > 0) {
+    out[out.length - 1] = { ...out[out.length - 1], cache_control: { type: "ephemeral" } };
+  }
+  return out;
 }
 
 function buildPrompt(miniAppEnabled: boolean, platform: string): string {
