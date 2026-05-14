@@ -1,4 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home,
@@ -8,6 +15,10 @@ import {
   ChevronRight,
   Check,
   ShoppingBag,
+  ShoppingCart,
+  Plus,
+  Minus,
+  X,
   Utensils,
   Plane,
   Music,
@@ -199,6 +210,94 @@ export function DynamicMiniAppView({
 
   const [tabId, setTabId] = useState(initialTabId);
 
+  // ---------- Cart state (Level 2A) ----------
+  // Cart is keyed by item.title (assumed unique within a Mini App). Values
+  // are quantities. Lives in component state — closing the Mini App resets
+  // it, which is fine for v1 (each order is a fresh session). Future: move
+  // to Telegram.WebApp.CloudStorage for persistence across reopens.
+  const [cart, setCart] = useState<Map<string, number>>(() => new Map());
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const cartConfig = miniApp.cart;
+  const cartEnabled = !!cartConfig?.enabled;
+  const cartCurrency = cartConfig?.currency ?? "₽";
+
+  // Enriched cart items with original item data (for thumb, badge, etc.).
+  // We also clamp against the current items array — if an item was removed
+  // from the Mini App after being added to the cart, it disappears too.
+  const cartItems = useMemo(() => {
+    const items = miniApp.items ?? [];
+    return items
+      .filter((i) => cart.has(i.title))
+      .map((i) => ({ item: i, qty: cart.get(i.title) ?? 0 }));
+  }, [cart, miniApp.items]);
+
+  const cartTotal = useMemo(
+    () => cartItems.reduce((sum, { item, qty }) => sum + (item.priceNumeric ?? 0) * qty, 0),
+    [cartItems],
+  );
+
+  const cartCount = useMemo(() => cartItems.reduce((sum, { qty }) => sum + qty, 0), [cartItems]);
+
+  const addToCart = useCallback((item: MiniAppItem) => {
+    setCart((prev) => {
+      const next = new Map(prev);
+      next.set(item.title, (next.get(item.title) ?? 0) + 1);
+      return next;
+    });
+    // Haptic feedback when running inside real Telegram. The mock in preview
+    // also responds (logs the event).
+    const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+    tg?.HapticFeedback?.selectionChanged?.();
+  }, []);
+
+  const removeFromCart = useCallback((title: string) => {
+    setCart((prev) => {
+      const cur = prev.get(title) ?? 0;
+      if (cur <= 0) return prev;
+      const next = new Map(prev);
+      if (cur <= 1) next.delete(title);
+      else next.set(title, cur - 1);
+      return next;
+    });
+    const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+    tg?.HapticFeedback?.selectionChanged?.();
+  }, []);
+
+  const deleteFromCart = useCallback((title: string) => {
+    setCart((prev) => {
+      if (!prev.has(title)) return prev;
+      const next = new Map(prev);
+      next.delete(title);
+      return next;
+    });
+  }, []);
+
+  const submitCart = useCallback(() => {
+    if (cartCount === 0) return;
+    const payload = {
+      action: cartConfig?.sendAction ?? "order",
+      items: cartItems.map(({ item, qty }) => ({
+        title: item.title,
+        price: item.priceNumeric ?? 0,
+        qty,
+      })),
+      total: cartTotal,
+      currency: cartCurrency,
+    };
+    const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+    if (tg) {
+      tg.HapticFeedback?.notificationOccurred?.("success");
+      tg.sendData?.(JSON.stringify(payload));
+      // Inside real Telegram, sendData also closes the Mini App. In preview,
+      // we mimic this: clear the cart and close the sheet so the user sees
+      // a clean state. The mock logs the payload to console for debugging.
+    }
+    setCart(new Map());
+    setSheetOpen(false);
+  }, [cartCount, cartItems, cartTotal, cartConfig, cartCurrency]);
+  // ---------- /Cart state ----------
+
   useEffect(() => {
     if (view === "miniapp") {
       const next =
@@ -269,6 +368,10 @@ export function DynamicMiniAppView({
                 hero={miniApp.hero}
                 stats={miniApp.stats}
                 items={miniApp.items?.slice(0, layout === "grid" ? 4 : 2)}
+                cartEnabled={cartEnabled}
+                cart={cart}
+                onAddToCart={addToCart}
+                onRemoveFromCart={removeFromCart}
               />
             )}
             {tabId !== "home" && tabId !== "plans" && tabId !== "profile" && (
@@ -278,6 +381,10 @@ export function DynamicMiniAppView({
                 layout={layout}
                 items={miniApp.items}
                 label={miniApp.itemsLabel}
+                cartEnabled={cartEnabled}
+                cart={cart}
+                onAddToCart={addToCart}
+                onRemoveFromCart={removeFromCart}
               />
             )}
             {tabId === "plans" && (
@@ -294,6 +401,38 @@ export function DynamicMiniAppView({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Sticky cart bar (Level 2A) — sits above bottom tabs, visible from any
+          tab when cart is enabled AND has items. Tap opens bottom-sheet. */}
+      {cartEnabled && cartCount > 0 && (
+        <button
+          onClick={() => setSheetOpen(true)}
+          className={cn(
+            "flex items-center justify-between gap-2 border-t px-3 py-2 text-left transition-colors",
+            useDarkTheme
+              ? "border-white/5 bg-[oklch(0.22_0.03_260)] hover:bg-[oklch(0.25_0.03_260)]"
+              : "border-black/5 bg-white hover:bg-black/[0.02]",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white"
+              style={{ backgroundColor: accentColor }}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-semibold leading-tight">
+                {cartCount} · {cartTotal} {cartCurrency}
+              </span>
+              <span className="text-[8.5px] opacity-50">
+                {cartConfig?.ctaLabel ?? "Оформить заказ"}
+              </span>
+            </div>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 opacity-50" />
+        </button>
+      )}
 
       {/* Bottom tabs */}
       <div
@@ -326,6 +465,116 @@ export function DynamicMiniAppView({
           );
         })}
       </div>
+
+      {/* Bottom-sheet for cart contents — overlays everything when sheetOpen.
+          Tapping the dimmed area closes it; the CTA at the bottom submits
+          via Telegram.WebApp.sendData and clears the cart. */}
+      <AnimatePresence>
+        {sheetOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 z-50 flex flex-col bg-black/40"
+            onClick={() => setSheetOpen(false)}
+          >
+            <div className="flex-1" />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "flex max-h-[80%] flex-col rounded-t-2xl px-3 pb-3 pt-2",
+                useDarkTheme
+                  ? "bg-[oklch(0.22_0.03_260)] text-white"
+                  : "bg-white text-[oklch(0.16_0_0)]",
+              )}
+            >
+              {/* Handle */}
+              <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-black/15 dark:bg-white/15" />
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[12px] font-semibold">
+                  {cartConfig?.ctaLabel ?? "Оформить заказ"}
+                </span>
+                <button
+                  onClick={() => setSheetOpen(false)}
+                  className="rounded-full p-1 opacity-50 hover:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {/* Scrollable item list */}
+              <div className="flex-1 space-y-1.5 overflow-y-auto">
+                {cartItems.map(({ item, qty }) => (
+                  <div
+                    key={item.title}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-2 py-1.5",
+                      useDarkTheme ? "bg-white/5" : "bg-black/[0.03]",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[10.5px] font-medium">{item.title}</div>
+                      <div className="text-[9px] opacity-50">
+                        {item.priceNumeric ?? 0} {cartCurrency}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => removeFromCart(item.title)}
+                        className={cn(
+                          "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                          useDarkTheme
+                            ? "bg-white/10 hover:bg-white/20"
+                            : "bg-black/[0.06] hover:bg-black/10",
+                        )}
+                        aria-label="-"
+                      >
+                        <Minus className="h-2.5 w-2.5" />
+                      </button>
+                      <span className="w-5 text-center text-[10px] font-semibold tabular-nums">
+                        {qty}
+                      </span>
+                      <button
+                        onClick={() => addToCart(item)}
+                        className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white"
+                        style={{ backgroundColor: accentColor }}
+                        aria-label="+"
+                      >
+                        <Plus className="h-2.5 w-2.5" />
+                      </button>
+                      <button
+                        onClick={() => deleteFromCart(item.title)}
+                        className="ml-0.5 rounded-full p-1 opacity-40 hover:opacity-100"
+                        aria-label="remove"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Total + submit */}
+              <div className="mt-2 flex items-center justify-between border-t pt-2 border-black/5 dark:border-white/10">
+                <span className="text-[10px] opacity-60">Итого</span>
+                <span className="text-[13px] font-semibold tabular-nums">
+                  {cartTotal} {cartCurrency}
+                </span>
+              </div>
+              <button
+                onClick={submitCart}
+                className="mt-2 w-full rounded-xl py-2.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: accentColor }}
+              >
+                {cartConfig?.ctaLabel ?? "Оформить заказ"} · {cartTotal} {cartCurrency}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -338,6 +587,10 @@ function HomeTab({
   hero,
   stats,
   items,
+  cartEnabled,
+  cart,
+  onAddToCart,
+  onRemoveFromCart,
 }: {
   isTg: boolean;
   useDarkTheme: boolean;
@@ -353,6 +606,10 @@ function HomeTab({
   };
   stats?: MiniAppStat[];
   items?: MiniAppItem[];
+  cartEnabled?: boolean;
+  cart?: Map<string, number>;
+  onAddToCart?: (item: MiniAppItem) => void;
+  onRemoveFromCart?: (title: string) => void;
 }) {
   const { t } = useI18n();
   const HeroIcon = pickIcon(hero?.icon, Sparkles);
@@ -434,7 +691,16 @@ function HomeTab({
 
       {items && items.length > 0 && (
         <div className="mt-4">
-          <ItemsList items={items} layout={layout} isTg={isTg} accentColor={accentColor} />
+          <ItemsList
+            items={items}
+            layout={layout}
+            isTg={isTg}
+            accentColor={accentColor}
+            cartEnabled={cartEnabled}
+            cart={cart}
+            onAddToCart={onAddToCart}
+            onRemoveFromCart={onRemoveFromCart}
+          />
         </div>
       )}
     </div>
@@ -447,12 +713,20 @@ function ItemsTab({
   layout,
   items,
   label,
+  cartEnabled,
+  cart,
+  onAddToCart,
+  onRemoveFromCart,
 }: {
   isTg: boolean;
   accentColor: string;
   layout: MiniAppLayout;
   items?: MiniAppItem[];
   label?: string;
+  cartEnabled?: boolean;
+  cart?: Map<string, number>;
+  onAddToCart?: (item: MiniAppItem) => void;
+  onRemoveFromCart?: (title: string) => void;
 }) {
   const { t } = useI18n();
   const list = items ?? [];
@@ -464,7 +738,16 @@ function ItemsTab({
       {list.length === 0 ? (
         <EmptyState isTg={isTg} text="—" />
       ) : (
-        <ItemsList items={list} layout={layout} isTg={isTg} accentColor={accentColor} />
+        <ItemsList
+          items={list}
+          layout={layout}
+          isTg={isTg}
+          accentColor={accentColor}
+          cartEnabled={cartEnabled}
+          cart={cart}
+          onAddToCart={onAddToCart}
+          onRemoveFromCart={onRemoveFromCart}
+        />
       )}
     </div>
   );
@@ -476,17 +759,45 @@ function ItemsList({
   layout,
   isTg,
   accentColor,
+  cartEnabled,
+  cart,
+  onAddToCart,
+  onRemoveFromCart,
 }: {
   items: MiniAppItem[];
   layout: MiniAppLayout;
   isTg: boolean;
   accentColor: string;
+  cartEnabled?: boolean;
+  cart?: Map<string, number>;
+  onAddToCart?: (item: MiniAppItem) => void;
+  onRemoveFromCart?: (title: string) => void;
 }) {
+  // Helper: per-item cart props. An item is "addable" only when cart is
+  // enabled AND it has a numeric price; without priceNumeric it's a purely
+  // decorative card and we don't render +/- controls.
+  const itemCartProps = (it: MiniAppItem) => {
+    const addable = !!cartEnabled && typeof it.priceNumeric === "number" && it.priceNumeric > 0;
+    if (!addable) return { addable: false as const };
+    return {
+      addable: true as const,
+      qty: cart?.get(it.title) ?? 0,
+      onAdd: () => onAddToCart?.(it),
+      onRemove: () => onRemoveFromCart?.(it.title),
+    };
+  };
+
   if (layout === "grid") {
     return (
       <div className="grid grid-cols-2 gap-2">
         {items.map((it, i) => (
-          <ItemTile key={`${it.title}-${i}`} item={it} isTg={isTg} accentColor={accentColor} />
+          <ItemTile
+            key={`${it.title}-${i}`}
+            item={it}
+            isTg={isTg}
+            accentColor={accentColor}
+            {...itemCartProps(it)}
+          />
         ))}
       </div>
     );
@@ -501,6 +812,7 @@ function ItemsList({
             isTg={isTg}
             accentColor={accentColor}
             compact
+            {...itemCartProps(it)}
           />
         ))}
       </div>
@@ -509,7 +821,13 @@ function ItemsList({
   return (
     <div className="space-y-1.5">
       {items.map((it, i) => (
-        <ItemRow key={`${it.title}-${i}`} item={it} isTg={isTg} accentColor={accentColor} />
+        <ItemRow
+          key={`${it.title}-${i}`}
+          item={it}
+          isTg={isTg}
+          accentColor={accentColor}
+          {...itemCartProps(it)}
+        />
       ))}
     </div>
   );
@@ -586,12 +904,23 @@ function ItemRow({
   isTg,
   accentColor,
   compact = false,
+  addable = false,
+  qty = 0,
+  onAdd,
+  onRemove,
 }: {
   item: MiniAppItem;
   isTg: boolean;
   accentColor: string;
   compact?: boolean;
+  addable?: boolean;
+  qty?: number;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }) {
+  // Cart controls click-handlers must not propagate to the row's outer
+  // <button>, otherwise wrapping clickable content would double-fire.
+  const stop = (e: ReactMouseEvent) => e.stopPropagation();
   return (
     <button
       className={cn(
@@ -608,7 +937,50 @@ function ItemRow({
         )}
       </div>
       {item.meta && <div className="text-[10px] font-semibold opacity-80">{item.meta}</div>}
-      {item.badge ? (
+      {/* Right side: cart controls take priority over chevron/badge */}
+      {addable ? (
+        qty > 0 ? (
+          <div className="flex items-center gap-1" onClick={stop}>
+            <button
+              onClick={(e) => {
+                stop(e);
+                onRemove?.();
+              }}
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded-full",
+                isTg ? "bg-white/10 hover:bg-white/20" : "bg-black/[0.06] hover:bg-black/10",
+              )}
+              aria-label="−"
+            >
+              <Minus className="h-2.5 w-2.5" />
+            </button>
+            <span className="w-4 text-center text-[10px] font-semibold tabular-nums">{qty}</span>
+            <button
+              onClick={(e) => {
+                stop(e);
+                onAdd?.();
+              }}
+              className="flex h-5 w-5 items-center justify-center rounded-full text-white"
+              style={{ backgroundColor: accentColor }}
+              aria-label="+"
+            >
+              <Plus className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              stop(e);
+              onAdd?.();
+            }}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-white transition hover:opacity-90"
+            style={{ backgroundColor: accentColor }}
+            aria-label="+"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        )
+      ) : item.badge ? (
         <ItemBadge item={item} isTg={isTg} />
       ) : (
         !compact && <ChevronRight className="h-3.5 w-3.5 opacity-40" />
@@ -622,13 +994,22 @@ function ItemTile({
   item,
   isTg,
   accentColor,
+  addable = false,
+  qty = 0,
+  onAdd,
+  onRemove,
 }: {
   item: MiniAppItem;
   isTg: boolean;
   accentColor: string;
+  addable?: boolean;
+  qty?: number;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = item.image && !imgFailed;
+  const stop = (e: ReactMouseEvent) => e.stopPropagation();
   return (
     <button
       className={cn(
@@ -666,6 +1047,32 @@ function ItemTile({
         {item.badge && (
           <div className="absolute right-1.5 top-1.5">
             <ItemBadge item={item} isTg={isTg} />
+          </div>
+        )}
+        {/* Cart "+" button — bottom-right corner overlay. Each tap adds one;
+            for fine control (−/qty) the user opens the bottom-sheet. We show
+            a small qty pill if already in cart. */}
+        {addable && (
+          <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1" onClick={stop}>
+            {qty > 0 && (
+              <span
+                className="rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-white tabular-nums"
+                aria-label={`в корзине ${qty}`}
+              >
+                ×{qty}
+              </span>
+            )}
+            <button
+              onClick={(e) => {
+                stop(e);
+                onAdd?.();
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white shadow-md transition hover:opacity-90"
+              style={{ backgroundColor: accentColor }}
+              aria-label="+"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>

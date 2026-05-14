@@ -74,6 +74,28 @@ export interface MiniAppItem {
   image?: string;
   /** Optional hex color (e.g. "#22c55e") for the badge background. */
   badgeColor?: string;
+  /**
+   * Numeric price used for cart math. If set AND cart is enabled on the
+   * Mini App, the item becomes "addable" — a "+" control appears on its
+   * tile/row and tapping it adds the item to the cart. Items without
+   * priceNumeric stay decorative.
+   */
+  priceNumeric?: number;
+}
+
+export interface MiniAppCart {
+  /** Master switch — when false, all cart UI is hidden. */
+  enabled: boolean;
+  /**
+   * The `action` field in the JSON payload sent to the bot via
+   * Telegram.WebApp.sendData when the user confirms the order.
+   * Default: "order".
+   */
+  sendAction: string;
+  /** Currency suffix shown in totals, e.g. "₽", "$". Default: "₽". */
+  currency: string;
+  /** Label of the "submit order" button in the sticky bar + bottom sheet. */
+  ctaLabel: string;
 }
 
 export interface MiniAppPlanCard {
@@ -128,6 +150,14 @@ export interface AnvlMiniAppState {
   tabs: MiniAppTabSpec[];
   /** Label of the items tab (e.g. "Menu", "Servers", "Catalog") */
   itemsLabel: string;
+  /**
+   * Optional cart configuration. When `cart.enabled` is true, items with
+   * `priceNumeric` become addable and a sticky bar with the order total
+   * appears at the bottom of the Mini App. Tapping the bar opens a
+   * bottom-sheet with the full cart; the CTA inside dispatches the order
+   * to the bot via Telegram.WebApp.sendData.
+   */
+  cart?: MiniAppCart;
 }
 
 export interface AnvlBlueprint {
@@ -224,9 +254,28 @@ function parseItems(v: unknown): MiniAppItem[] | undefined {
       badge: isStr(i.badge) ? i.badge : undefined,
       image: isImageUrl(i.image) ? i.image : undefined,
       badgeColor: isHexColor(i.badgeColor) ? i.badgeColor : undefined,
+      priceNumeric:
+        typeof i.priceNumeric === "number" && isFinite(i.priceNumeric) && i.priceNumeric >= 0
+          ? i.priceNumeric
+          : undefined,
     }))
     .slice(0, 8);
   return out.length ? out : undefined;
+}
+
+/** Strict, defensive parser for cart config — used by safeParseAnvlBlueprint. */
+function parseCart(v: unknown): MiniAppCart | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const c = v as Partial<MiniAppCart>;
+  // We only emit a cart object when explicitly enabled. This keeps existing
+  // mini apps (without cart) byte-identical after a parse round-trip.
+  if (!c.enabled) return undefined;
+  return {
+    enabled: true,
+    sendAction: isStr(c.sendAction) ? c.sendAction : "order",
+    currency: isStr(c.currency) ? c.currency : "₽",
+    ctaLabel: isStr(c.ctaLabel) ? c.ctaLabel : "Оформить заказ",
+  };
 }
 
 function parsePlanCards(v: unknown): MiniAppPlanCard[] | undefined {
@@ -373,6 +422,7 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
         plans: parsePlanCards(m.plans),
         tabs: parseTabs(m.tabs),
         itemsLabel: isStr(m.itemsLabel) ? m.itemsLabel : undefined,
+        cart: parseCart(m.cart),
       };
     }
 
