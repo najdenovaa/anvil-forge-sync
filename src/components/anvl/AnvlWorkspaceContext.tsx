@@ -677,12 +677,14 @@ export function AnvlWorkspaceProvider({
       addAiNode, connectAiNodes, updateAiNodeParam,
       removeAiNode, removeAiEdge, renameAiNode, serializeCanvas,
       mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
+      initMiniApp, setMiniAppHero, setMiniAppStats, setMiniAppTabs,
+      addMiniAppItem, addMiniAppPlan, clearMiniAppItems, clearMiniAppPlans,
       addMenuSection, removeMenuSection, updateMenuSection,
       saveStatus, lastSavedAt, snapshotNow,
       flowId, slug, rollbackToVersion,
       lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, addMenuSection, removeMenuSection, updateMenuSection, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
+    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, initMiniApp, setMiniAppHero, setMiniAppStats, setMiniAppTabs, addMiniAppItem, addMiniAppPlan, clearMiniAppItems, clearMiniAppPlans, addMenuSection, removeMenuSection, updateMenuSection, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
