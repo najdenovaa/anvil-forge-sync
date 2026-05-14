@@ -999,13 +999,12 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             if (system) requestBody.system = system;
             if (anthropicTools) {
               requestBody.tools = anthropicTools;
-              // tool_choice "auto" — model decides per turn. With our
-              // multi-turn loop, this gives a clean exit condition: the
-              // model keeps calling tools until the task is done, then
-              // returns text only (which produces roundCalls.size === 0
-              // and breaks the outer loop). Forcing "any" would never let
-              // it return text-only and we'd loop until the safety cap.
-              requestBody.tool_choice = { type: "auto" };
+              // tool_choice "any" — force the model to call at least one tool
+              // per round. With "auto", Sonnet 4.6 tends to stop after the
+              // first get_canvas call instead of continuing with the actual
+              // work (observed empirically). The summaryOnly follow-up path
+              // (where toolDefs is undefined) is what produces the final text.
+              requestBody.tool_choice = { type: "any" };
             }
 
             const upstream = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1034,6 +1033,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             const reader = upstream.body.getReader();
             let buffer = "";
             let assistantContent = "";
+            let stopReason: string | null = null;
             // Tool calls collected in this round, keyed by Anthropic's
             // content_block index. Each tool_use block streams its input as
             // partial_json chunks; we buffer until content_block_stop and
@@ -1126,6 +1126,17 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                   continue;
                 }
 
+                if (type === "message_delta") {
+                  // Anthropic sends final stop_reason here. Useful for
+                  // diagnostics — distinguishes "end_turn" (model done) from
+                  // "tool_use" (paused for tool result), "max_tokens" (cut
+                  // off), "stop_sequence" (matched stop string).
+                  if (typeof evt?.delta?.stop_reason === "string") {
+                    stopReason = evt.delta.stop_reason;
+                  }
+                  continue;
+                }
+
                 if (type === "error") {
                   console.error("Anthropic stream error event:", evt);
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -1137,7 +1148,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               }
             }
 
-            console.log(`[architect-chat] round=${round} stream done, tool_calls=${roundCalls.size}, assistant_content_length=${assistantContent.length}, tool_call_names=${JSON.stringify(Array.from(roundCalls.values()).map(c => c.name))}`);
+            console.log(`[architect-chat] round=${round} stream done, stop_reason=${stopReason ?? "none"}, tool_calls=${roundCalls.size}, assistant_content_length=${assistantContent.length}, tool_call_names=${JSON.stringify(Array.from(roundCalls.values()).map(c => c.name))}`);
 
             // End the conversation ONLY when the model stopped calling tools.
             // While the model keeps making tool_calls, we feed synthetic results
