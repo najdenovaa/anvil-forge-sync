@@ -1,7 +1,13 @@
-// Anvl AI Architect chat - streams via Lovable AI Gateway.
+// Anvl AI Architect chat — streams from the Anthropic Messages API.
 // The model MUST drive the canvas via tool calls. Text is OPTIONAL — the
 // pipeline UI on the frontend visualises every tool call live so the user
 // always sees AI's thinking and the visual being assembled in real time.
+//
+// We keep the conversation in OpenAI-style internally (role: system/user/
+// assistant/tool, tool_calls with function/arguments-as-string) and emit
+// OpenAI-style SSE to the client, so LeftAIPanel does not need to change.
+// The Anthropic format is contained inside this file via the converters
+// and the upstream stream parser below.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -258,113 +264,128 @@ Use Max concepts: Max Developer Console token, /commands, inline buttons
 (payload), keyboard with rows. Do NOT mention Telegram-only features.`;
 
 const REAL_MODELS = {
-  gemini_flash: "gemini-2.5-flash",
-  gemini_pro: "gemini-2.5-pro",
+  claude_haiku: "claude-haiku-4-5-20251001",
+  claude_sonnet: "claude-sonnet-4-6",
+  claude_opus: "claude-opus-4-7",
 } as const;
 
+// UI selector labels → real model.
+// Auto / Claude / GPT / Grok → Sonnet 4.6 (the workhorse: smart enough for
+// tool-use, cheap enough to run all day).
+// Gemini → Haiku 4.5 (a "fast & cheap" pseudo-fallback, ~3x cheaper).
+// Explicit names sonnet/haiku/opus are also accepted directly.
 const ALIASES: Record<string, keyof typeof REAL_MODELS> = {
-  auto: "gemini_flash",
-  claude: "gemini_pro",
-  gpt: "gemini_pro",
-  gemini: "gemini_flash",
-  grok: "gemini_flash",
+  auto: "claude_sonnet",
+  claude: "claude_sonnet",
+  gpt: "claude_sonnet",
+  grok: "claude_sonnet",
+  gemini: "claude_haiku",
+  sonnet: "claude_sonnet",
+  haiku: "claude_haiku",
+  opus: "claude_opus",
 };
 
 function resolveModel(input?: string): string {
   const key = (input ?? "auto").toLowerCase();
   if (key in REAL_MODELS) return REAL_MODELS[key as keyof typeof REAL_MODELS];
   if (key in ALIASES) return REAL_MODELS[ALIASES[key]];
-  return REAL_MODELS.gemini_flash;
+  return REAL_MODELS.claude_sonnet;
 }
 
-// ===== OpenAI ↔ Google API format converters =====
-// We keep the conversation in OpenAI-style internally (role: system/user/
-// assistant/tool, tool_calls with function/arguments-as-string) because the
-// rest of the codebase and the streaming SSE format to the client expect that
-// shape. These helpers convert to/from the Google Generative Language API
-// shape (contents with role: user/model, parts with text/functionCall/
-// functionResponse, separate systemInstruction, tools.functionDeclarations).
+// ===== OpenAI ↔ Anthropic Messages API format converters =====
+// Internally the conversation uses OpenAI shape (role: system/user/assistant/
+// tool, tool_calls[].function.arguments as a JSON string). Anthropic expects
+// a separate `system` string, `messages` with roles only user/assistant, and
+// content blocks of type text / tool_use / tool_result. tool_use_id values
+// are minted by Anthropic on the response side; we preserve them so that the
+// next round's tool_result blocks reference the exact same id.
 
-function convertMessagesToGoogle(
+function convertMessagesToAnthropic(
   messages: Array<{ role: string; content: any; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
-): { systemInstruction: any; contents: any[] } {
+): { system: string; messages: any[] } {
   let systemText = "";
-  const contents: any[] = [];
-  // Track tool_call_id → function name so we can name functionResponse parts.
-  const toolIdToName = new Map<string, string>();
+  const out: any[] = [];
+
+  // Anthropic disallows two consecutive messages with the same role. In
+  // particular, several `role: "tool"` results in a row from our internal
+  // log must collapse into a single user message with multiple tool_result
+  // blocks. We track the "current pending user content" and flush it when
+  // the role flips.
+  let pendingUserBlocks: any[] | null = null;
+  const flushPendingUser = () => {
+    if (pendingUserBlocks && pendingUserBlocks.length > 0) {
+      out.push({ role: "user", content: pendingUserBlocks });
+    }
+    pendingUserBlocks = null;
+  };
+
   for (const m of messages) {
     if (m.role === "system") {
       const txt = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
       systemText += (systemText ? "\n\n" : "") + txt;
       continue;
     }
+
     if (m.role === "user") {
-      contents.push({
-        role: "user",
-        parts: [{ text: typeof m.content === "string" ? m.content : JSON.stringify(m.content) }],
-      });
+      flushPendingUser();
+      const txt = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      out.push({ role: "user", content: txt });
       continue;
     }
+
     if (m.role === "assistant") {
-      const parts: any[] = [];
+      flushPendingUser();
+      const blocks: any[] = [];
       const txt = typeof m.content === "string" ? m.content : "";
-      if (txt) parts.push({ text: txt });
+      if (txt) blocks.push({ type: "text", text: txt });
       if (Array.isArray(m.tool_calls)) {
         for (const tc of m.tool_calls) {
-          let args: any = {};
-          try { args = JSON.parse(tc.function?.arguments ?? "{}"); } catch { /* keep empty */ }
-          parts.push({ functionCall: { name: tc.function?.name ?? "", args } });
-          if (tc.id && tc.function?.name) toolIdToName.set(tc.id, tc.function.name);
+          let input: any = {};
+          try { input = JSON.parse(tc.function?.arguments ?? "{}"); } catch { /* keep empty */ }
+          blocks.push({
+            type: "tool_use",
+            id: tc.id ?? "",
+            name: tc.function?.name ?? "",
+            input,
+          });
         }
       }
-      if (parts.length === 0) parts.push({ text: "" });
-      contents.push({ role: "model", parts });
+      if (blocks.length === 0) blocks.push({ type: "text", text: "" });
+      out.push({ role: "assistant", content: blocks });
       continue;
     }
+
     if (m.role === "tool") {
-      const fnName = m.name || (m.tool_call_id ? (toolIdToName.get(m.tool_call_id) || "tool") : "tool");
-      let parsed: any = m.content;
-      if (typeof m.content === "string") {
-        try { parsed = JSON.parse(m.content); } catch { parsed = { content: m.content }; }
-      }
-      contents.push({
-        role: "user",
-        parts: [{ functionResponse: { name: fnName, response: parsed } }],
+      // Coalesce with any previous tool_result in the same logical turn.
+      const contentStr =
+        typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      if (pendingUserBlocks === null) pendingUserBlocks = [];
+      pendingUserBlocks.push({
+        type: "tool_result",
+        tool_use_id: m.tool_call_id ?? "",
+        content: contentStr,
       });
       continue;
     }
   }
-  return {
-    systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined,
-    contents,
-  };
+  flushPendingUser();
+
+  return { system: systemText, messages: out };
 }
 
-function convertToolsToGoogle(toolDefs: any[] | undefined): any[] | undefined {
+function convertToolsToAnthropic(toolDefs: any[] | undefined): any[] | undefined {
   if (!toolDefs || toolDefs.length === 0) return undefined;
-  return [{
-    functionDeclarations: toolDefs.map((t) => {
-      const fn = t.function ?? t;
-      // Google rejects schemas with `additionalProperties` field — strip it
-      // recursively. Also Google wants `properties: {}` at minimum.
-      const sanitize = (schema: any): any => {
-        if (!schema || typeof schema !== "object") return schema;
-        if (Array.isArray(schema)) return schema.map(sanitize);
-        const out: any = {};
-        for (const [k, v] of Object.entries(schema)) {
-          if (k === "additionalProperties") continue;
-          out[k] = sanitize(v);
-        }
-        if (out.type === "object" && !out.properties) out.properties = {};
-        return out;
-      };
-      return {
-        name: fn.name,
-        description: fn.description ?? "",
-        parameters: sanitize(fn.parameters ?? { type: "object", properties: {} }),
-      };
-    }),
-  }];
+  return toolDefs.map((t) => {
+    const fn = t.function ?? t;
+    const params = fn.parameters ?? { type: "object", properties: {} };
+    // Anthropic accepts standard JSON Schema and does NOT reject
+    // `additionalProperties` — pass the schema through unchanged.
+    return {
+      name: fn.name,
+      description: fn.description ?? "",
+      input_schema: params,
+    };
+  });
 }
 
 function buildPrompt(miniAppEnabled: boolean, platform: string): string {
@@ -905,9 +926,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const aiModel = resolveModel(model);
-    const apiKey = Deno.env.get("GOOGLE_API_KEY");
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
-      return json({ error: "GOOGLE_API_KEY is not configured" }, 500);
+      return json({ error: "ANTHROPIC_API_KEY is not configured" }, 500);
     }
 
     let systemPrompt: string;
@@ -966,34 +987,43 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           for (let round = 0; round < 8; round++) {
             console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
 
-            const { systemInstruction, contents } = convertMessagesToGoogle(conversation);
-            const googleTools = convertToolsToGoogle(toolDefs);
-            const googleBody: any = {
-              contents,
-              generationConfig: {
-                maxOutputTokens: summaryOnly ? 700 : 8192,
-                temperature: 0.7,
-              },
+            const { system, messages: anthropicMessages } = convertMessagesToAnthropic(conversation);
+            const anthropicTools = convertToolsToAnthropic(toolDefs);
+            const requestBody: any = {
+              model: aiModel,
+              max_tokens: summaryOnly ? 700 : 8192,
+              temperature: 0.7,
+              messages: anthropicMessages,
+              stream: true,
             };
-            if (systemInstruction) googleBody.systemInstruction = systemInstruction;
-            if (googleTools) {
-              googleBody.tools = googleTools;
-              googleBody.toolConfig = { functionCallingConfig: { mode: "ANY" } };
+            if (system) requestBody.system = system;
+            if (anthropicTools) {
+              requestBody.tools = anthropicTools;
+              // tool_choice "auto" — model decides per turn. With our
+              // multi-turn loop, this gives a clean exit condition: the
+              // model keeps calling tools until the task is done, then
+              // returns text only (which produces roundCalls.size === 0
+              // and breaks the outer loop). Forcing "any" would never let
+              // it return text-only and we'd loop until the safety cap.
+              requestBody.tool_choice = { type: "auto" };
             }
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
-            const upstream = await fetch(url, {
+            const upstream = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(googleBody),
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+              },
+              body: JSON.stringify(requestBody),
             });
 
             if (!upstream.ok || !upstream.body) {
               const text = await upstream.text().catch(() => "");
-              console.error("AI gateway error:", upstream.status, text);
+              console.error("Anthropic API error:", upstream.status, text);
               controller.enqueue(
                 encoder.encode(
-                  `data: ${JSON.stringify({ error: "gateway_error", status: upstream.status })}\n\n`,
+                  `data: ${JSON.stringify({ error: "gateway_error", status: upstream.status, detail: text.slice(0, 500) })}\n\n`,
                 ),
               );
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -1004,18 +1034,26 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             const reader = upstream.body.getReader();
             let buffer = "";
             let assistantContent = "";
-            // Tool calls collected in this round. Google delivers each
-            // functionCall as a complete object (not chunked deltas), so we
-            // assign a local index on first sight and finalize immediately.
-            const roundCalls = new Map<number, { id: string; name: string; args: any }>();
-            let maxLocalIndex = -1;
+            // Tool calls collected in this round, keyed by Anthropic's
+            // content_block index. Each tool_use block streams its input as
+            // partial_json chunks; we buffer until content_block_stop and
+            // only then emit a complete tool_call delta to the client (the
+            // client expects whole-JSON arguments, same as the previous
+            // Google-backed code path).
+            const roundCalls = new Map<number, { id: string; name: string; argsJson: string; localIdx: number }>();
             let nextLocalIdx = 0;
+            let maxLocalIndex = -1;
 
-            // Pump SSE events. Each `data:` line carries a Google chunk like:
-            //   { "candidates":[{ "content":{"role":"model","parts":[
-            //       { "text": "..." } | { "functionCall": {"name":"...","args":{...}} }
-            //   ]} }] }
-            // We translate each into an OpenAI-style delta and forward to client.
+            // Anthropic SSE is event-typed:
+            //   event: message_start
+            //   event: content_block_start  → tells us "block at index N is text or tool_use"
+            //   event: content_block_delta  → text_delta OR input_json_delta
+            //   event: content_block_stop   → block finished; for tool_use we now flush
+            //   event: message_delta        → stop_reason, usage
+            //   event: message_stop
+            //   event: ping
+            //   event: error
+            // We only need the data: payload (the event: line is informational).
             for (;;) {
               const { value, done } = await reader.read();
               if (done) break;
@@ -1028,41 +1066,74 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                 if (line.endsWith("\r")) line = line.slice(0, -1);
                 if (!line.startsWith("data: ")) continue;
                 const payload = line.slice(6).trim();
-                if (!payload || payload === "[DONE]") continue;
+                if (!payload) continue;
 
-                let parsed: any;
-                try { parsed = JSON.parse(payload); } catch { continue; }
+                let evt: any;
+                try { evt = JSON.parse(payload); } catch { continue; }
 
-                const parts = parsed?.candidates?.[0]?.content?.parts;
-                if (!Array.isArray(parts)) continue;
+                const type = evt?.type;
+                if (!type) continue;
 
-                for (const part of parts) {
-                  if (typeof part?.text === "string" && part.text.length > 0) {
-                    assistantContent += part.text;
-                    // Emit OpenAI-style content delta to client.
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                      choices: [{ delta: { content: part.text } }],
-                    })}\n\n`));
-                  } else if (part?.functionCall && typeof part.functionCall === "object") {
+                if (type === "content_block_start") {
+                  const idx = evt.index;
+                  const block = evt.content_block ?? {};
+                  if (block.type === "tool_use") {
                     const localIdx = nextLocalIdx++;
                     maxLocalIndex = Math.max(maxLocalIndex, localIdx);
-                    const name = String(part.functionCall.name ?? "");
-                    const args = part.functionCall.args ?? {};
-                    const id = `gemini_${round}_${localIdx}`;
-                    roundCalls.set(localIdx, { id, name, args });
-                    // Emit OpenAI-style tool_call delta to client. The client
-                    // accumulates by `index` and triggers applyToolCall when
-                    // the arguments string finishes — we deliver it whole.
+                    roundCalls.set(idx, {
+                      id: String(block.id ?? `call_${round}_${localIdx}`),
+                      name: String(block.name ?? ""),
+                      argsJson: "",
+                      localIdx,
+                    });
+                  }
+                  // text blocks need no setup — text_delta events carry data.
+                  continue;
+                }
+
+                if (type === "content_block_delta") {
+                  const idx = evt.index;
+                  const delta = evt.delta ?? {};
+                  if (delta.type === "text_delta" && typeof delta.text === "string" && delta.text.length > 0) {
+                    assistantContent += delta.text;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      choices: [{ delta: { content: delta.text } }],
+                    })}\n\n`));
+                  } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
+                    const tc = roundCalls.get(idx);
+                    if (tc) tc.argsJson += delta.partial_json;
+                  }
+                  continue;
+                }
+
+                if (type === "content_block_stop") {
+                  const idx = evt.index;
+                  const tc = roundCalls.get(idx);
+                  if (tc) {
+                    // Validate JSON; Anthropic guarantees a complete object
+                    // by content_block_stop, but be defensive.
+                    let argsForClient = tc.argsJson || "{}";
+                    try { JSON.parse(argsForClient); } catch { argsForClient = "{}"; }
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                       choices: [{ delta: { tool_calls: [{
-                        index: localIdx + indexOffset,
-                        id,
+                        index: tc.localIdx + indexOffset,
+                        id: tc.id,
                         type: "function",
-                        function: { name, arguments: JSON.stringify(args) },
+                        function: { name: tc.name, arguments: argsForClient },
                       }] } }],
                     })}\n\n`));
                   }
+                  continue;
                 }
+
+                if (type === "error") {
+                  console.error("Anthropic stream error event:", evt);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    error: "stream_error",
+                    detail: evt?.error?.message ?? "",
+                  })}\n\n`));
+                }
+                // message_start / message_delta / message_stop / ping: nothing to forward.
               }
             }
 
@@ -1080,12 +1151,17 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             }
 
             // Append assistant turn (with tool_calls) + one tool result per call.
+            // Order by Anthropic's block index so multi-tool-call assistant turns
+            // round-trip in stable order.
             const orderedCalls = Array.from(roundCalls.entries())
               .sort(([a], [b]) => a - b)
-              .map(([, c], i) => ({
-                id: c.id || `call_${round}_${i}`,
+              .map(([, c]) => ({
+                id: c.id,
                 type: "function" as const,
-                function: { name: c.name, arguments: typeof c.args === "string" ? (c.args || "{}") : JSON.stringify(c.args ?? {}) },
+                function: {
+                  name: c.name,
+                  arguments: c.argsJson && c.argsJson.length > 0 ? c.argsJson : "{}",
+                },
               }));
 
             conversation.push({
