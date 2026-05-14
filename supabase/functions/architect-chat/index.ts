@@ -732,6 +732,7 @@ function buildTools(miniAppEnabled: boolean) {
         parameters: { type: "object", properties: {}, additionalProperties: true },
       },
     },
+  );
 
   return tools;
 }
