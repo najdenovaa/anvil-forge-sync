@@ -126,6 +126,22 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Удалил раздел ${args.section_msg_id}`;
     case "update_menu_section":
       return `Обновил раздел ${args.section_msg_id}${args.new_button_label ? ` → «${args.new_button_label}»` : ""}`;
+    case "init_miniapp":
+      return `Инициализировал Mini App «${args.title ?? ""}»`;
+    case "set_miniapp_hero":
+      return "Установил hero-карточку";
+    case "set_miniapp_stats":
+      return `Установил статистику (${Array.isArray(args.stats) ? args.stats.length : 0} блока)`;
+    case "set_miniapp_tabs":
+      return `Установил ${Array.isArray(args.tabs) ? args.tabs.length : 0} табов`;
+    case "add_miniapp_item":
+      return `Добавил элемент «${args.title ?? ""}»`;
+    case "add_miniapp_plan":
+      return `Добавил тариф «${args.name ?? ""}»`;
+    case "clear_miniapp_items":
+      return "Очистил список items";
+    case "clear_miniapp_plans":
+      return "Очистил список plans";
     default:
       return name;
   }
