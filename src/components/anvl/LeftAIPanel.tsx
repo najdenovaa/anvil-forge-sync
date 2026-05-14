@@ -664,7 +664,24 @@ export function LeftAIPanel() {
 
     try {
       // Round 1 — model uses tools to mutate the canvas.
-      const { liveSteps, usedTools, finalAnswer } = await runRound(baseHistory);
+      const initial = await runRound(baseHistory);
+
+      // Auto-retry up to 2 times when the model returned an empty stream.
+      // This happens occasionally due to AI Gateway timeouts; a simple retry
+      // usually resolves it.
+      let retryAttempt = 0;
+      let currentResult = initial;
+      while (
+        !currentResult.usedTools &&
+        !currentResult.finalAnswer.trim() &&
+        retryAttempt < 2
+      ) {
+        retryAttempt++;
+        await new Promise((r) => setTimeout(r, 1000));
+        currentResult = await runRound(baseHistory);
+      }
+
+      const { liveSteps, usedTools, finalAnswer } = currentResult;
       // Auto-layout the freshly built graph left-to-right.
       if (usedTools) {
         setTimeout(() => relayoutCanvas(), 50);
@@ -686,9 +703,9 @@ export function LeftAIPanel() {
               copy[copy.length - 1] = {
                 ...last,
                 content:
-                  "Я начал собирать бот, но запрос слишком большой — поток ответа был обрезан. " +
-                  "Канвас содержит частичную сборку. Давай разделим: скажи, какую ОДНУ фичу " +
-                  "собрать первой (например «регистрация + профиль» или «турниры»), и я добавлю остальное по шагам.",
+                  "Часть работы выполнена (см. шаги выше), но финальный комментарий от модели не пришёл. " +
+                  "Канвас содержит то что успело примениться — проверь его. Если не хватает чего-то, " +
+                  "попроси «добавь Mini App контент» или «дособери остальное».",
                 pending: false,
               };
             }
@@ -703,9 +720,9 @@ export function LeftAIPanel() {
             copy[copy.length - 1] = {
               ...last,
               content:
-                "Не получилось собрать бот за один проход — запрос слишком большой. " +
-                "Опиши, пожалуйста, ОДНУ фичу для старта (например «регистрация и главное меню»), " +
-                "и я добавлю остальное следующими сообщениями.",
+                "Модель не вернула ответ — пустой стрим. Это обычно временный сбой AI Gateway, " +
+                "не объём твоего запроса. Попробуй то же сообщение ещё раз, или переключи модель " +
+                "в селекторе слева на другую (Claude / GPT / Gemini).",
               pending: false,
             };
           }

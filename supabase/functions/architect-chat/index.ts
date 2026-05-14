@@ -761,6 +761,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
 
         try {
           for (let round = 0; round < 8; round++) {
+            console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
@@ -845,11 +846,14 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               }
             }
 
+            console.log(`[architect-chat] round=${round} stream done, tool_calls=${roundCalls.size}, assistant_content_length=${assistantContent.length}, tool_call_names=${JSON.stringify(Array.from(roundCalls.values()).map(c => c.name))}`);
+
             // End the conversation ONLY when the model stopped calling tools.
             // While the model keeps making tool_calls, we feed synthetic results
             // back and run another round — this gives it room to break a big task
             // into multiple turns instead of hedging with "task too big" text.
             if (roundCalls.size === 0) {
+              console.log(`[architect-chat] FINISHED at round=${round}, exit_reason=empty_round`);
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
@@ -883,6 +887,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           }
 
           // Safety cap reached.
+          console.log(`[architect-chat] FINISHED at safety cap (8 rounds), exit_reason=cap`);
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (err) {
