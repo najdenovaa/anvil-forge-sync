@@ -761,6 +761,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
 
         try {
           for (let round = 0; round < 8; round++) {
+            console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
