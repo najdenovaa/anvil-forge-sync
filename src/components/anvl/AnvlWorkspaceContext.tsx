@@ -605,6 +605,49 @@ export function AnvlWorkspaceProvider({
     setMiniAppEnabled(true);
   }, [setMiniAppEnabled]);
 
+  // ===== Composite Mini App helpers (round 1: thin wrappers) =====
+  const initMiniApp = useCallback(
+    (args: { title: string; subtitle?: string; accent?: AnvlMiniAppState["accent"]; itemsLabel?: string; theme?: "light" | "dark" }) => {
+      const patch: Partial<AnvlMiniAppState> & { theme?: "light" | "dark" } = {};
+      if (args.title !== undefined) patch.title = args.title;
+      if (args.subtitle !== undefined) patch.subtitle = args.subtitle;
+      if (args.accent !== undefined) patch.accent = args.accent;
+      if (args.itemsLabel !== undefined) patch.itemsLabel = args.itemsLabel;
+      if (args.theme !== undefined) (patch as { theme?: "light" | "dark" }).theme = args.theme;
+      mergeMiniApp(patch);
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
+  const setMiniAppHero = useCallback((hero: MiniAppHero) => {
+    mergeMiniApp({ hero });
+    setMiniAppEnabled(true);
+  }, [mergeMiniApp, setMiniAppEnabled]);
+  const setMiniAppStats = useCallback((stats: MiniAppStat[]) => {
+    mergeMiniApp({ stats });
+    setMiniAppEnabled(true);
+  }, [mergeMiniApp, setMiniAppEnabled]);
+  const setMiniAppTabs = useCallback((tabs: MiniAppTabSpec[]) => {
+    mergeMiniApp({ tabs });
+    setMiniAppEnabled(true);
+  }, [mergeMiniApp, setMiniAppEnabled]);
+  const addMiniAppItem = useCallback((item: MiniAppItem) => {
+    setMiniApp((cur) => ({ ...cur, items: [...(cur.items ?? []), item] }));
+    setMiniAppEnabled(true);
+  }, [setMiniAppEnabled]);
+  const addMiniAppPlan = useCallback((plan: MiniAppPlanCard) => {
+    setMiniApp((cur) => ({ ...cur, plans: [...(cur.plans ?? []), plan] }));
+    setMiniAppEnabled(true);
+  }, [setMiniAppEnabled]);
+  const clearMiniAppItems = useCallback(() => {
+    mergeMiniApp({ items: [] });
+    setMiniAppEnabled(true);
+  }, [mergeMiniApp, setMiniAppEnabled]);
+  const clearMiniAppPlans = useCallback(() => {
+    mergeMiniApp({ plans: [] });
+    setMiniAppEnabled(true);
+  }, [mergeMiniApp, setMiniAppEnabled]);
+
   const { status: saveStatus, lastSavedAt, snapshotNow, flowId } = useFlowPersistence({
     slug,
     nodes,
