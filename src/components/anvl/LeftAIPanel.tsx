@@ -377,6 +377,14 @@ export function LeftAIPanel() {
         else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
         else if (name === "set_preview") mergePreview(args);
         else if (name === "set_miniapp") mergeMiniApp(args);
+        else if (name === "init_miniapp") initMiniApp(args);
+        else if (name === "set_miniapp_hero") setMiniAppHero(args as any);
+        else if (name === "set_miniapp_stats") setMiniAppStats(Array.isArray(args.stats) ? args.stats : []);
+        else if (name === "set_miniapp_tabs") setMiniAppTabs(Array.isArray(args.tabs) ? args.tabs : []);
+        else if (name === "add_miniapp_item") addMiniAppItem(args as any);
+        else if (name === "add_miniapp_plan") addMiniAppPlan(args as any);
+        else if (name === "clear_miniapp_items") clearMiniAppItems();
+        else if (name === "clear_miniapp_plans") clearMiniAppPlans();
         else if (name === "set_code") {
           setGeneratedCode(String(args.content ?? ""));
           codeApplied = true;
