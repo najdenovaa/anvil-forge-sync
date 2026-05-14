@@ -730,7 +730,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         let indexOffset = 0; // shift tool_call indexes across rounds so client buffers don't collide
 
         try {
-          for (let round = 0; round < 4; round++) {
+          for (let round = 0; round < 8; round++) {
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
