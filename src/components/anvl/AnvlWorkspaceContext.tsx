@@ -9,7 +9,16 @@ import {
   type ReactNode,
 } from "react";
 import type { Edge, Node } from "reactflow";
-import type { AnvlBlueprint, AnvlMiniAppState, AnvlPreviewState } from "@/lib/anvl-blueprint";
+import type {
+  AnvlBlueprint,
+  AnvlMiniAppState,
+  AnvlPreviewState,
+  MiniAppHero,
+  MiniAppItem,
+  MiniAppPlanCard,
+  MiniAppStat,
+  MiniAppTabSpec,
+} from "@/lib/anvl-blueprint";
 import type { VariableDef } from "@/lib/anvl-types";
 import { lintFlow, type LintIssue } from "@/lib/flow-linter";
 import { useFlowPersistence, type SaveStatus } from "./useFlowPersistence";
