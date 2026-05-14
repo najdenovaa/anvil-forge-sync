@@ -39,6 +39,7 @@ export interface AnvlPreviewState {
 }
 
 export type MiniAppAccent = "blue" | "green" | "orange" | "violet" | "pink" | "red" | "teal";
+export type MiniAppLayout = "list" | "grid" | "compact";
 
 export interface MiniAppHero {
   /** Big headline shown on the home screen, e.g. "Order food", "Book a table" */
@@ -49,6 +50,10 @@ export interface MiniAppHero {
   cta: string;
   /** Lucide-like icon name. Renderer maps to a small whitelist. */
   icon?: string;
+  /** Optional URL of a square image to show in place of the icon block. */
+  image?: string;
+  /** Optional URL of a background image behind the hero. */
+  backgroundImage?: string;
 }
 
 export interface MiniAppStat {
@@ -65,6 +70,10 @@ export interface MiniAppItem {
   /** Optional emoji as a visual marker (flag, food, etc.) */
   emoji?: string;
   badge?: string;
+  /** Optional URL of a product image (replaces emoji / letter placeholder). */
+  image?: string;
+  /** Optional hex color (e.g. "#22c55e") for the badge background. */
+  badgeColor?: string;
 }
 
 export interface MiniAppPlanCard {
@@ -94,6 +103,19 @@ export interface AnvlMiniAppState {
   plan: MiniAppPlan;
   /** Color accent for buttons, badges, header */
   accent: MiniAppAccent;
+  /**
+   * Optional precise brand hex color (e.g. "#FF5722"). When set and valid,
+   * overrides the named `accent` palette in the renderer. Use for exact
+   * brand matches; otherwise leave undefined and rely on `accent`.
+   */
+  accentHex?: string;
+  /**
+   * How items are laid out in the items tab:
+   *  - "list" (default): one-line rows
+   *  - "grid": 2-column tiles with large image on top
+   *  - "compact": tighter rows, no chevrons
+   */
+  layout?: MiniAppLayout;
   /** Hero block on the home tab */
   hero: MiniAppHero;
   /** 2-4 quick stats under the hero */
@@ -132,12 +154,28 @@ const NODE_KINDS: NodeKind[] = [
 const ACTIONS: BuiltInPreviewAction[] = ["open_miniapp", "plans", "help", "profile", "locations"];
 const PLANS: MiniAppPlan[] = ["free", "pro", "team"];
 const ACCENTS: MiniAppAccent[] = ["blue", "green", "orange", "violet", "pink", "red", "teal"];
+const LAYOUTS: MiniAppLayout[] = ["list", "grid", "compact"];
+
+/** Accepts #abc, #abcd, #aabbcc, #aabbccdd (case-insensitive). */
+export function isHexColor(v: unknown): v is string {
+  return typeof v === "string" && /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v.trim());
+}
+
+/** Cheap URL check — accepts http(s) and data: URLs. Used for image fields. */
+export function isImageUrl(v: unknown): v is string {
+  if (typeof v !== "string") return false;
+  const s = v.trim();
+  return /^https?:\/\//i.test(s) || s.startsWith("data:image/");
+}
 
 function isNodeKind(value: unknown): value is NodeKind {
   return typeof value === "string" && NODE_KINDS.includes(value as NodeKind);
 }
 function isAction(value: unknown): value is PreviewAction {
-  return typeof value === "string" && (ACTIONS.includes(value as BuiltInPreviewAction) || value.startsWith("screen:"));
+  return (
+    typeof value === "string" &&
+    (ACTIONS.includes(value as BuiltInPreviewAction) || value.startsWith("screen:"))
+  );
 }
 function isStr(v: unknown): v is string {
   return typeof v === "string" && v.length > 0;
@@ -152,13 +190,21 @@ function parseHero(v: unknown): MiniAppHero | undefined {
     subtitle: isStr(h.subtitle) ? h.subtitle : undefined,
     cta: h.cta,
     icon: isStr(h.icon) ? h.icon : undefined,
+    image: isImageUrl(h.image) ? h.image : undefined,
+    backgroundImage: isImageUrl(h.backgroundImage) ? h.backgroundImage : undefined,
   };
 }
 
 function parseStats(v: unknown): MiniAppStat[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v
-    .filter((s): s is MiniAppStat => !!s && typeof s === "object" && isStr((s as MiniAppStat).label) && isStr((s as MiniAppStat).value))
+    .filter(
+      (s): s is MiniAppStat =>
+        !!s &&
+        typeof s === "object" &&
+        isStr((s as MiniAppStat).label) &&
+        isStr((s as MiniAppStat).value),
+    )
     .map((s) => ({ label: s.label, value: s.value, unit: isStr(s.unit) ? s.unit : undefined }))
     .slice(0, 4);
   return out.length ? out : undefined;
@@ -167,13 +213,17 @@ function parseStats(v: unknown): MiniAppStat[] | undefined {
 function parseItems(v: unknown): MiniAppItem[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v
-    .filter((i): i is MiniAppItem => !!i && typeof i === "object" && isStr((i as MiniAppItem).title))
+    .filter(
+      (i): i is MiniAppItem => !!i && typeof i === "object" && isStr((i as MiniAppItem).title),
+    )
     .map((i) => ({
       title: i.title,
       subtitle: isStr(i.subtitle) ? i.subtitle : undefined,
       meta: isStr(i.meta) ? i.meta : undefined,
       emoji: isStr(i.emoji) ? i.emoji : undefined,
       badge: isStr(i.badge) ? i.badge : undefined,
+      image: isImageUrl(i.image) ? i.image : undefined,
+      badgeColor: isHexColor(i.badgeColor) ? i.badgeColor : undefined,
     }))
     .slice(0, 8);
   return out.length ? out : undefined;
@@ -184,7 +234,11 @@ function parsePlanCards(v: unknown): MiniAppPlanCard[] | undefined {
   const out = v
     .filter(
       (p): p is MiniAppPlanCard =>
-        !!p && typeof p === "object" && isStr((p as MiniAppPlanCard).id) && isStr((p as MiniAppPlanCard).name) && isStr((p as MiniAppPlanCard).price),
+        !!p &&
+        typeof p === "object" &&
+        isStr((p as MiniAppPlanCard).id) &&
+        isStr((p as MiniAppPlanCard).name) &&
+        isStr((p as MiniAppPlanCard).price),
     )
     .map((p) => ({
       id: p.id,
@@ -202,7 +256,13 @@ function parsePlanCards(v: unknown): MiniAppPlanCard[] | undefined {
 function parseTabs(v: unknown): MiniAppTabSpec[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v
-    .filter((t): t is MiniAppTabSpec => !!t && typeof t === "object" && isStr((t as MiniAppTabSpec).id) && isStr((t as MiniAppTabSpec).label))
+    .filter(
+      (t): t is MiniAppTabSpec =>
+        !!t &&
+        typeof t === "object" &&
+        isStr((t as MiniAppTabSpec).id) &&
+        isStr((t as MiniAppTabSpec).label),
+    )
     .map((t) => ({ id: t.id, label: t.label, icon: isStr(t.icon) ? t.icon : undefined }))
     .slice(0, 4);
   return out.length >= 2 ? out : undefined;
@@ -232,7 +292,9 @@ function parsePreviewScreens(v: unknown): AnvlPreviewScreen[] | undefined {
     .map((screen) => ({
       id: screen.id,
       userMessage: isStr(screen.userMessage) ? screen.userMessage : undefined,
-      botMessages: screen.botMessages.filter((item): item is string => typeof item === "string").slice(0, 4),
+      botMessages: screen.botMessages
+        .filter((item): item is string => typeof item === "string")
+        .slice(0, 4),
       buttons: parsePreviewButtons(screen.buttons) ?? [],
     }))
     .filter((screen) => screen.botMessages.length > 0)
@@ -277,7 +339,9 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
         botStatus: typeof preview.botStatus === "string" ? preview.botStatus : undefined,
         userMessage: typeof preview.userMessage === "string" ? preview.userMessage : undefined,
         botMessages: Array.isArray(preview.botMessages)
-          ? preview.botMessages.filter((item): item is string => typeof item === "string").slice(0, 3)
+          ? preview.botMessages
+              .filter((item): item is string => typeof item === "string")
+              .slice(0, 3)
           : undefined,
         buttons: parsePreviewButtons(preview.buttons),
         initialScreen: isStr(preview.initialScreen) ? preview.initialScreen : undefined,
@@ -290,10 +354,18 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
       blueprint.miniapp = {
         title: isStr(m.title) ? m.title : undefined,
         subtitle: isStr(m.subtitle) ? m.subtitle : undefined,
-        plan: isStr(m.plan) && PLANS.includes(m.plan as MiniAppPlan) ? (m.plan as MiniAppPlan) : undefined,
+        plan:
+          isStr(m.plan) && PLANS.includes(m.plan as MiniAppPlan)
+            ? (m.plan as MiniAppPlan)
+            : undefined,
         accent:
           isStr(m.accent) && ACCENTS.includes(m.accent as MiniAppAccent)
             ? (m.accent as MiniAppAccent)
+            : undefined,
+        accentHex: isHexColor(m.accentHex) ? m.accentHex : undefined,
+        layout:
+          isStr(m.layout) && LAYOUTS.includes(m.layout as MiniAppLayout)
+            ? (m.layout as MiniAppLayout)
             : undefined,
         hero: parseHero(m.hero),
         stats: parseStats(m.stats),

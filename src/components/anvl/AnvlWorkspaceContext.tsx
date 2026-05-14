@@ -144,7 +144,15 @@ interface WorkspaceCtx {
   };
   mergePreview: (patch: Partial<AnvlPreviewState>) => void;
   mergeMiniApp: (patch: Partial<AnvlMiniAppState>) => void;
-  initMiniApp: (args: { title: string; subtitle?: string; accent?: AnvlMiniAppState["accent"]; itemsLabel?: string; theme?: "light" | "dark" }) => void;
+  initMiniApp: (args: {
+    title: string;
+    subtitle?: string;
+    accent?: AnvlMiniAppState["accent"];
+    accentHex?: string;
+    layout?: AnvlMiniAppState["layout"];
+    itemsLabel?: string;
+    theme?: "light" | "dark";
+  }) => void;
   setMiniAppHero: (hero: MiniAppHero) => void;
   setMiniAppStats: (stats: MiniAppStat[]) => void;
   setMiniAppTabs: (tabs: MiniAppTabSpec[]) => void;
@@ -188,8 +196,12 @@ export function AnvlWorkspaceProvider({
   const hydratedSlugRef = useRef<string | null>(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
-  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
-  useEffect(() => { edgesRef.current = edges; }, [edges]);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
     if (blueprint.nodes?.length) {
@@ -207,9 +219,11 @@ export function AnvlWorkspaceProvider({
         },
       }));
 
-      const nextEdges: Edge[] = (blueprint.edges?.length
-        ? blueprint.edges
-        : nextNodes.slice(1).map((_, index) => ({ from: index, to: index + 1 })))
+      const nextEdges: Edge[] = (
+        blueprint.edges?.length
+          ? blueprint.edges
+          : nextNodes.slice(1).map((_, index) => ({ from: index, to: index + 1 }))
+      )
         .filter((edge) => nextNodes[edge.from] && nextNodes[edge.to])
         .map((edge, index) => ({
           id: `ai-edge-${index + 1}`,
@@ -231,18 +245,21 @@ export function AnvlWorkspaceProvider({
     }
   }, []);
 
-  const hydrate = useCallback((snap: FlowSnapshot) => {
-    hydratedSlugRef.current = snap.slug;
-    setNodes(snap.nodes?.length ? snap.nodes : initialNodes);
-    setEdges(snap.edges?.length ? snap.edges : initialEdges);
-    setPreview(snap.preview ?? {});
-    setMiniApp(snap.miniapp ?? {});
-    setGeneratedCode(snap.generatedCode ?? "");
-    setVariables(snap.variables ?? []);
-    // Sync the workspace-level Mini App toggle with what's stored in the DB
-    // so the Architect knows whether to keep building Mini App content.
-    setMiniAppEnabled(!!snap.miniappEnabled);
-  }, [setMiniAppEnabled]);
+  const hydrate = useCallback(
+    (snap: FlowSnapshot) => {
+      hydratedSlugRef.current = snap.slug;
+      setNodes(snap.nodes?.length ? snap.nodes : initialNodes);
+      setEdges(snap.edges?.length ? snap.edges : initialEdges);
+      setPreview(snap.preview ?? {});
+      setMiniApp(snap.miniapp ?? {});
+      setGeneratedCode(snap.generatedCode ?? "");
+      setVariables(snap.variables ?? []);
+      // Sync the workspace-level Mini App toggle with what's stored in the DB
+      // so the Architect knows whether to keep building Mini App content.
+      setMiniAppEnabled(!!snap.miniappEnabled);
+    },
+    [setMiniAppEnabled],
+  );
 
   const rollbackToVersion = useCallback((version: FlowVersionFull) => {
     setNodes(version.nodes ?? []);
@@ -261,7 +278,10 @@ export function AnvlWorkspaceProvider({
     setNodes((ns) => {
       // We need current edges; read via setEdges identity callback.
       let currentEdges: Edge[] = [];
-      setEdges((es) => { currentEdges = es; return es; });
+      setEdges((es) => {
+        currentEdges = es;
+        return es;
+      });
       return autoLayout(ns, currentEdges);
     });
   }, []);
@@ -373,9 +393,7 @@ export function AnvlWorkspaceProvider({
           ...existing,
           { label: args.button_label, action: cb },
         ]);
-        const backButtons = serializeMenuButtons([
-          { label: backLabel, action: "back_to_menu" },
-        ]);
+        const backButtons = serializeMenuButtons([{ label: backLabel, action: "back_to_menu" }]);
 
         const updated = prev.map((n) =>
           n.id === args.menu_id
@@ -407,7 +425,10 @@ export function AnvlWorkspaceProvider({
           {
             id: msgId,
             type: "anvl",
-            position: { x: 40 + Math.floor((baseIdx + 1) / 2) * 280, y: 90 + ((baseIdx + 1) % 2) * 170 },
+            position: {
+              x: 40 + Math.floor((baseIdx + 1) / 2) * 280,
+              y: 90 + ((baseIdx + 1) % 2) * 170,
+            },
             data: {
               kind: msgKind,
               title: args.button_label,
@@ -418,7 +439,10 @@ export function AnvlWorkspaceProvider({
           {
             id: backKbId,
             type: "anvl",
-            position: { x: 40 + Math.floor((baseIdx + 2) / 2) * 280, y: 90 + ((baseIdx + 2) % 2) * 170 },
+            position: {
+              x: 40 + Math.floor((baseIdx + 2) / 2) * 280,
+              y: 90 + ((baseIdx + 2) % 2) * 170,
+            },
             data: {
               kind: "keyboard.inline",
               title: `Назад → ${args.menu_id}`,
@@ -432,7 +456,10 @@ export function AnvlWorkspaceProvider({
           newNodes.push({
             id: backTrigId,
             type: "anvl",
-            position: { x: 40 + Math.floor((baseIdx + 3) / 2) * 280, y: 90 + ((baseIdx + 3) % 2) * 170 },
+            position: {
+              x: 40 + Math.floor((baseIdx + 3) / 2) * 280,
+              y: 90 + ((baseIdx + 3) % 2) * 170,
+            },
             data: {
               kind: "trigger.callback",
               title: "Тап «Назад в меню»",
@@ -465,64 +492,57 @@ export function AnvlWorkspaceProvider({
     [],
   );
 
-  const removeMenuSection = useCallback(
-    (args: { menu_id: string; section_msg_id: string }) => {
-      const currentNodes = nodesRef.current;
-      const currentEdges = edgesRef.current;
+  const removeMenuSection = useCallback((args: { menu_id: string; section_msg_id: string }) => {
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
 
-      // Derive sibling ids by convention; fall back to edge walk if missing.
-      const sectionId = args.section_msg_id.replace(/_msg$/, "");
-      const sectionTrigId = `${sectionId}_trig`;
-      const backKbByConv = `${sectionId}_back_kb`;
+    // Derive sibling ids by convention; fall back to edge walk if missing.
+    const sectionId = args.section_msg_id.replace(/_msg$/, "");
+    const sectionTrigId = `${sectionId}_trig`;
+    const backKbByConv = `${sectionId}_back_kb`;
 
-      const backKbId =
-        (currentNodes.find((n) => n.id === backKbByConv) ? backKbByConv : null) ??
-        currentEdges.find(
-          (e) =>
-            e.source === args.section_msg_id &&
-            currentNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
-        )?.target ??
-        null;
+    const backKbId =
+      (currentNodes.find((n) => n.id === backKbByConv) ? backKbByConv : null) ??
+      currentEdges.find(
+        (e) =>
+          e.source === args.section_msg_id &&
+          currentNodes.find((n) => n.id === e.target)?.data?.kind === "keyboard.inline",
+      )?.target ??
+      null;
 
-      // Find the callback_data this section is bound to (params.data on its
-      // trigger.callback node, if present) so we can drop the matching button.
-      const sectionTrig = currentNodes.find((n) => n.id === sectionTrigId);
-      const callbackData =
-        (sectionTrig?.data?.params as Record<string, string> | undefined)?.data ?? null;
+    // Find the callback_data this section is bound to (params.data on its
+    // trigger.callback node, if present) so we can drop the matching button.
+    const sectionTrig = currentNodes.find((n) => n.id === sectionTrigId);
+    const callbackData =
+      (sectionTrig?.data?.params as Record<string, string> | undefined)?.data ?? null;
 
-      const dropIds = new Set(
-        [args.section_msg_id, backKbId, sectionTrigId].filter(
-          (x): x is string => !!x,
-        ),
-      );
+    const dropIds = new Set(
+      [args.section_msg_id, backKbId, sectionTrigId].filter((x): x is string => !!x),
+    );
 
-      setNodes((prev) =>
-        prev
-          .filter((n) => !dropIds.has(n.id))
-          .map((n) => {
-            if (n.id !== args.menu_id || n.data?.kind !== "keyboard.inline") return n;
-            const filtered = parseMenuButtons((n.data?.params as any)?.buttons).filter(
-              (b) => b.action !== callbackData && b.action !== `screen:${args.section_msg_id}`,
-            );
-            return {
-              ...n,
-              data: {
-                ...n.data,
-                params: {
-                  ...((n.data?.params as Record<string, string>) ?? {}),
-                  buttons: serializeMenuButtons(filtered),
-                },
+    setNodes((prev) =>
+      prev
+        .filter((n) => !dropIds.has(n.id))
+        .map((n) => {
+          if (n.id !== args.menu_id || n.data?.kind !== "keyboard.inline") return n;
+          const filtered = parseMenuButtons((n.data?.params as any)?.buttons).filter(
+            (b) => b.action !== callbackData && b.action !== `screen:${args.section_msg_id}`,
+          );
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              params: {
+                ...((n.data?.params as Record<string, string>) ?? {}),
+                buttons: serializeMenuButtons(filtered),
               },
-            };
-          }),
-      );
+            },
+          };
+        }),
+    );
 
-      setEdges((prev) =>
-        prev.filter((e) => !dropIds.has(e.source) && !dropIds.has(e.target)),
-      );
-    },
-    [],
-  );
+    setEdges((prev) => prev.filter((e) => !dropIds.has(e.source) && !dropIds.has(e.target)));
+  }, []);
 
   const updateMenuSection = useCallback(
     (args: {
@@ -539,7 +559,11 @@ export function AnvlWorkspaceProvider({
 
       setNodes((prev) =>
         prev.map((n) => {
-          if (n.id === args.menu_id && n.data?.kind === "keyboard.inline" && args.new_button_label) {
+          if (
+            n.id === args.menu_id &&
+            n.data?.kind === "keyboard.inline" &&
+            args.new_button_label
+          ) {
             const updated = parseMenuButtons((n.data?.params as any)?.buttons).map((b) =>
               b.action === callbackData || b.action === legacyAction
                 ? { ...b, label: args.new_button_label! }
@@ -563,7 +587,10 @@ export function AnvlWorkspaceProvider({
               ...n,
               data: {
                 ...n.data,
-                params: { ...((n.data?.params as Record<string, string>) ?? {}), [key]: args.new_content },
+                params: {
+                  ...((n.data?.params as Record<string, string>) ?? {}),
+                  [key]: args.new_content,
+                },
               },
             };
           }
@@ -587,10 +614,21 @@ export function AnvlWorkspaceProvider({
       nodes: nodes.map((n) => ({
         id: n.id,
         kind: (n.data?.kind as string) ?? "",
-        label: (n.data?.title as string) ?? (n.data?.label as string) ?? (n.data?.titleKey as string) ?? "",
-        params: abbreviate((n.data?.kind as string) ?? "", (n.data?.params as Record<string, string>) ?? {}),
+        label:
+          (n.data?.title as string) ??
+          (n.data?.label as string) ??
+          (n.data?.titleKey as string) ??
+          "",
+        params: abbreviate(
+          (n.data?.kind as string) ?? "",
+          (n.data?.params as Record<string, string>) ?? {},
+        ),
       })),
-      edges: edges.map((e) => ({ from: e.source, to: e.target, sourceHandle: e.sourceHandle ?? null })),
+      edges: edges.map((e) => ({
+        from: e.source,
+        to: e.target,
+        sourceHandle: e.sourceHandle ?? null,
+      })),
       variables,
     };
   }, [nodes, edges, variables]);
@@ -599,19 +637,32 @@ export function AnvlWorkspaceProvider({
     setPreview((cur) => ({ ...cur, ...patch }));
   }, []);
 
-  const mergeMiniApp = useCallback((patch: Partial<AnvlMiniAppState>) => {
-    setMiniApp((cur) => ({ ...cur, ...patch }));
-    // Any architect-driven Mini App update implies the user wants Mini App mode.
-    setMiniAppEnabled(true);
-  }, [setMiniAppEnabled]);
+  const mergeMiniApp = useCallback(
+    (patch: Partial<AnvlMiniAppState>) => {
+      setMiniApp((cur) => ({ ...cur, ...patch }));
+      // Any architect-driven Mini App update implies the user wants Mini App mode.
+      setMiniAppEnabled(true);
+    },
+    [setMiniAppEnabled],
+  );
 
   // ===== Composite Mini App helpers (round 1: thin wrappers) =====
   const initMiniApp = useCallback(
-    (args: { title: string; subtitle?: string; accent?: AnvlMiniAppState["accent"]; itemsLabel?: string; theme?: "light" | "dark" }) => {
+    (args: {
+      title: string;
+      subtitle?: string;
+      accent?: AnvlMiniAppState["accent"];
+      accentHex?: string;
+      layout?: AnvlMiniAppState["layout"];
+      itemsLabel?: string;
+      theme?: "light" | "dark";
+    }) => {
       const patch: Partial<AnvlMiniAppState> & { theme?: "light" | "dark" } = {};
       if (args.title !== undefined) patch.title = args.title;
       if (args.subtitle !== undefined) patch.subtitle = args.subtitle;
       if (args.accent !== undefined) patch.accent = args.accent;
+      if (args.accentHex !== undefined) patch.accentHex = args.accentHex;
+      if (args.layout !== undefined) patch.layout = args.layout;
       if (args.itemsLabel !== undefined) patch.itemsLabel = args.itemsLabel;
       if (args.theme !== undefined) (patch as { theme?: "light" | "dark" }).theme = args.theme;
       mergeMiniApp(patch);
@@ -619,26 +670,41 @@ export function AnvlWorkspaceProvider({
     },
     [mergeMiniApp, setMiniAppEnabled],
   );
-  const setMiniAppHero = useCallback((hero: MiniAppHero) => {
-    mergeMiniApp({ hero });
-    setMiniAppEnabled(true);
-  }, [mergeMiniApp, setMiniAppEnabled]);
-  const setMiniAppStats = useCallback((stats: MiniAppStat[]) => {
-    mergeMiniApp({ stats });
-    setMiniAppEnabled(true);
-  }, [mergeMiniApp, setMiniAppEnabled]);
-  const setMiniAppTabs = useCallback((tabs: MiniAppTabSpec[]) => {
-    mergeMiniApp({ tabs });
-    setMiniAppEnabled(true);
-  }, [mergeMiniApp, setMiniAppEnabled]);
-  const addMiniAppItem = useCallback((item: MiniAppItem) => {
-    setMiniApp((cur) => ({ ...cur, items: [...(cur.items ?? []), item] }));
-    setMiniAppEnabled(true);
-  }, [setMiniAppEnabled]);
-  const addMiniAppPlan = useCallback((plan: MiniAppPlanCard) => {
-    setMiniApp((cur) => ({ ...cur, plans: [...(cur.plans ?? []), plan] }));
-    setMiniAppEnabled(true);
-  }, [setMiniAppEnabled]);
+  const setMiniAppHero = useCallback(
+    (hero: MiniAppHero) => {
+      mergeMiniApp({ hero });
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
+  const setMiniAppStats = useCallback(
+    (stats: MiniAppStat[]) => {
+      mergeMiniApp({ stats });
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
+  const setMiniAppTabs = useCallback(
+    (tabs: MiniAppTabSpec[]) => {
+      mergeMiniApp({ tabs });
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
+  const addMiniAppItem = useCallback(
+    (item: MiniAppItem) => {
+      setMiniApp((cur) => ({ ...cur, items: [...(cur.items ?? []), item] }));
+      setMiniAppEnabled(true);
+    },
+    [setMiniAppEnabled],
+  );
+  const addMiniAppPlan = useCallback(
+    (plan: MiniAppPlanCard) => {
+      setMiniApp((cur) => ({ ...cur, plans: [...(cur.plans ?? []), plan] }));
+      setMiniAppEnabled(true);
+    },
+    [setMiniAppEnabled],
+  );
   const clearMiniAppItems = useCallback(() => {
     mergeMiniApp({ items: [] });
     setMiniAppEnabled(true);
@@ -648,7 +714,12 @@ export function AnvlWorkspaceProvider({
     setMiniAppEnabled(true);
   }, [mergeMiniApp, setMiniAppEnabled]);
 
-  const { status: saveStatus, lastSavedAt, snapshotNow, flowId } = useFlowPersistence({
+  const {
+    status: saveStatus,
+    lastSavedAt,
+    snapshotNow,
+    flowId,
+  } = useFlowPersistence({
     slug,
     nodes,
     edges,
@@ -664,27 +735,94 @@ export function AnvlWorkspaceProvider({
   });
 
   const lintIssues = useMemo<LintIssue[]>(() => {
-    try { return lintFlow(nodes, edges, variables); }
-    catch { return []; }
+    try {
+      return lintFlow(nodes, edges, variables);
+    } catch {
+      return [];
+    }
   }, [nodes, edges, variables]);
 
   const value = useMemo(
     () => ({
-      nodes, edges, setNodes, setEdges,
-      preview, miniApp, generatedCode, setGeneratedCode,
-      variables, setVariables,
+      nodes,
+      edges,
+      setNodes,
+      setEdges,
+      preview,
+      miniApp,
+      generatedCode,
+      setGeneratedCode,
+      variables,
+      setVariables,
       applyBlueprint,
-      addAiNode, connectAiNodes, updateAiNodeParam,
-      removeAiNode, removeAiEdge, renameAiNode, serializeCanvas,
-      mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas,
-      initMiniApp, setMiniAppHero, setMiniAppStats, setMiniAppTabs,
-      addMiniAppItem, addMiniAppPlan, clearMiniAppItems, clearMiniAppPlans,
-      addMenuSection, removeMenuSection, updateMenuSection,
-      saveStatus, lastSavedAt, snapshotNow,
-      flowId, slug, rollbackToVersion,
+      addAiNode,
+      connectAiNodes,
+      updateAiNodeParam,
+      removeAiNode,
+      removeAiEdge,
+      renameAiNode,
+      serializeCanvas,
+      mergePreview,
+      mergeMiniApp,
+      resetAiCanvas,
+      relayoutCanvas,
+      initMiniApp,
+      setMiniAppHero,
+      setMiniAppStats,
+      setMiniAppTabs,
+      addMiniAppItem,
+      addMiniAppPlan,
+      clearMiniAppItems,
+      clearMiniAppPlans,
+      addMenuSection,
+      removeMenuSection,
+      updateMenuSection,
+      saveStatus,
+      lastSavedAt,
+      snapshotNow,
+      flowId,
+      slug,
+      rollbackToVersion,
       lintIssues,
     }),
-    [nodes, edges, preview, miniApp, generatedCode, variables, applyBlueprint, addAiNode, connectAiNodes, updateAiNodeParam, removeAiNode, removeAiEdge, renameAiNode, serializeCanvas, mergePreview, mergeMiniApp, resetAiCanvas, relayoutCanvas, initMiniApp, setMiniAppHero, setMiniAppStats, setMiniAppTabs, addMiniAppItem, addMiniAppPlan, clearMiniAppItems, clearMiniAppPlans, addMenuSection, removeMenuSection, updateMenuSection, saveStatus, lastSavedAt, snapshotNow, flowId, slug, rollbackToVersion, lintIssues],
+    [
+      nodes,
+      edges,
+      preview,
+      miniApp,
+      generatedCode,
+      variables,
+      applyBlueprint,
+      addAiNode,
+      connectAiNodes,
+      updateAiNodeParam,
+      removeAiNode,
+      removeAiEdge,
+      renameAiNode,
+      serializeCanvas,
+      mergePreview,
+      mergeMiniApp,
+      resetAiCanvas,
+      relayoutCanvas,
+      initMiniApp,
+      setMiniAppHero,
+      setMiniAppStats,
+      setMiniAppTabs,
+      addMiniAppItem,
+      addMiniAppPlan,
+      clearMiniAppItems,
+      clearMiniAppPlans,
+      addMenuSection,
+      removeMenuSection,
+      updateMenuSection,
+      saveStatus,
+      lastSavedAt,
+      snapshotNow,
+      flowId,
+      slug,
+      rollbackToVersion,
+      lintIssues,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
