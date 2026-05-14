@@ -251,21 +251,113 @@ Use Max concepts: Max Developer Console token, /commands, inline buttons
 (payload), keyboard with rows. Do NOT mention Telegram-only features.`;
 
 const REAL_MODELS = {
-  gpt: "openai/gpt-5",
-  gemini: "google/gemini-3-flash-preview",
+  gemini_flash: "gemini-2.5-flash",
+  gemini_pro: "gemini-2.5-pro",
 } as const;
 
 const ALIASES: Record<string, keyof typeof REAL_MODELS> = {
-  auto: "gemini",
-  claude: "gpt",
-  grok: "gemini",
+  auto: "gemini_flash",
+  claude: "gemini_pro",
+  gpt: "gemini_pro",
+  gemini: "gemini_flash",
+  grok: "gemini_flash",
 };
 
 function resolveModel(input?: string): string {
   const key = (input ?? "auto").toLowerCase();
   if (key in REAL_MODELS) return REAL_MODELS[key as keyof typeof REAL_MODELS];
   if (key in ALIASES) return REAL_MODELS[ALIASES[key]];
-  return REAL_MODELS.gemini;
+  return REAL_MODELS.gemini_flash;
+}
+
+// ===== OpenAI ↔ Google API format converters =====
+// We keep the conversation in OpenAI-style internally (role: system/user/
+// assistant/tool, tool_calls with function/arguments-as-string) because the
+// rest of the codebase and the streaming SSE format to the client expect that
+// shape. These helpers convert to/from the Google Generative Language API
+// shape (contents with role: user/model, parts with text/functionCall/
+// functionResponse, separate systemInstruction, tools.functionDeclarations).
+
+function convertMessagesToGoogle(
+  messages: Array<{ role: string; content: any; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
+): { systemInstruction: any; contents: any[] } {
+  let systemText = "";
+  const contents: any[] = [];
+  // Track tool_call_id → function name so we can name functionResponse parts.
+  const toolIdToName = new Map<string, string>();
+  for (const m of messages) {
+    if (m.role === "system") {
+      const txt = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      systemText += (systemText ? "\n\n" : "") + txt;
+      continue;
+    }
+    if (m.role === "user") {
+      contents.push({
+        role: "user",
+        parts: [{ text: typeof m.content === "string" ? m.content : JSON.stringify(m.content) }],
+      });
+      continue;
+    }
+    if (m.role === "assistant") {
+      const parts: any[] = [];
+      const txt = typeof m.content === "string" ? m.content : "";
+      if (txt) parts.push({ text: txt });
+      if (Array.isArray(m.tool_calls)) {
+        for (const tc of m.tool_calls) {
+          let args: any = {};
+          try { args = JSON.parse(tc.function?.arguments ?? "{}"); } catch { /* keep empty */ }
+          parts.push({ functionCall: { name: tc.function?.name ?? "", args } });
+          if (tc.id && tc.function?.name) toolIdToName.set(tc.id, tc.function.name);
+        }
+      }
+      if (parts.length === 0) parts.push({ text: "" });
+      contents.push({ role: "model", parts });
+      continue;
+    }
+    if (m.role === "tool") {
+      const fnName = m.name || (m.tool_call_id ? (toolIdToName.get(m.tool_call_id) || "tool") : "tool");
+      let parsed: any = m.content;
+      if (typeof m.content === "string") {
+        try { parsed = JSON.parse(m.content); } catch { parsed = { content: m.content }; }
+      }
+      contents.push({
+        role: "user",
+        parts: [{ functionResponse: { name: fnName, response: parsed } }],
+      });
+      continue;
+    }
+  }
+  return {
+    systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined,
+    contents,
+  };
+}
+
+function convertToolsToGoogle(toolDefs: any[] | undefined): any[] | undefined {
+  if (!toolDefs || toolDefs.length === 0) return undefined;
+  return [{
+    functionDeclarations: toolDefs.map((t) => {
+      const fn = t.function ?? t;
+      // Google rejects schemas with `additionalProperties` field — strip it
+      // recursively. Also Google wants `properties: {}` at minimum.
+      const sanitize = (schema: any): any => {
+        if (!schema || typeof schema !== "object") return schema;
+        if (Array.isArray(schema)) return schema.map(sanitize);
+        const out: any = {};
+        for (const [k, v] of Object.entries(schema)) {
+          if (k === "additionalProperties") continue;
+          out[k] = sanitize(v);
+        }
+        if (out.type === "object" && !out.properties) out.properties = {};
+        return out;
+      };
+      return {
+        name: fn.name,
+        description: fn.description ?? "",
+        parameters: sanitize(fn.parameters ?? { type: "object", properties: {} }),
+      };
+    }),
+  }];
 }
 
 function buildPrompt(miniAppEnabled: boolean, platform: string): string {
@@ -802,9 +894,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const aiModel = resolveModel(model);
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    const apiKey = Deno.env.get("GOOGLE_API_KEY");
     if (!apiKey) {
-      return json({ error: "LOVABLE_API_KEY is not configured" }, 500);
+      return json({ error: "GOOGLE_API_KEY is not configured" }, 500);
     }
 
     let systemPrompt: string;
@@ -862,19 +954,27 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         try {
           for (let round = 0; round < 8; round++) {
             console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
-            const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
+
+            const { systemInstruction, contents } = convertMessagesToGoogle(conversation);
+            const googleTools = convertToolsToGoogle(toolDefs);
+            const googleBody: any = {
+              contents,
+              generationConfig: {
+                maxOutputTokens: summaryOnly ? 700 : 8192,
+                temperature: 0.7,
               },
-              body: JSON.stringify({
-                model: aiModel,
-                messages: conversation,
-                stream: true,
-                max_tokens: summaryOnly ? 700 : 8192,
-                ...(toolDefs ? { tools: toolDefs, tool_choice: "required" } : {}),
-              }),
+            };
+            if (systemInstruction) googleBody.systemInstruction = systemInstruction;
+            if (googleTools) {
+              googleBody.tools = googleTools;
+              googleBody.toolConfig = { functionCallingConfig: { mode: "ANY" } };
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
+            const upstream = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(googleBody),
             });
 
             if (!upstream.ok || !upstream.body) {
@@ -893,12 +993,18 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             const reader = upstream.body.getReader();
             let buffer = "";
             let assistantContent = "";
-            // Tool calls collected in this round, keyed by upstream index.
-            const roundCalls = new Map<number, { id: string; name: string; args: string }>();
+            // Tool calls collected in this round. Google delivers each
+            // functionCall as a complete object (not chunked deltas), so we
+            // assign a local index on first sight and finalize immediately.
+            const roundCalls = new Map<number, { id: string; name: string; args: any }>();
             let maxLocalIndex = -1;
+            let nextLocalIdx = 0;
 
-            // Pump SSE events: forward to client (with re-indexed tool_calls)
-            // and capture content + tool_calls for the next round.
+            // Pump SSE events. Each `data:` line carries a Google chunk like:
+            //   { "candidates":[{ "content":{"role":"model","parts":[
+            //       { "text": "..." } | { "functionCall": {"name":"...","args":{...}} }
+            //   ]} }] }
+            // We translate each into an OpenAI-style delta and forward to client.
             for (;;) {
               const { value, done } = await reader.read();
               if (done) break;
@@ -909,45 +1015,42 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                 let line = buffer.slice(0, nl);
                 buffer = buffer.slice(nl + 1);
                 if (line.endsWith("\r")) line = line.slice(0, -1);
-                if (!line.startsWith("data: ")) {
-                  if (line) controller.enqueue(encoder.encode(line + "\n"));
-                  continue;
-                }
+                if (!line.startsWith("data: ")) continue;
                 const payload = line.slice(6).trim();
-                if (payload === "[DONE]") {
-                  // Swallow — we may need another round; only emit at the very end.
-                  continue;
-                }
-                try {
-                  const parsed = JSON.parse(payload);
-                  const choice = parsed.choices?.[0];
-                  const delta = choice?.delta;
-                  if (typeof delta?.content === "string") {
-                    assistantContent += delta.content;
+                if (!payload || payload === "[DONE]") continue;
+
+                let parsed: any;
+                try { parsed = JSON.parse(payload); } catch { continue; }
+
+                const parts = parsed?.candidates?.[0]?.content?.parts;
+                if (!Array.isArray(parts)) continue;
+
+                for (const part of parts) {
+                  if (typeof part?.text === "string" && part.text.length > 0) {
+                    assistantContent += part.text;
+                    // Emit OpenAI-style content delta to client.
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      choices: [{ delta: { content: part.text } }],
+                    })}\n\n`));
+                  } else if (part?.functionCall && typeof part.functionCall === "object") {
+                    const localIdx = nextLocalIdx++;
+                    maxLocalIndex = Math.max(maxLocalIndex, localIdx);
+                    const name = String(part.functionCall.name ?? "");
+                    const args = part.functionCall.args ?? {};
+                    const id = `gemini_${round}_${localIdx}`;
+                    roundCalls.set(localIdx, { id, name, args });
+                    // Emit OpenAI-style tool_call delta to client. The client
+                    // accumulates by `index` and triggers applyToolCall when
+                    // the arguments string finishes — we deliver it whole.
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      choices: [{ delta: { tool_calls: [{
+                        index: localIdx + indexOffset,
+                        id,
+                        type: "function",
+                        function: { name, arguments: JSON.stringify(args) },
+                      }] } }],
+                    })}\n\n`));
                   }
-                  if (Array.isArray(delta?.tool_calls)) {
-                    for (const tc of delta.tool_calls) {
-                      const localIdx = tc.index ?? 0;
-                      maxLocalIndex = Math.max(maxLocalIndex, localIdx);
-                      const slot = roundCalls.get(localIdx) ?? { id: "", name: "", args: "" };
-                      if (tc.id) slot.id = tc.id;
-                      if (tc.function?.name) slot.name = tc.function.name;
-                      const argsChunk = tc.function?.arguments;
-                      if (typeof argsChunk === "string") {
-                        slot.args += argsChunk;
-                      } else if (argsChunk && typeof argsChunk === "object") {
-                        // Google sometimes sends a parsed object instead of a string chunk.
-                        slot.args = JSON.stringify(argsChunk);
-                      }
-                      roundCalls.set(localIdx, slot);
-                      // Re-index for the client so buffers across rounds don't collide.
-                      tc.index = localIdx + indexOffset;
-                    }
-                  }
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
-                } catch {
-                  // Forward un-parseable lines verbatim — better than dropping.
-                  controller.enqueue(encoder.encode(line + "\n"));
                 }
               }
             }
@@ -971,7 +1074,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               .map(([, c], i) => ({
                 id: c.id || `call_${round}_${i}`,
                 type: "function" as const,
-                function: { name: c.name, arguments: c.args || "{}" },
+                function: { name: c.name, arguments: typeof c.args === "string" ? (c.args || "{}") : JSON.stringify(c.args ?? {}) },
               }));
 
             conversation.push({
@@ -984,6 +1087,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               conversation.push({
                 role: "tool",
                 tool_call_id: call.id,
+                name: call.function.name,
                 content: call.function.name === "get_canvas" ? canvasResult : `{"ok":true}`,
               });
             }
