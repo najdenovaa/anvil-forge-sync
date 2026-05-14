@@ -932,7 +932,13 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                       const slot = roundCalls.get(localIdx) ?? { id: "", name: "", args: "" };
                       if (tc.id) slot.id = tc.id;
                       if (tc.function?.name) slot.name = tc.function.name;
-                      if (typeof tc.function?.arguments === "string") slot.args += tc.function.arguments;
+                      const argsChunk = tc.function?.arguments;
+                      if (typeof argsChunk === "string") {
+                        slot.args += argsChunk;
+                      } else if (argsChunk && typeof argsChunk === "object") {
+                        // Google sometimes sends a parsed object instead of a string chunk.
+                        slot.args = JSON.stringify(argsChunk);
+                      }
                       roundCalls.set(localIdx, slot);
                       // Re-index for the client so buffers across rounds don't collide.
                       tc.index = localIdx + indexOffset;
