@@ -846,11 +846,14 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               }
             }
 
+            console.log(`[architect-chat] round=${round} stream done, tool_calls=${roundCalls.size}, assistant_content_length=${assistantContent.length}, tool_call_names=${JSON.stringify(Array.from(roundCalls.values()).map(c => c.name))}`);
+
             // End the conversation ONLY when the model stopped calling tools.
             // While the model keeps making tool_calls, we feed synthetic results
             // back and run another round — this gives it room to break a big task
             // into multiple turns instead of hedging with "task too big" text.
             if (roundCalls.size === 0) {
+              console.log(`[architect-chat] FINISHED at round=${round}, exit_reason=empty_round`);
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
