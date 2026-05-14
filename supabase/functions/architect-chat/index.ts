@@ -20,7 +20,7 @@ BUILD — строить с нуля. Признаки: «сделай бота 
 
 EDIT — точечная правка существующего. Признаки: «измени», «добавь», «убери», «поменяй», «переименуй», ссылки на конкретные элементы («кнопку Цены», «приветствие», «вторую ветку»).
 
-Если неясно: get_canvas → если флоу есть и нет явного «начни заново» → EDIT, если флоу пуст → BUILD. В крайнем случае задайте ОДИН уточняющий вопрос БЕЗ tool_calls.
+Если неясно: get_canvas → если флоу есть и нет явного «начни заново» → EDIT, если флоу пуст → BUILD. В крайнем случае задайте ОДИН уточняющий вопрос БЕЗ tool_calls — но ТОЛЬКО если запрос пользователя НЕЯСЕН. Большой объём работы — НЕ повод задавать вопрос; разбивайте на раунды (см. раздел «БОЛЬШИЕ ЗАДАЧИ» ниже).
 
 == АЛГОРИТМ BUILD ==
 1. reset_canvas() — ОБЯЗАТЕЛЬНО первым tool_call.
@@ -54,6 +54,19 @@ ID нод: используйте ТОЛЬКО ID из ответа get_canvas. 
 keyboard.inline в этом раннтайме — ТЕРМИНАЛЬНЫЙ узел: после прикрепления клавиатуры обход останавливается, и бот ждёт нажатия. Маршрутизация нажатий ВСЕГДА через trigger.callback-ноды: их params.data должно совпадать с action кнопки. Никогда не создавай ребро menu_kb → message — это даст либо неработающую кнопку, либо infinite loop.
 
 Правильная цепочка главного меню: trigger.command → (action.input для имени, опционально) → message.text(menu_msg) → keyboard.inline(menu_kb). На этом всё. Каждая кнопка меню обслуживается отдельной trigger.callback(data=...) → дальнейшая нода.
+
+== БОЛЬШИЕ ЗАДАЧИ И РАЗБИВКА НА РАУНДЫ ==
+Архитектор работает в multi-turn loop'е: до 8 раундов на один ответ пользователю. После каждого раунда вы можете продолжить, вызвав ЛЮБОЙ tool_call в следующем раунде — система даст вам новый шанс.
+
+Если задача большая (бот + Mini App + много контента), РАЗБЕЙТЕ её на последовательные раунды ОДНОГО ответа пользователю:
+- Раунд 1: каркас бота (reset_canvas + set_variables + триггеры + основные ноды + базовые keyboard.inline).
+- Раунд 2: FAQ-разделы (add_menu_section по одному).
+- Раунд 3: Mini App контент (init_miniapp + hero + items + plans + tabs).
+- Раунд 4: финальные set_preview + set_code.
+
+В конце каждого промежуточного раунда ОБЯЗАТЕЛЬНО вызовите get_canvas() — это даёт системе сигнал «продолжаю в следующем раунде», вы получаете свежий snapshot, и общий лимит на токены ответа сбрасывается.
+
+ЗАПРЕЩЕНО отвечать пользователю «задача слишком большая», «не получилось за один проход», «опишите по одной фиче». Это худший возможный исход. Лучше сделайте ЧАСТЬ работы и продолжите в следующих раундах через get_canvas — система предусмотрена для этого.
 
 == COMPOSITE TOOLS: КОГДА И КАК ==
 add_menu_section атомарно собирает паттерн «новая кнопка в существующем меню → trigger.callback → нода-ответ → keyboard.inline с кнопкой возврата → shared trigger.callback(back_to_menu) → menu_msg → menu_kb». Это правильный способ для FAQ-разделов: невозможно перепутать ID, невозможно забыть связь, невозможно создать loop.
@@ -111,6 +124,23 @@ operator: eq, neq, gt, lt, gte, lte, contains, not_contains, starts_with, ends_w
 ИСПОЛЬЗУЙТЕ ЭТО. НЕ создавайте logic.condition сразу после action.input для дубль-проверки regex'ом — рантайм пере-входит в input без нового текста и бот замолкает.
 
 logic.condition после action.input допустима только для бизнес-логики (сравнение с порогом, проверка членства, не-regex проверки формата).
+
+== СБОРКА MINI APP ==
+Если включён Mini App-режим (в описании пользователя упомянуты «мини апп», «webapp», «приложение», или вы добавили в канвас ноду miniapp.screen) — вы ОБЯЗАНЫ собрать контент Mini App через composite-tools в том же ответе. Не оставляйте flows.miniapp пустым — иначе пользователь увидит дефолтную заглушку «Anvl VPN», независимо от темы бота.
+
+Обязательная последовательность вызовов:
+1. init_miniapp({ title, subtitle, accent, theme: "dark"|"light", itemsLabel? }) — ПЕРВЫЙ вызов для Mini App. accent — короткое имя цвета («orange» для пиццы/фастфуда, «blue» для tech, «green» для фитнеса, «purple» для премиум).
+2. set_miniapp_hero({ title, subtitle, cta, icon? }) — большая карточка сверху. cta — текст основной кнопки.
+3. set_miniapp_stats([{ label, value, unit? }, ...]) — 2-4 показателя в шапке (например: «Пицц в меню — 6», «Доставка — 30 мин», «Рейтинг — 4.8/5»).
+4. (EDIT) clear_miniapp_items() — если перестраиваете содержимое.
+5. add_miniapp_item({ title, subtitle?, meta?, emoji?, badge? }) — ОТДЕЛЬНО для каждого товара/услуги. title — название, subtitle — короткое описание, meta — цена/длительность, emoji — короткий значок, badge — необязательная метка («Хит», «Новинка»).
+6. (EDIT) clear_miniapp_plans() — если перестраиваете тарифы.
+7. add_miniapp_plan({ id, name, price, unit?, description?, highlight?, features?: [...] }) — ОТДЕЛЬНО для каждого тарифа. id — латинский ключ, highlight: true — для рекомендованного тарифа.
+8. set_miniapp_tabs([{ id, label, icon? }, ...]) — нижние табы, обычно 3-4 штуки.
+
+ВСЕ значения должны быть из ОПИСАНИЯ ПОЛЬЗОВАТЕЛЯ — конкретные товары, цены, тарифы. Не выдумывайте контент. Если пользователь упомянул шесть пицц с ценами — вызовите add_miniapp_item шесть раз с этими названиями и ценами.
+
+set_miniapp (старый, единым JSON) — оставлен как escape hatch, но ПРЕДПОЧИТАЙТЕ composite-tools — модель путается в большом JSON.
 
 == GRAPH INTEGRITY (обязательно перед финальным ответом) ==
 A. Каждая нода кроме trigger.* имеет хотя бы одно входящее ребро.
@@ -730,7 +760,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         let indexOffset = 0; // shift tool_call indexes across rounds so client buffers don't collide
 
         try {
-          for (let round = 0; round < 4; round++) {
+          for (let round = 0; round < 8; round++) {
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
@@ -815,13 +845,11 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               }
             }
 
-            // Decide: any get_canvas calls? If so, satisfy ALL collected tool_calls
-            // with synthetic results and run another round. Otherwise — finalize.
-            const hasGetCanvas = Array.from(roundCalls.values()).some(
-              (c) => c.name === "get_canvas",
-            );
-
-            if (!hasGetCanvas || roundCalls.size === 0) {
+            // End the conversation ONLY when the model stopped calling tools.
+            // While the model keeps making tool_calls, we feed synthetic results
+            // back and run another round — this gives it room to break a big task
+            // into multiple turns instead of hedging with "task too big" text.
+            if (roundCalls.size === 0) {
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
