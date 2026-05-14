@@ -552,7 +552,22 @@ function buildTools(miniAppEnabled: boolean) {
         "stats:[{label,value,unit?}], items:[{title,subtitle?,meta?,emoji?,badge?}], " +
         "plans:[{id,name,price,unit?,description?,highlight?,features?[]}], tabs:[{id,label,icon?}] }. " +
         "Domain-specific values only — never leave it empty.",
-      parameters: { type: "object", additionalProperties: true },
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          subtitle: { type: "string" },
+          accent: { type: "string" },
+          itemsLabel: { type: "string" },
+          theme: { type: "string" },
+          hero: { type: "object", additionalProperties: true },
+          stats: { type: "array", items: { type: "object", additionalProperties: true } },
+          items: { type: "array", items: { type: "object", additionalProperties: true } },
+          plans: { type: "array", items: { type: "object", additionalProperties: true } },
+          tabs: { type: "array", items: { type: "object", additionalProperties: true } },
+        },
+        additionalProperties: true,
+      },
     },
   });
 
