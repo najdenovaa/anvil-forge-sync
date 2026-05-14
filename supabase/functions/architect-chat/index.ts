@@ -125,6 +125,23 @@ operator: eq, neq, gt, lt, gte, lte, contains, not_contains, starts_with, ends_w
 
 logic.condition после action.input допустима только для бизнес-логики (сравнение с порогом, проверка членства, не-regex проверки формата).
 
+== СБОРКА MINI APP ==
+Если включён Mini App-режим (в описании пользователя упомянуты «мини апп», «webapp», «приложение», или вы добавили в канвас ноду miniapp.screen) — вы ОБЯЗАНЫ собрать контент Mini App через composite-tools в том же ответе. Не оставляйте flows.miniapp пустым — иначе пользователь увидит дефолтную заглушку «Anvl VPN», независимо от темы бота.
+
+Обязательная последовательность вызовов:
+1. init_miniapp({ title, subtitle, accent, theme: "dark"|"light", itemsLabel? }) — ПЕРВЫЙ вызов для Mini App. accent — короткое имя цвета («orange» для пиццы/фастфуда, «blue» для tech, «green» для фитнеса, «purple» для премиум).
+2. set_miniapp_hero({ title, subtitle, cta, icon? }) — большая карточка сверху. cta — текст основной кнопки.
+3. set_miniapp_stats([{ label, value, unit? }, ...]) — 2-4 показателя в шапке (например: «Пицц в меню — 6», «Доставка — 30 мин», «Рейтинг — 4.8/5»).
+4. (EDIT) clear_miniapp_items() — если перестраиваете содержимое.
+5. add_miniapp_item({ title, subtitle?, meta?, emoji?, badge? }) — ОТДЕЛЬНО для каждого товара/услуги. title — название, subtitle — короткое описание, meta — цена/длительность, emoji — короткий значок, badge — необязательная метка («Хит», «Новинка»).
+6. (EDIT) clear_miniapp_plans() — если перестраиваете тарифы.
+7. add_miniapp_plan({ id, name, price, unit?, description?, highlight?, features?: [...] }) — ОТДЕЛЬНО для каждого тарифа. id — латинский ключ, highlight: true — для рекомендованного тарифа.
+8. set_miniapp_tabs([{ id, label, icon? }, ...]) — нижние табы, обычно 3-4 штуки.
+
+ВСЕ значения должны быть из ОПИСАНИЯ ПОЛЬЗОВАТЕЛЯ — конкретные товары, цены, тарифы. Не выдумывайте контент. Если пользователь упомянул шесть пицц с ценами — вызовите add_miniapp_item шесть раз с этими названиями и ценами.
+
+set_miniapp (старый, единым JSON) — оставлен как escape hatch, но ПРЕДПОЧИТАЙТЕ composite-tools — модель путается в большом JSON.
+
 == GRAPH INTEGRITY (обязательно перед финальным ответом) ==
 A. Каждая нода кроме trigger.* имеет хотя бы одно входящее ребро.
 B. Welcome-нода (первый message после trigger.command) соединена с триггером.
