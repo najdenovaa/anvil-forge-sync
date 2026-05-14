@@ -126,6 +126,22 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Удалил раздел ${args.section_msg_id}`;
     case "update_menu_section":
       return `Обновил раздел ${args.section_msg_id}${args.new_button_label ? ` → «${args.new_button_label}»` : ""}`;
+    case "init_miniapp":
+      return `Инициализировал Mini App «${args.title ?? ""}»`;
+    case "set_miniapp_hero":
+      return "Установил hero-карточку";
+    case "set_miniapp_stats":
+      return `Установил статистику (${Array.isArray(args.stats) ? args.stats.length : 0} блока)`;
+    case "set_miniapp_tabs":
+      return `Установил ${Array.isArray(args.tabs) ? args.tabs.length : 0} табов`;
+    case "add_miniapp_item":
+      return `Добавил элемент «${args.title ?? ""}»`;
+    case "add_miniapp_plan":
+      return `Добавил тариф «${args.name ?? ""}»`;
+    case "clear_miniapp_items":
+      return "Очистил список items";
+    case "clear_miniapp_plans":
+      return "Очистил список plans";
     default:
       return name;
   }
@@ -223,6 +239,14 @@ export function LeftAIPanel() {
     serializeCanvas,
     mergePreview,
     mergeMiniApp,
+    initMiniApp,
+    setMiniAppHero,
+    setMiniAppStats,
+    setMiniAppTabs,
+    addMiniAppItem,
+    addMiniAppPlan,
+    clearMiniAppItems,
+    clearMiniAppPlans,
     resetAiCanvas,
     relayoutCanvas,
     setVariables,
@@ -353,6 +377,14 @@ export function LeftAIPanel() {
         else if (name === "set_param") updateAiNodeParam(args.id, args.key, args.value);
         else if (name === "set_preview") mergePreview(args);
         else if (name === "set_miniapp") mergeMiniApp(args);
+        else if (name === "init_miniapp") initMiniApp(args);
+        else if (name === "set_miniapp_hero") setMiniAppHero(args as any);
+        else if (name === "set_miniapp_stats") setMiniAppStats(Array.isArray(args.stats) ? args.stats : []);
+        else if (name === "set_miniapp_tabs") setMiniAppTabs(Array.isArray(args.tabs) ? args.tabs : []);
+        else if (name === "add_miniapp_item") addMiniAppItem(args as any);
+        else if (name === "add_miniapp_plan") addMiniAppPlan(args as any);
+        else if (name === "clear_miniapp_items") clearMiniAppItems();
+        else if (name === "clear_miniapp_plans") clearMiniAppPlans();
         else if (name === "set_code") {
           setGeneratedCode(String(args.content ?? ""));
           codeApplied = true;
