@@ -1020,11 +1020,15 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             if (!upstream.ok || !upstream.body) {
               const text = await upstream.text().catch(() => "");
               console.error("Anthropic API error:", upstream.status, text);
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ error: "gateway_error", status: upstream.status, detail: text.slice(0, 500) })}\n\n`,
-                ),
-              );
+              // Surface the upstream error as a visible content delta so the
+              // user sees the actual cause in chat (instead of the generic
+              // "empty stream" fallback the client falls back to when no
+              // content arrives). This is a diagnostics aid — once stable
+              // we can downgrade to a quieter message.
+              const errMsg = `⚠️ Anthropic API ${upstream.status}\n\n${text.slice(0, 1500) || "(empty body)"}`;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                choices: [{ delta: { content: errMsg } }],
+              })}\n\n`));
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
               return;
@@ -1149,6 +1153,17 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             }
 
             console.log(`[architect-chat] round=${round} stream done, stop_reason=${stopReason ?? "none"}, tool_calls=${roundCalls.size}, assistant_content_length=${assistantContent.length}, tool_call_names=${JSON.stringify(Array.from(roundCalls.values()).map(c => c.name))}`);
+
+            // Diagnostic: if Anthropic returned absolutely nothing (no text,
+            // no tool_calls) — surface that in chat so the user sees it
+            // instead of a silent failure. This catches the case where the
+            // model decided to stop without producing any output.
+            if (roundCalls.size === 0 && assistantContent.length === 0) {
+              const diag = `⚠️ [DEBUG round=${round}] Anthropic вернул пустой ответ.\nstop_reason=${stopReason ?? "unknown"}\nЭто значит модель решила ничего не выводить. Скорее всего проблема в промпте или tool_choice.`;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                choices: [{ delta: { content: diag } }],
+              })}\n\n`));
+            }
 
             // End the conversation ONLY when the model stopped calling tools.
             // While the model keeps making tool_calls, we feed synthetic results
