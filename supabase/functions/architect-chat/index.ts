@@ -1063,7 +1063,14 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
         let indexOffset = 0; // shift tool_call indexes across rounds so client buffers don't collide
 
         try {
-          for (let round = 0; round < 8; round++) {
+          // Round cap raised from 8 to 30 (2026-05-15). Under tool_choice:"any",
+          // Sonnet 4.6 prefers to emit one tool_use per round rather than batching
+          // them. With the old cap of 8, multi-step pipelines (e.g. "build a shop
+          // bot": 6× add_miniapp_item + set_miniapp_cart + add_webapp_handler +
+          // structural nodes = 12-17 ops) silently truncated at 8 — the user
+          // saw a half-built bot and a confident summary text. 30 gives us 4×
+          // headroom on realistic asks while still capping runaway loops.
+          for (let round = 0; round < 30; round++) {
             console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
 
             const { system, messages: anthropicMessages } = convertMessagesToAnthropic(conversation);
