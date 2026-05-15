@@ -57,6 +57,14 @@ export interface SimMessage {
   warning?: string;
 }
 
+/** Payload shape sent by Mini App via Telegram.WebApp.sendData. */
+export interface SimWebappPayload {
+  action?: string;
+  items?: Array<{ title?: string; price?: number; qty?: number }>;
+  total?: number | string;
+  currency?: string;
+}
+
 interface SimulatorCtx {
   /** True when at least one canvas node can be used as a simulation entry. */
   available: boolean;
@@ -97,6 +105,11 @@ interface SimulatorCtx {
   /** Follow the first outgoing edge of the effective node — used by the
    *  preview to continue past action.api / condition after staging. */
   advance: () => void;
+  /** Simulate a Telegram.WebApp.sendData event from the preview Mini App.
+   *  Finds the matching trigger.webapp_data node (by `action`), seeds
+   *  {webapp.*} into the template context, and jumps to it so the chat
+   *  shows the bot's reply. No-op if no matching trigger exists. */
+  submitWebappData: (payload: SimWebappPayload) => void;
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
@@ -411,6 +424,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [variables, setVariables] = useState<Record<string, unknown>>({});
   const [lastInputText, setLastInputText] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
+  /** Populated by submitWebappData; consumed by composeMessage when the
+   *  current branch is a `trigger.webapp_data` → message.text reply. */
+  const [webappCtx, setWebappCtx] = useState<TemplateContext["webapp"] | undefined>(undefined);
 
   useEffect(() => {
     if (!entryId) {
@@ -438,8 +454,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       var: variables,
       text: lastInputText,
       system: buildSystemContext(),
+      webapp: webappCtx,
     }),
-    [variables, lastInputText],
+    [variables, lastInputText, webappCtx],
   );
 
   const composed = useMemo(() => {
@@ -606,6 +623,52 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
     if (next) jumpTo(next.target, next.id);
   }, [composed, edges, nodes, jumpTo]);
 
+  /**
+   * Simulate a Telegram.WebApp.sendData event from the in-canvas Mini App
+   * preview. Mirrors bot-runtime.pickTrigger + buildWebappCtx so the
+   * preview chat shows the exact bubble the live bot would send.
+   *
+   * Behavior:
+   *  - Builds {webapp.action,total,currency,count,items_summary,raw}.
+   *  - Finds a `trigger.webapp_data` node whose params.action matches
+   *    payload.action (empty params.action = catch-all).
+   *  - Jumps to that trigger so composeMessage walks downstream
+   *    message.text and renders {webapp.*} via tplCtx.
+   *  - No-op when no matching trigger exists — the preview chat keeps
+   *    its current state, which mirrors the live bot's silence.
+   */
+  const submitWebappData = useCallback(
+    (payload: SimWebappPayload) => {
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const summary = items
+        .filter((i) => i && typeof i.title === "string")
+        .map((i) => `${i.title} × ${i.qty ?? 1}`)
+        .join(", ");
+      const wctx: TemplateContext["webapp"] = {
+        action: typeof payload.action === "string" ? payload.action : undefined,
+        total: payload.total != null ? String(payload.total) : undefined,
+        currency: typeof payload.currency === "string" ? payload.currency : undefined,
+        count: String(items.length),
+        items_summary: summary || undefined,
+        raw: JSON.stringify(payload),
+      };
+      setWebappCtx(wctx);
+
+      const want = (payload.action ?? "").trim();
+      const trig = nodes.find((n) => {
+        if ((n.data?.kind as NodeKind) !== "trigger.webapp_data") return false;
+        const a = String(((n.data?.params as Record<string, string>) ?? {}).action ?? "").trim();
+        return !a || !want || a === want;
+      });
+      if (!trig) {
+        console.warn("[sim] webapp_data dropped: no trigger.webapp_data matches action", want);
+        return;
+      }
+      jumpTo(trig.id);
+    },
+    [nodes, jumpTo],
+  );
+
   // Auto-advance through logic.condition nodes — the simulator should behave
   // like the real runtime: when a condition has a structured config we evaluate
   // it from `variables` and silently follow the matching branch. When the
@@ -679,6 +742,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       setCameraFollow,
       breadcrumb,
       advance,
+      submitWebappData,
     }),
     [
       available,
@@ -700,6 +764,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       cameraFollow,
       breadcrumb,
       advance,
+      submitWebappData,
     ],
   );
 
