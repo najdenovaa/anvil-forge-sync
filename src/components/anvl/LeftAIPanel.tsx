@@ -373,6 +373,42 @@ export function LeftAIPanel() {
   const sendRef = useRef<(text?: string) => void>(() => {});
   const bootedRef = useRef(false);
 
+  const applyLocalQuickFix = (text: string) => {
+    const normalized = normalizeNodeRef(text);
+    const asksForMiniAppOrderWire =
+      /соедин|связ|протян|подключ|мини|mini|webapp|заказ|order|trigger|триггер/.test(normalized) &&
+      /мини|mini|webapp/.test(normalized) &&
+      /заказ|order|trigger|триггер|senddata/.test(normalized);
+    if (!asksForMiniAppOrderWire) return null;
+
+    const canvasNodes = nodes.map((n) => ({
+      id: n.id,
+      kind: (n.data?.kind as string) ?? "message.text",
+      title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
+      params: (n.data?.params as Record<string, unknown>) ?? {},
+    }));
+    const miniNode = canvasNodes.find((n) => n.kind === "miniapp.screen");
+    let orderTrigger = canvasNodes.find(
+      (n) => n.kind === "trigger.webapp_data" && String(n.params.action ?? "").trim() === "order",
+    );
+    if (!orderTrigger) orderTrigger = canvasNodes.find((n) => n.kind === "trigger.webapp_data");
+
+    if (!orderTrigger) {
+      addWebappHandler({
+        handler_id: "order",
+        action: "order",
+        response_text:
+          "Спасибо, {first_name}! Заказ на {webapp.total} {webapp.currency}: {webapp.items_summary}. Готовим 30 минут.",
+      });
+      orderTrigger = { id: "order_trig", kind: "trigger.webapp_data", title: "Заказ из Mini App", params: { action: "order" } };
+    }
+    if (miniNode) connectAiNodes(miniNode.id, orderTrigger.id);
+    relayoutCanvas();
+    return miniNode
+      ? "Готово: связал Mini App с триггером заказа и оставил существующий canvas без пересборки."
+      : "Готово: добавил приёмник заказа из Mini App и оставил существующий canvas без пересборки.";
+  };
+
   useEffect(() => {
     setMessages((prev) =>
       prev.length === 1 && prev[0].role === "assistant"
