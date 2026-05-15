@@ -4,6 +4,7 @@ export type NodeKind =
   | "trigger.command"
   | "trigger.message"
   | "trigger.callback"
+  | "trigger.webapp_data"
   | "message.text"
   | "message.photo"
   | "message.document"
@@ -40,11 +41,21 @@ export interface VariableDef {
 // --- Conditions ----------------------------------------------------------
 
 export type CompareOp =
-  | "eq" | "neq"
-  | "gt" | "lt" | "gte" | "lte"
-  | "contains" | "not_contains" | "starts_with" | "ends_with" | "matches_regex"
-  | "is_empty" | "is_not_empty"
-  | "is_true" | "is_false";
+  | "eq"
+  | "neq"
+  | "gt"
+  | "lt"
+  | "gte"
+  | "lte"
+  | "contains"
+  | "not_contains"
+  | "starts_with"
+  | "ends_with"
+  | "matches_regex"
+  | "is_empty"
+  | "is_not_empty"
+  | "is_true"
+  | "is_false";
 
 export type ConditionSource = "var" | "user" | "system" | "text";
 
@@ -74,7 +85,9 @@ export function parseCondition(raw: string | undefined | null): Condition {
     try {
       const c = JSON.parse(raw);
       if (c && (c.kind === "leaf" || c.kind === "group")) return c as Condition;
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
   return {
     kind: "group",

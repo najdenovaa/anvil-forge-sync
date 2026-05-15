@@ -25,20 +25,40 @@ const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
  * Per-kind parameter schema. Each entry describes which fields the inspector
  * shows for a given node kind. Values are stored under node.data.params.
  */
-const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text" | "textarea" | "select"; options?: string[]; placeholder?: string }[]> = {
+const FIELD_SCHEMAS: Record<
+  NodeKind,
+  {
+    key: string;
+    label: string;
+    type: "text" | "textarea" | "select";
+    options?: string[];
+    placeholder?: string;
+  }[]
+> = {
   "trigger.command": [
     { key: "command", label: "Command", type: "text", placeholder: "/start" },
     { key: "description", label: "Description", type: "text", placeholder: "Start the bot" },
   ],
-  "trigger.message": [
-    { key: "match", label: "Match", type: "text", placeholder: "regex or text" },
-  ],
+  "trigger.message": [{ key: "match", label: "Match", type: "text", placeholder: "regex or text" }],
   "trigger.callback": [
     { key: "data", label: "Callback data", type: "text", placeholder: "open_menu" },
   ],
+  "trigger.webapp_data": [
+    {
+      key: "action",
+      label: "Action (matches sendData.action from Mini App)",
+      type: "text",
+      placeholder: "order",
+    },
+  ],
   "message.text": [
     { key: "text", label: "Text", type: "textarea", placeholder: "Hello {first_name}!" },
-    { key: "parseMode", label: "Parse mode", type: "select", options: ["HTML", "MarkdownV2", "None"] },
+    {
+      key: "parseMode",
+      label: "Parse mode",
+      type: "select",
+      options: ["HTML", "MarkdownV2", "None"],
+    },
   ],
   "message.photo": [
     { key: "url", label: "Photo URL", type: "text", placeholder: "https://..." },
@@ -49,7 +69,12 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
     { key: "filename", label: "Filename", type: "text" },
   ],
   "keyboard.inline": [
-    { key: "buttons", label: "Buttons (one per line: label|action)", type: "textarea", placeholder: "Order|order\nHelp|help" },
+    {
+      key: "buttons",
+      label: "Buttons (one per line: label|action)",
+      type: "textarea",
+      placeholder: "Order|order\nHelp|help",
+    },
   ],
   "keyboard.reply": [
     { key: "buttons", label: "Buttons (one per line)", type: "textarea", placeholder: "Yes\nNo" },
@@ -67,7 +92,7 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
   "action.api": [
     { key: "method", label: "Method", type: "select", options: ["GET", "POST", "PUT", "DELETE"] },
     { key: "url", label: "URL", type: "text", placeholder: "https://api.example.com/..." },
-    { key: "body", label: "Body (JSON)", type: "textarea", placeholder: "{ \"key\": \"value\" }" },
+    { key: "body", label: "Body (JSON)", type: "textarea", placeholder: '{ "key": "value" }' },
   ],
   "action.set_var": [
     { key: "variable", label: "Variable", type: "text", placeholder: "user_name" },
@@ -76,9 +101,24 @@ const FIELD_SCHEMAS: Record<NodeKind, { key: string; label: string; type: "text"
   ],
   "action.input": [
     { key: "variable", label: "Save to variable", type: "text", placeholder: "user_phone" },
-    { key: "prompt", label: "Question to user", type: "textarea", placeholder: "Введите ваш телефон:" },
-    { key: "validation", label: "Validation regex (optional)", type: "text", placeholder: "^\\+?\\d{10,12}$" },
-    { key: "errorMessage", label: "Error message", type: "text", placeholder: "Неверный формат, попробуйте ещё раз" },
+    {
+      key: "prompt",
+      label: "Question to user",
+      type: "textarea",
+      placeholder: "Введите ваш телефон:",
+    },
+    {
+      key: "validation",
+      label: "Validation regex (optional)",
+      type: "text",
+      placeholder: "^\\+?\\d{10,12}$",
+    },
+    {
+      key: "errorMessage",
+      label: "Error message",
+      type: "text",
+      placeholder: "Неверный формат, попробуйте ещё раз",
+    },
     { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
   ],
 };
@@ -111,7 +151,9 @@ export function NodeInspector() {
 
   const setTitle = (val: string) => {
     setNodes((ns) =>
-      ns.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, title: val, titleKey: undefined } } : n)),
+      ns.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, title: val, titleKey: undefined } } : n,
+      ),
     );
   };
 
@@ -125,7 +167,9 @@ export function NodeInspector() {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{kind}</div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {kind}
+          </div>
           <div className="truncate text-[13px] font-semibold">{titleVal}</div>
         </div>
         <button
@@ -137,7 +181,11 @@ export function NodeInspector() {
         </button>
       </div>
 
-      <Accordion.Root type="multiple" defaultValue={["general", "condition", "params"]} className="space-y-2">
+      <Accordion.Root
+        type="multiple"
+        defaultValue={["general", "condition", "params"]}
+        className="space-y-2"
+      >
         <AccordionItem value="general" label="General">
           <FieldRow label="Title" value={titleVal} onChange={setTitle} />
         </AccordionItem>
@@ -145,7 +193,13 @@ export function NodeInspector() {
         {kind === "logic.condition" && (
           <AccordionItem value="condition" label="Condition">
             <ConditionBuilder
-              value={tryParseCondition(params.condition) ?? { kind: "group", combinator: "AND", children: [] }}
+              value={
+                tryParseCondition(params.condition) ?? {
+                  kind: "group",
+                  combinator: "AND",
+                  children: [],
+                }
+              }
               onChange={(c) => updateAiNodeParam(node.id, "condition", JSON.stringify(c))}
               trueBranch={params.trueBranch}
               falseBranch={params.falseBranch}
@@ -160,14 +214,18 @@ export function NodeInspector() {
 
         <AccordionItem value="params" label="Parameters">
           {schema.length === 0 ? (
-            <div className="px-1 py-1 text-[11px] text-muted-foreground">No parameters for this node kind.</div>
+            <div className="px-1 py-1 text-[11px] text-muted-foreground">
+              No parameters for this node kind.
+            </div>
           ) : (
             schema.map((f) => {
               const isTpl = f.type === "textarea" && TEMPLATE_FIELDS[kind]?.has(f.key);
               if (isTpl) {
                 return (
                   <label key={f.key} className="block">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{f.label}</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+                      {f.label}
+                    </div>
                     <TemplateInput
                       value={params[f.key] ?? ""}
                       placeholder={f.placeholder}
@@ -212,7 +270,11 @@ export function NodeInspector() {
             value={(node.data?.preview as string) ?? ""}
             onChange={(v) =>
               setNodes((ns) =>
-                ns.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, preview: v, previewKey: undefined } } : n)),
+                ns.map((n) =>
+                  n.id === node.id
+                    ? { ...n, data: { ...n.data, preview: v, previewKey: undefined } }
+                    : n,
+                ),
               )
             }
           />
@@ -225,7 +287,15 @@ export function NodeInspector() {
   );
 }
 
-function AccordionItem({ value, label, children }: { value: string; label: string; children: React.ReactNode }) {
+function AccordionItem({
+  value,
+  label,
+  children,
+}: {
+  value: string;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <Accordion.Item value={value} className="hairline overflow-hidden rounded-lg bg-surface">
       <Accordion.Header>
@@ -245,10 +315,22 @@ function AccordionItem({ value, label, children }: { value: string; label: strin
   );
 }
 
-function FieldRow({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (v: string) => void }) {
+function FieldRow({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
       <input
         type="text"
         value={value}
@@ -260,10 +342,22 @@ function FieldRow({ label, value, placeholder, onChange }: { label: string; valu
   );
 }
 
-function FieldArea({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (v: string) => void }) {
+function FieldArea({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -275,10 +369,22 @@ function FieldArea({ label, value, placeholder, onChange }: { label: string; val
   );
 }
 
-function FieldSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+function FieldSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
