@@ -34,6 +34,14 @@ export interface TemplateContext {
     today: string;
     bot_username?: string;
   };
+  webapp?: {
+    action?: string;
+    total?: string;
+    currency?: string;
+    count?: string;
+    items_summary?: string;
+    raw?: string;
+  };
 }
 
 const USER_ALIASES = new Set(["first_name", "last_name", "username"]);
