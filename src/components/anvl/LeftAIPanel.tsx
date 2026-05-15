@@ -399,12 +399,28 @@ export function LeftAIPanel() {
     const liveSteps: string[] = [];
     let liveStep: 0 | 1 | 2 | 3 = 0;
 
-    const applyToolCall = (name: string, argsRaw: string) => {
+    const applyToolCall = (rawName: string, argsRaw: string) => {
       let args: any;
       try {
         args = JSON.parse(argsRaw);
       } catch {
         return;
+      }
+      // Normalise common hallucinated tool names + arg synonyms so the
+      // architect's intent isn't silently dropped when Sonnet invents a
+      // plausible-sounding alias (e.g. connect_nodes / add_edge / link with
+      // source/target instead of connect with from/to).
+      let name = rawName;
+      if (name === "connect_nodes" || name === "add_edge" || name === "link_nodes" || name === "link") {
+        name = "connect";
+      }
+      if (name === "connect" && args && typeof args === "object") {
+        if (args.source != null && args.from == null) args.from = args.source;
+        if (args.target != null && args.to == null) args.to = args.target;
+      }
+      if (name === "remove_edge" && args && typeof args === "object") {
+        if (args.source != null && args.from == null) args.from = args.source;
+        if (args.target != null && args.to == null) args.to = args.target;
       }
       liveOps.push({ name, args: args ?? {} });
       liveSteps.push(describeToolStep(name, args ?? {}));
