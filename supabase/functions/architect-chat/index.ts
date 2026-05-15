@@ -1066,6 +1066,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           `Если запрос звучит как «соедини X с Y» / «протяни ноду» / «исправь связь» — это ОДИН вызов connect и всё.\n\n` +
           systemPrompt;
       }
+    }
 
     const canvasResult = JSON.stringify(
       canvasSnapshot && typeof canvasSnapshot === "object"
