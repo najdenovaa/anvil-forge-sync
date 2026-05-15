@@ -212,6 +212,25 @@ export function AnvlWorkspaceProvider({
     edgesRef.current = edges;
   }, [edges]);
 
+  // Self-heal Level 2B visual wiring: Mini App order submission is triggered
+  // by Telegram web_app_data, so the runtime does not require an incoming edge
+  // into trigger.webapp_data. Users still expect to see a dashed relation from
+  // the Mini App node to the order trigger on the canvas. If both nodes exist,
+  // keep that visual edge present and persist it with the normal autosave.
+  useEffect(() => {
+    const miniNode = nodes.find((n) => n.data?.kind === "miniapp.screen");
+    const orderTrigger =
+      nodes.find(
+        (n) =>
+          n.data?.kind === "trigger.webapp_data" &&
+          String((n.data?.params as Record<string, unknown> | undefined)?.action ?? "") === "order",
+      ) ?? nodes.find((n) => n.data?.kind === "trigger.webapp_data");
+    if (!miniNode || !orderTrigger) return;
+    const edgeId = `ai-${miniNode.id}-${orderTrigger.id}`;
+    if (edges.some((e) => e.source === miniNode.id && e.target === orderTrigger.id)) return;
+    setEdges((prev) => [...prev, { id: edgeId, source: miniNode.id, target: orderTrigger.id, animated: true }]);
+  }, [nodes, edges]);
+
   const applyBlueprint = useCallback((blueprint: AnvlBlueprint) => {
     if (blueprint.nodes?.length) {
       const nextNodes: Node[] = blueprint.nodes.map((node, index) => ({
