@@ -183,6 +183,74 @@ function stripTaggedBlocks(source: string) {
     .replace(/<code>[\s\S]*?<\/code>/gi, "");
 }
 
+type CanvasNodeHint = {
+  id: string;
+  kind: string;
+  title: string;
+  params: Record<string, unknown>;
+};
+
+function normalizeNodeRef(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^a-zа-я0-9]+/g, "");
+}
+
+function nodeSearchText(node: CanvasNodeHint) {
+  return normalizeNodeRef(
+    [node.id, node.kind, node.title, node.params.action, node.params.data, node.params.command]
+      .filter((v) => v != null && String(v).trim())
+      .join(" "),
+  );
+}
+
+function resolveCanvasNodeRef(
+  raw: unknown,
+  nodes: CanvasNodeHint[],
+  role: "source" | "target" | "any" = "any",
+) {
+  const value = String(raw ?? "").trim();
+  if (!value) return value;
+  if (nodes.some((node) => node.id === value)) return value;
+
+  const normalized = normalizeNodeRef(value);
+  const byNormalizedId = nodes.find((node) => normalizeNodeRef(node.id) === normalized);
+  if (byNormalizedId) return byNormalizedId.id;
+
+  const byKind = nodes.find((node) => normalizeNodeRef(node.kind) === normalized);
+  if (byKind) return byKind.id;
+
+  const mentionsMiniApp = /miniapp|миниапп|миниприлож|webapp|вебапп|screen|экран/.test(normalized);
+  const mentionsOrderTrigger =
+    /order|заказ|оформ|senddata|webappdata|triggerwebapp|триггер/.test(normalized);
+
+  if (mentionsOrderTrigger && role !== "source") {
+    const orderTrigger =
+      nodes.find(
+        (node) =>
+          node.kind === "trigger.webapp_data" &&
+          (/order|заказ|оформ/.test(normalized)
+            ? normalizeNodeRef(node.params.action ?? node.title).includes("order") ||
+              normalizeNodeRef(node.params.action ?? node.title).includes("заказ")
+            : true),
+      ) ?? nodes.find((node) => node.kind === "trigger.webapp_data");
+    if (orderTrigger) return orderTrigger.id;
+  }
+
+  if (mentionsMiniApp && role !== "target") {
+    const miniAppNode = nodes.find((node) => node.kind === "miniapp.screen");
+    if (miniAppNode) return miniAppNode.id;
+  }
+
+  const byText = nodes.find((node) => {
+    const haystack = nodeSearchText(node);
+    return haystack.includes(normalized) || normalized.includes(haystack);
+  });
+  return byText?.id ?? value;
+}
+
 function buildRunnableCodeFromTools(ops: ToolOp[], platform: string) {
   const nodes = new Map<
     string,
@@ -305,6 +373,42 @@ export function LeftAIPanel() {
   const sendRef = useRef<(text?: string) => void>(() => {});
   const bootedRef = useRef(false);
 
+  const applyLocalQuickFix = (text: string) => {
+    const normalized = normalizeNodeRef(text);
+    const asksForMiniAppOrderWire =
+      /соедин|связ|протян|подключ|мини|mini|webapp|заказ|order|trigger|триггер/.test(normalized) &&
+      /мини|mini|webapp/.test(normalized) &&
+      /заказ|order|trigger|триггер|senddata/.test(normalized);
+    if (!asksForMiniAppOrderWire) return null;
+
+    const canvasNodes = nodes.map((n) => ({
+      id: n.id,
+      kind: (n.data?.kind as string) ?? "message.text",
+      title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
+      params: (n.data?.params as Record<string, unknown>) ?? {},
+    }));
+    const miniNode = canvasNodes.find((n) => n.kind === "miniapp.screen");
+    let orderTrigger = canvasNodes.find(
+      (n) => n.kind === "trigger.webapp_data" && String(n.params.action ?? "").trim() === "order",
+    );
+    if (!orderTrigger) orderTrigger = canvasNodes.find((n) => n.kind === "trigger.webapp_data");
+
+    if (!orderTrigger) {
+      addWebappHandler({
+        handler_id: "order",
+        action: "order",
+        response_text:
+          "Спасибо, {first_name}! Заказ на {webapp.total} {webapp.currency}: {webapp.items_summary}. Готовим 30 минут.",
+      });
+      orderTrigger = { id: "order_trig", kind: "trigger.webapp_data", title: "Заказ из Mini App", params: { action: "order" } };
+    }
+    if (miniNode) connectAiNodes(miniNode.id, orderTrigger.id);
+    relayoutCanvas();
+    return miniNode
+      ? "Готово: связал Mini App с триггером заказа и оставил существующий canvas без пересборки."
+      : "Готово: добавил приёмник заказа из Mini App и оставил существующий canvas без пересборки.";
+  };
+
   useEffect(() => {
     setMessages((prev) =>
       prev.length === 1 && prev[0].role === "assistant"
@@ -350,7 +454,7 @@ export function LeftAIPanel() {
         title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
         params: (n.data?.params as Record<string, string>) ?? {},
       })),
-      edges: edges.map((e) => ({ from: e.source, to: e.target })),
+        edges: edges.map((e) => ({ from: e.source, to: e.target, sourceHandle: e.sourceHandle ?? null })),
     };
 
     const canvasSnapshot = serializeCanvas();
@@ -417,10 +521,14 @@ export function LeftAIPanel() {
       if (name === "connect" && args && typeof args === "object") {
         if (args.source != null && args.from == null) args.from = args.source;
         if (args.target != null && args.to == null) args.to = args.target;
+        args.from = resolveCanvasNodeRef(args.from, flowSnapshot.nodes, "source");
+        args.to = resolveCanvasNodeRef(args.to, flowSnapshot.nodes, "target");
       }
       if (name === "remove_edge" && args && typeof args === "object") {
         if (args.source != null && args.from == null) args.from = args.source;
         if (args.target != null && args.to == null) args.to = args.target;
+        args.from = resolveCanvasNodeRef(args.from, flowSnapshot.nodes, "source");
+        args.to = resolveCanvasNodeRef(args.to, flowSnapshot.nodes, "target");
       }
       liveOps.push({ name, args: args ?? {} });
       liveSteps.push(describeToolStep(name, args ?? {}));
@@ -724,6 +832,20 @@ export function LeftAIPanel() {
     if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
+    const localFix = applyLocalQuickFix(text);
+    if (localFix) {
+      setMessages([
+        ...messages,
+        userMsg,
+        {
+          role: "assistant",
+          content: localFix,
+          thoughts: "• Локальная точечная правка без запроса к архитектору\n• Canvas не пересобирался",
+        },
+      ]);
+      return;
+    }
+
     const placeholder: Msg = {
       role: "assistant",
       content: "",

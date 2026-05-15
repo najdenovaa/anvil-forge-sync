@@ -50,6 +50,7 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
   const meta = NODE_CATALOG[data.kind];
   const Icon = meta.icon;
   const isTrigger = meta.group === "Triggers";
+  const canReceiveIncoming = data.kind === "trigger.webapp_data";
   const { t } = useI18n();
   const { activeNodeId } = useBotSimulator();
   const { lintIssues } = useAnvlWorkspace();
@@ -105,7 +106,7 @@ export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {
         </div>
       )}
 
-      {!isTrigger && (
+      {(!isTrigger || canReceiveIncoming) && (
         <Handle type="target" position={Position.Left} className="!h-2.5 !w-2.5" />
       )}
 
