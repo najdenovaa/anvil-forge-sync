@@ -1066,6 +1066,8 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           `Делай МИНИМАЛЬНУЮ точечную правку: get_canvas → 1-3 операции (connect / set_param / add_node) → готово.\n` +
           `НЕ пересобирай существующие ноды. НЕ повторяй set_variables / set_preview / set_code, если правка их не затрагивает.\n` +
           `Если запрос звучит как «соедини X с Y» / «протяни ноду» / «исправь связь» — это ОДИН вызов connect и всё.\n\n` +
+          `Если X/Y описаны словами, найди реальные ID через get_canvas: Mini App = kind miniapp.screen, триггер заказа = kind trigger.webapp_data с params.action='order'.\n` +
+          `Для Mini App → заказ используй connect(from=<miniapp.screen id>, to=<trigger.webapp_data id>) и больше ничего не меняй.\n\n` +
           systemPrompt;
       }
     }
