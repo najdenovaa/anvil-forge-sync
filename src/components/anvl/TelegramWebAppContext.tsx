@@ -30,12 +30,19 @@ export function TelegramWebAppProvider({ children }: { children: ReactNode }) {
   const handleRef = useRef<TmaMockHandle | null>(null);
 
   if (handleRef.current === null && typeof window !== "undefined") {
-    const handle = createTelegramWebAppMock({
-      onChange: () => force((n) => n + 1),
-    });
-    handleRef.current = handle;
-    // Install on window so generated code finds it like inside Telegram.
-    window.Telegram = { WebApp: handle.webApp };
+    // CRITICAL: if real Telegram has already injected window.Telegram.WebApp
+    // (i.e. we're running inside a real Telegram client via /m/:flowId),
+    // do NOT overwrite it with the mock — that would silently kill sendData()
+    // and the bot would never receive web_app_data.
+    const realTg = (window as unknown as { Telegram?: { WebApp?: { initData?: string; sendData?: unknown } } }).Telegram?.WebApp;
+    const isRealTelegram = !!realTg && typeof realTg.sendData === "function" && typeof realTg.initData === "string" && realTg.initData.length > 0;
+    if (!isRealTelegram) {
+      const handle = createTelegramWebAppMock({
+        onChange: () => force((n) => n + 1),
+      });
+      handleRef.current = handle;
+      window.Telegram = { WebApp: handle.webApp };
+    }
   }
 
   useEffect(() => {
