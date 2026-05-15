@@ -57,6 +57,14 @@ export interface SimMessage {
   warning?: string;
 }
 
+/** Payload shape sent by Mini App via Telegram.WebApp.sendData. */
+export interface SimWebappPayload {
+  action?: string;
+  items?: Array<{ title?: string; price?: number; qty?: number }>;
+  total?: number | string;
+  currency?: string;
+}
+
 interface SimulatorCtx {
   /** True when at least one canvas node can be used as a simulation entry. */
   available: boolean;
