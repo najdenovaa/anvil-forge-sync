@@ -742,6 +742,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       setCameraFollow,
       breadcrumb,
       advance,
+      submitWebappData,
     }),
     [
       available,
@@ -763,6 +764,7 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       cameraFollow,
       breadcrumb,
       advance,
+      submitWebappData,
     ],
   );
 
