@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { I18nProvider } from "@/components/anvl/I18nContext";
 import { PlatformProvider } from "@/components/anvl/PlatformContext";
 import { MiniAppProvider } from "@/components/anvl/MiniAppContext";
-import { TelegramWebAppProvider } from "@/components/anvl/TelegramWebAppContext";
 import { DynamicMiniAppView } from "@/components/anvl/DynamicMiniApp";
 import type { AnvlMiniAppState } from "@/lib/anvl-blueprint";
 
@@ -14,6 +13,9 @@ export const Route = createFileRoute("/m/$flowId")({
       { title: `Mini App — ${params.flowId}` },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
     ],
+    // CRITICAL: load the official Telegram WebApp SDK so window.Telegram.WebApp
+    // is the REAL one (sendData reaches the bot), not our preview mock.
+    scripts: [{ src: "https://telegram.org/js/telegram-web-app.js", async: false }],
   }),
   component: PublicMiniApp,
 });
@@ -26,7 +28,6 @@ function PublicMiniApp() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      // Try by id first, then by slug.
       const isUuid = /^[0-9a-f-]{36}$/i.test(flowId);
       const q = isUuid
         ? supabase.from("flows").select("miniapp").eq("id", flowId).maybeSingle()
@@ -63,11 +64,9 @@ function PublicMiniApp() {
     <I18nProvider>
       <PlatformProvider>
         <MiniAppProvider>
-          <TelegramWebAppProvider>
-            <div className="h-screen w-screen overflow-hidden">
-              <DynamicMiniAppView miniApp={miniApp} />
-            </div>
-          </TelegramWebAppProvider>
+          <div className="h-screen w-screen overflow-hidden">
+            <DynamicMiniAppView miniApp={miniApp} />
+          </div>
         </MiniAppProvider>
       </PlatformProvider>
     </I18nProvider>
