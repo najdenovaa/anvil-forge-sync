@@ -183,6 +183,74 @@ function stripTaggedBlocks(source: string) {
     .replace(/<code>[\s\S]*?<\/code>/gi, "");
 }
 
+type CanvasNodeHint = {
+  id: string;
+  kind: string;
+  title: string;
+  params: Record<string, unknown>;
+};
+
+function normalizeNodeRef(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^a-zа-я0-9]+/g, "");
+}
+
+function nodeSearchText(node: CanvasNodeHint) {
+  return normalizeNodeRef(
+    [node.id, node.kind, node.title, node.params.action, node.params.data, node.params.command]
+      .filter((v) => v != null && String(v).trim())
+      .join(" "),
+  );
+}
+
+function resolveCanvasNodeRef(
+  raw: unknown,
+  nodes: CanvasNodeHint[],
+  role: "source" | "target" | "any" = "any",
+) {
+  const value = String(raw ?? "").trim();
+  if (!value) return value;
+  if (nodes.some((node) => node.id === value)) return value;
+
+  const normalized = normalizeNodeRef(value);
+  const byNormalizedId = nodes.find((node) => normalizeNodeRef(node.id) === normalized);
+  if (byNormalizedId) return byNormalizedId.id;
+
+  const byKind = nodes.find((node) => normalizeNodeRef(node.kind) === normalized);
+  if (byKind) return byKind.id;
+
+  const mentionsMiniApp = /miniapp|миниапп|миниприлож|webapp|вебапп|screen|экран/.test(normalized);
+  const mentionsOrderTrigger =
+    /order|заказ|оформ|senddata|webappdata|triggerwebapp|триггер/.test(normalized);
+
+  if (mentionsOrderTrigger && role !== "source") {
+    const orderTrigger =
+      nodes.find(
+        (node) =>
+          node.kind === "trigger.webapp_data" &&
+          (/order|заказ|оформ/.test(normalized)
+            ? normalizeNodeRef(node.params.action ?? node.title).includes("order") ||
+              normalizeNodeRef(node.params.action ?? node.title).includes("заказ")
+            : true),
+      ) ?? nodes.find((node) => node.kind === "trigger.webapp_data");
+    if (orderTrigger) return orderTrigger.id;
+  }
+
+  if (mentionsMiniApp && role !== "target") {
+    const miniAppNode = nodes.find((node) => node.kind === "miniapp.screen");
+    if (miniAppNode) return miniAppNode.id;
+  }
+
+  const byText = nodes.find((node) => {
+    const haystack = nodeSearchText(node);
+    return haystack.includes(normalized) || normalized.includes(haystack);
+  });
+  return byText?.id ?? value;
+}
+
 function buildRunnableCodeFromTools(ops: ToolOp[], platform: string) {
   const nodes = new Map<
     string,
