@@ -105,6 +105,11 @@ interface SimulatorCtx {
   /** Follow the first outgoing edge of the effective node — used by the
    *  preview to continue past action.api / condition after staging. */
   advance: () => void;
+  /** Simulate a Telegram.WebApp.sendData event from the preview Mini App.
+   *  Finds the matching trigger.webapp_data node (by `action`), seeds
+   *  {webapp.*} into the template context, and jumps to it so the chat
+   *  shows the bot's reply. No-op if no matching trigger exists. */
+  submitWebappData: (payload: SimWebappPayload) => void;
 }
 
 const Ctx = createContext<SimulatorCtx | null>(null);
