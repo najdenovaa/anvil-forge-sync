@@ -289,13 +289,15 @@ export function DynamicMiniAppView({
     if (tg) {
       tg.HapticFeedback?.notificationOccurred?.("success");
       tg.sendData?.(JSON.stringify(payload));
-      // Inside real Telegram, sendData also closes the Mini App. In preview,
-      // we mimic this: clear the cart and close the sheet so the user sees
-      // a clean state. The mock logs the payload to console for debugging.
+      tg.close?.();
+      // Close explicitly after sendData: real Telegram accepts this and the
+      // preview mock fires the same close event, so the user returns to chat
+      // immediately after confirming the order.
     }
     setCart(new Map());
     setSheetOpen(false);
-  }, [cartCount, cartItems, cartTotal, cartConfig, cartCurrency]);
+    close();
+  }, [cartCount, cartItems, cartTotal, cartConfig, cartCurrency, close]);
   // ---------- /Cart state ----------
 
   useEffect(() => {
