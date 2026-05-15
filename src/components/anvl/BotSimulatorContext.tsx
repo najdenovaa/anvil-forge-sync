@@ -454,8 +454,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
       var: variables,
       text: lastInputText,
       system: buildSystemContext(),
+      webapp: webappCtx,
     }),
-    [variables, lastInputText],
+    [variables, lastInputText, webappCtx],
   );
 
   const composed = useMemo(() => {
