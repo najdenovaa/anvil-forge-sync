@@ -310,10 +310,14 @@ export function DynamicMiniAppView({
       // preview mock fires the same close event, so the user returns to chat
       // immediately after confirming the order.
     }
+    // Preview-only: notify the in-canvas simulator so the chat tab shows
+    // the bot's webapp_data reply. In real Telegram (no provider), this
+    // is undefined and Telegram itself delivers web_app_data to the bot.
+    onWebappSubmit?.(payload);
     setCart(new Map());
     setSheetOpen(false);
     close();
-  }, [cartCount, cartItems, cartTotal, cartConfig, cartCurrency, close]);
+  }, [cartCount, cartItems, cartTotal, cartConfig, cartCurrency, close, onWebappSubmit]);
   // ---------- /Cart state ----------
 
   useEffect(() => {
