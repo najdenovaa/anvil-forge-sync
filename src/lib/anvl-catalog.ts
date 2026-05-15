@@ -2,6 +2,7 @@ import {
   Slash,
   MessageSquare,
   MousePointerClick,
+  ShoppingBag,
   Type,
   Image as ImageIcon,
   FileText,
@@ -49,6 +50,13 @@ export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
     labelKey: "node.trigger.callback.label",
     descKey: "node.trigger.callback.desc",
     icon: MousePointerClick,
+  },
+  "trigger.webapp_data": {
+    kind: "trigger.webapp_data",
+    group: "Triggers",
+    labelKey: "node.trigger.webapp_data.label",
+    descKey: "node.trigger.webapp_data.desc",
+    icon: ShoppingBag,
   },
   "message.text": {
     kind: "message.text",
@@ -122,10 +130,4 @@ export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
   },
 };
 
-export const NODE_GROUPS: NodeGroup[] = [
-  "Triggers",
-  "Messages",
-  "Keyboards",
-  "Mini App",
-  "Logic",
-];
+export const NODE_GROUPS: NodeGroup[] = ["Triggers", "Messages", "Keyboards", "Mini App", "Logic"];

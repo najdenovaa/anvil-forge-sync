@@ -34,6 +34,27 @@ export interface TemplateContext {
     today: string;
     bot_username?: string;
   };
+  /**
+   * Data from the latest Telegram.WebApp.sendData payload sent by a Mini App.
+   * Populated by bot-runtime when a `trigger.webapp_data` node fires; absent
+   * otherwise. Lets response templates address {webapp.total},
+   * {webapp.items_summary}, {webapp.action}, {webapp.count}, {webapp.currency}.
+   * The raw JSON is also exposed as {webapp.raw} for power users.
+   */
+  webapp?: {
+    /** Value of `action` field in the JSON payload (e.g. "order"). */
+    action?: string;
+    /** Numeric total — pre-stringified to ease template use. */
+    total?: string;
+    /** Currency symbol from the payload. */
+    currency?: string;
+    /** Number of distinct line-items, NOT total quantity. */
+    count?: string;
+    /** Pre-formatted human-readable list, e.g. "Latte × 2, Raf × 1". */
+    items_summary?: string;
+    /** Raw payload JSON as a string for advanced usage. */
+    raw?: string;
+  };
 }
 
 const USER_ALIASES = new Set(["first_name", "last_name", "username"]);

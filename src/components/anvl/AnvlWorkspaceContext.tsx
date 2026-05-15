@@ -138,6 +138,13 @@ interface WorkspaceCtx {
     new_button_label?: string;
     new_content?: string;
   }) => void;
+  /**
+   * Atomically create a webapp-data handler: a `trigger.webapp_data` node
+   * filtering on `action`, plus a `message.text` reply, plus an edge between
+   * them. Used by the architect to wire up Mini App → bot response in one
+   * shot (e.g. user submits a cart, bot replies "Thanks for your order…").
+   */
+  addWebappHandler: (args: { handler_id: string; action: string; response_text: string }) => void;
   serializeCanvas: () => {
     nodes: { id: string; kind: string; label: string; params: Record<string, string> }[];
     edges: { from: string; to: string; sourceHandle: string | null }[];
@@ -603,6 +610,68 @@ export function AnvlWorkspaceProvider({
     [],
   );
 
+  /**
+   * Composite tool for the architect: in one call, create a `trigger.webapp_data`
+   * node (matched by `action`), a `message.text` node (the reply), and the edge
+   * between them. Idempotent — if the handler_id already maps to existing nodes,
+   * we skip with a console warn rather than duplicating. This mirrors the
+   * addMenuSection pattern so the architect cannot easily desync ids.
+   *
+   * The response_text may use the {webapp.action}, {webapp.total},
+   * {webapp.items_summary}, {webapp.count}, {webapp.currency} placeholders —
+   * bot-runtime populates them from the parsed sendData payload.
+   */
+  const addWebappHandler = useCallback(
+    (args: { handler_id: string; action: string; response_text: string }) => {
+      const trigId = `${args.handler_id}_trig`;
+      const msgId = `${args.handler_id}_msg`;
+      const action = String(args.action ?? "").trim();
+
+      setNodes((prev) => {
+        if (prev.some((n) => n.id === trigId) || prev.some((n) => n.id === msgId)) {
+          console.warn("addWebappHandler: nodes already exist", args.handler_id);
+          return prev;
+        }
+        const baseIdx = prev.length;
+        const newNodes: Node[] = [
+          {
+            id: trigId,
+            type: "anvl",
+            position: { x: 40 + Math.floor(baseIdx / 2) * 280, y: 90 + (baseIdx % 2) * 170 },
+            data: {
+              kind: "trigger.webapp_data",
+              title: action ? `Заказ «${action}»` : "Заказ из Mini App",
+              preview: `action: ${action || "(any)"}`,
+              params: { action },
+            },
+          },
+          {
+            id: msgId,
+            type: "anvl",
+            position: {
+              x: 40 + Math.floor((baseIdx + 1) / 2) * 280,
+              y: 90 + ((baseIdx + 1) % 2) * 170,
+            },
+            data: {
+              kind: "message.text",
+              title: "Ответ боту",
+              preview: args.response_text.slice(0, 80),
+              params: { text: args.response_text },
+            },
+          },
+        ];
+        return [...prev, ...newNodes];
+      });
+
+      setEdges((prev) => {
+        const eid = `ai-${trigId}-${msgId}`;
+        if (prev.some((e) => e.id === eid)) return prev;
+        return [...prev, { id: eid, source: trigId, target: msgId, animated: true }];
+      });
+    },
+    [],
+  );
+
   const serializeCanvas = useCallback(() => {
     const abbreviate = (kind: string, params: Record<string, string>) => {
       const out: Record<string, string> = {};
@@ -803,6 +872,7 @@ export function AnvlWorkspaceProvider({
       addMenuSection,
       removeMenuSection,
       updateMenuSection,
+      addWebappHandler,
       saveStatus,
       lastSavedAt,
       snapshotNow,
@@ -842,6 +912,7 @@ export function AnvlWorkspaceProvider({
       addMenuSection,
       removeMenuSection,
       updateMenuSection,
+      addWebappHandler,
       saveStatus,
       lastSavedAt,
       snapshotNow,

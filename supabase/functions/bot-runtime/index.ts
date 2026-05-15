@@ -90,6 +90,7 @@ function buildTplCtx(ctx: RunCtx): TemplateContext {
     var: ctx.variables as Record<string, unknown>,
     text: ctx.text,
     system: buildSystemContext(ctx.bot.bot_username ?? undefined),
+    webapp: ctx.webapp,
   };
 }
 
@@ -195,6 +196,21 @@ interface RunCtx {
   visitedInputs: Set<string>;
   /** Per-input re-entry count in this turn (loop guard). */
   reentryCount: Map<string, number>;
+  /**
+   * Parsed Telegram.WebApp.sendData payload from a Mini App, if the
+   * current turn was triggered by `trigger.webapp_data`. Exposed to
+   * templates as {webapp.action}, {webapp.total}, {webapp.items_summary},
+   * {webapp.count}, {webapp.currency}, {webapp.raw}. Absent on regular
+   * command/message/callback turns.
+   */
+  webapp?: {
+    action?: string;
+    total?: string;
+    currency?: string;
+    count?: string;
+    items_summary?: string;
+    raw?: string;
+  };
 }
 
 function findNode(flow: Flow, id: string | null | undefined): FlowNode | undefined {
@@ -208,9 +224,53 @@ function nextEdges(flow: Flow, fromId: string, handle?: string): FlowEdge[] {
   );
 }
 
+/**
+ * Parse the JSON inside Telegram message.web_app_data.data. Returns null if
+ * the input is missing or not valid JSON. Mini App contract (set in
+ * DynamicMiniApp.submitCart) is `{action, items[], total, currency}`.
+ */
+function parseWebAppData(message: any): {
+  action?: string;
+  total?: number | string;
+  currency?: string;
+  items?: Array<{ title?: string; price?: number; qty?: number }>;
+} | null {
+  const raw = message?.web_app_data?.data;
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pre-format a WebApp payload into the slots exposed to templates. Returns
+ * `null` if there's nothing to expose. `items_summary` collapses items into
+ * a human string: "Latte × 2, Raf × 1". `count` is line-items, NOT total qty.
+ */
+function buildWebappCtx(payload: ReturnType<typeof parseWebAppData>): RunCtx["webapp"] | undefined {
+  if (!payload) return undefined;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const summary = items
+    .filter((i) => i && typeof i.title === "string")
+    .map((i) => `${i.title} × ${i.qty ?? 1}`)
+    .join(", ");
+  return {
+    action: typeof payload.action === "string" ? payload.action : undefined,
+    total: payload.total != null ? String(payload.total) : undefined,
+    currency: typeof payload.currency === "string" ? payload.currency : undefined,
+    count: String(items.length),
+    items_summary: summary || undefined,
+    raw: JSON.stringify(payload),
+  };
+}
+
 function pickTrigger(flow: Flow, update: any): FlowNode | undefined {
   const message = update.message;
   const callback = update.callback_query;
+  const webappPayload = parseWebAppData(message);
 
   for (const n of flow.nodes) {
     const kind = n.data?.kind;
@@ -230,6 +290,13 @@ function pickTrigger(flow: Flow, update: any): FlowNode | undefined {
     }
     if (kind === "trigger.callback" && callback?.data) {
       if (!params.data || callback.data === params.data) return n;
+    }
+    if (kind === "trigger.webapp_data" && webappPayload) {
+      // Match by the `action` field inside the payload. Empty params.action
+      // means "catch any webapp_data event" — useful for a single shared
+      // handler in MVPs.
+      const want = String(params.action ?? "").trim();
+      if (!want || webappPayload.action === want) return n;
     }
   }
   // Fallback: any trigger.command on /start
@@ -616,6 +683,12 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
   const trig = pickTrigger(flow, effectiveUpdate);
   if (trig) {
     startId = trig.id;
+    // If we matched a webapp_data trigger, populate ctx.webapp so message.text
+    // nodes downstream can use {webapp.total}, {webapp.items_summary}, etc.
+    if (trig.data?.kind === "trigger.webapp_data") {
+      const payload = parseWebAppData(effectiveUpdate.message);
+      ctx.webapp = buildWebappCtx(payload);
+    }
   } else if (existing?.current_node_id) {
     const cur = findNode(flow, existing.current_node_id);
     if (cur?.data?.kind === "action.input") {

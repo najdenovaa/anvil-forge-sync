@@ -144,6 +144,8 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Удалил раздел ${args.section_msg_id}`;
     case "update_menu_section":
       return `Обновил раздел ${args.section_msg_id}${args.new_button_label ? ` → «${args.new_button_label}»` : ""}`;
+    case "add_webapp_handler":
+      return `Подключил приёмник заказа (action=${args.action ?? "order"})`;
     case "init_miniapp":
       return `Инициализировал Mini App «${args.title ?? ""}»`;
     case "set_miniapp_hero":
@@ -285,6 +287,7 @@ export function LeftAIPanel() {
     addMenuSection,
     removeMenuSection,
     updateMenuSection,
+    addWebappHandler,
     nodes,
     edges,
     slug,
@@ -441,6 +444,7 @@ export function LeftAIPanel() {
         else if (name === "add_menu_section") addMenuSection(args);
         else if (name === "remove_menu_section") removeMenuSection(args);
         else if (name === "update_menu_section") updateMenuSection(args);
+        else if (name === "add_webapp_handler") addWebappHandler(args as any);
         // get_canvas is fulfilled server-side: the edge function injects a
         // tool_result with the live canvasSnapshot before continuing the
         // conversation. Nothing to apply on the client.
