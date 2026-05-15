@@ -160,6 +160,22 @@ function miniAppUrl(ctx: RunCtx) {
 function buildReplyMarkup(kb: OutgoingKeyboard | undefined, ctx?: RunCtx) {
   if (!kb) return undefined;
   if (kb.inline?.length) {
+    // If any button opens a Mini App AND the flow listens for webapp_data,
+    // we must promote that button to a *reply* keyboard button — sendData()
+    // only works from reply keyboard, never from inline keyboard.
+    const hasMiniApp = kb.inline.some((b) => b.action === "open_miniapp");
+    const expectsWebappData =
+      !!ctx && ctx.flow.nodes.some((n) => n.data?.kind === "trigger.webapp_data");
+    if (hasMiniApp && expectsWebappData && ctx) {
+      const url = miniAppUrl(ctx);
+      const miniBtn = kb.inline.find((b) => b.action === "open_miniapp")!;
+      ctx.nextReplyKeyboardLabels = [miniBtn.label];
+      return {
+        keyboard: [[{ text: miniBtn.label, web_app: { url } }]],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+      };
+    }
     return {
       inline_keyboard: kb.inline.map((b) => [
         b.action === "open_miniapp" && ctx
