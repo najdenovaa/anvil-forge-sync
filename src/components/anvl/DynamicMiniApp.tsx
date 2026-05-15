@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "./I18nContext";
 import { useMiniApp } from "./MiniAppContext";
+import { useBotSimulator } from "./BotSimulatorContext";
 import { usePlatform } from "./PlatformContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import {
