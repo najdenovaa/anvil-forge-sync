@@ -832,6 +832,20 @@ export function LeftAIPanel() {
     if (!override) setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
+    const localFix = applyLocalQuickFix(text);
+    if (localFix) {
+      setMessages([
+        ...messages,
+        userMsg,
+        {
+          role: "assistant",
+          content: localFix,
+          thoughts: "• Локальная точечная правка без запроса к архитектору\n• Canvas не пересобирался",
+        },
+      ]);
+      return;
+    }
+
     const placeholder: Msg = {
       role: "assistant",
       content: "",
