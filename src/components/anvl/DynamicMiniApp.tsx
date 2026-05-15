@@ -139,13 +139,28 @@ function resolveAccent(accentHex: string | undefined, accent: MiniAppAccent): st
 
 export function DynamicMiniApp() {
   const { miniApp } = useAnvlWorkspace();
-  return <DynamicMiniAppView miniApp={miniApp} />;
+  // Workspace context only — pipe submitCart payload into the simulator so
+  // the in-canvas chat triggers the user's `trigger.webapp_data` branch
+  // instead of just closing the Mini App with no follow-up bubble.
+  const { submitWebappData } = useBotSimulator();
+  return <DynamicMiniAppView miniApp={miniApp} onWebappSubmit={submitWebappData} />;
 }
 
 export function DynamicMiniAppView({
   miniApp,
+  onWebappSubmit,
 }: {
   miniApp: Partial<import("@/lib/anvl-blueprint").AnvlMiniAppState>;
+  /** Optional preview-only hook: invoked alongside Telegram.WebApp.sendData
+   *  so the in-canvas simulator can run the corresponding bot reply. Real
+   *  Telegram (the /m/$flowId route) leaves this undefined and relies on
+   *  Telegram delivering web_app_data to bot-runtime instead. */
+  onWebappSubmit?: (payload: {
+    action?: string;
+    items?: Array<{ title?: string; price?: number; qty?: number }>;
+    total?: number | string;
+    currency?: string;
+  }) => void;
 }) {
   const { t } = useI18n();
   const { view, targetTab, close } = useMiniApp();
