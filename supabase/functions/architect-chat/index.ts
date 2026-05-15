@@ -372,7 +372,13 @@ function convertMessagesToAnthropic(
           });
         }
       }
-      if (blocks.length === 0) blocks.push({ type: "text", text: "" });
+      // Anthropic API rejects assistant messages whose content is an empty
+      // text block ("messages: text content blocks must be non-empty", 400).
+      // This can happen when a previous round produced 0 text + 0 tool_calls
+      // (refusal, max_tokens cut-off, or genuine empty stream). Pushing a
+      // placeholder "" or " " is also rejected. Cleanest fix: skip such turns
+      // entirely — they carry no signal for the next round anyway.
+      if (blocks.length === 0) continue;
       out.push({ role: "assistant", content: blocks });
       continue;
     }
