@@ -418,7 +418,7 @@ export function LeftAIPanel() {
         title: (n.data?.title as string) ?? (n.data?.titleKey as string) ?? "",
         params: (n.data?.params as Record<string, string>) ?? {},
       })),
-      edges: edges.map((e) => ({ from: e.source, to: e.target })),
+        edges: edges.map((e) => ({ from: e.source, to: e.target, sourceHandle: e.sourceHandle ?? null })),
     };
 
     const canvasSnapshot = serializeCanvas();
@@ -485,10 +485,14 @@ export function LeftAIPanel() {
       if (name === "connect" && args && typeof args === "object") {
         if (args.source != null && args.from == null) args.from = args.source;
         if (args.target != null && args.to == null) args.to = args.target;
+        args.from = resolveCanvasNodeRef(args.from, flowSnapshot.nodes, "source");
+        args.to = resolveCanvasNodeRef(args.to, flowSnapshot.nodes, "target");
       }
       if (name === "remove_edge" && args && typeof args === "object") {
         if (args.source != null && args.from == null) args.from = args.source;
         if (args.target != null && args.to == null) args.to = args.target;
+        args.from = resolveCanvasNodeRef(args.from, flowSnapshot.nodes, "source");
+        args.to = resolveCanvasNodeRef(args.to, flowSnapshot.nodes, "target");
       }
       liveOps.push({ name, args: args ?? {} });
       liveSteps.push(describeToolStep(name, args ?? {}));
