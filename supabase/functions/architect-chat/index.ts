@@ -1043,7 +1043,29 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
 
       systemPrompt = buildPrompt(effectiveMiniApp, platform) + describeSnapshot(flowSnapshot);
       toolDefs = enableTools ? buildTools(effectiveMiniApp) : undefined;
-    }
+
+      // ===== EDIT-mode hard guard =====
+      // If the canvas already has nodes AND the user did NOT explicitly ask
+      // for a rebuild, we FORCIBLY remove `reset_canvas` from the tool set
+      // and prepend a hard rule to the system prompt. Sonnet 4.6 routinely
+      // mis-classifies small tweaks ("протяни ноду от mini app к триггеру")
+      // as BUILD and wipes the user's canvas, burning credits and trust.
+      // Removing the tool entirely is the only reliable defence — prompt
+      // discipline alone has been insufficient.
+      const canvasHasNodes = canvasNodes.length > 0;
+      const rebuildKeywords = /(пересобер|собери заново|начни заново|с нуля|забудь старый|reset|rebuild|from scratch|wipe)/i;
+      const explicitRebuild = rebuildKeywords.test(lastUserMsg);
+      if (canvasHasNodes && !explicitRebuild && toolDefs) {
+        toolDefs = toolDefs.filter((t) => t?.function?.name !== "reset_canvas");
+        systemPrompt =
+          `== HARD CONSTRAINT (system enforced) ==\n` +
+          `На канвасе уже есть ${canvasNodes.length} нод. Пользователь НЕ просил пересборки.\n` +
+          `Это EDIT-режим. Инструмент reset_canvas УДАЛЁН — его нельзя вызвать.\n` +
+          `Делай МИНИМАЛЬНУЮ точечную правку: get_canvas → 1-3 операции (connect / set_param / add_node) → готово.\n` +
+          `НЕ пересобирай существующие ноды. НЕ повторяй set_variables / set_preview / set_code, если правка их не затрагивает.\n` +
+          `Если запрос звучит как «соедини X с Y» / «протяни ноду» / «исправь связь» — это ОДИН вызов connect и всё.\n\n` +
+          systemPrompt;
+      }
 
     const canvasResult = JSON.stringify(
       canvasSnapshot && typeof canvasSnapshot === "object"
