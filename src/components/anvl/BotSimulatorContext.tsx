@@ -424,6 +424,9 @@ export function BotSimulatorProvider({ children }: { children: ReactNode }) {
   const [variables, setVariables] = useState<Record<string, unknown>>({});
   const [lastInputText, setLastInputText] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
+  /** Populated by submitWebappData; consumed by composeMessage when the
+   *  current branch is a `trigger.webapp_data` → message.text reply. */
+  const [webappCtx, setWebappCtx] = useState<TemplateContext["webapp"] | undefined>(undefined);
 
   useEffect(() => {
     if (!entryId) {
