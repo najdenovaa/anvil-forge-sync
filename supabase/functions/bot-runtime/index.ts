@@ -571,13 +571,30 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
         node.id,
       );
       const buttonLabel = String(params.button_label ?? "Открыть Mini App");
+      // CRITICAL: Telegram.WebApp.sendData() ONLY works when the Mini App is
+      // launched from a *reply* KeyboardButton with `web_app`. From inline
+      // keyboard / menu button / direct link, sendData is silently dropped
+      // and the bot never receives `web_app_data`. So if this flow listens
+      // for trigger.webapp_data, we MUST use a reply keyboard button.
+      const expectsWebappData = ctx.flow.nodes.some(
+        (n) => n.data?.kind === "trigger.webapp_data",
+      );
+      const reply_markup = expectsWebappData
+        ? {
+            keyboard: [[{ text: buttonLabel, web_app: { url } }]],
+            resize_keyboard: true,
+            one_time_keyboard: false,
+          }
+        : { inline_keyboard: [[{ text: buttonLabel, web_app: { url } }]] };
       await sendAndLog("sendMessage", {
         chat_id: ctx.chatId,
         text,
-        reply_markup: {
-          inline_keyboard: [[{ text: buttonLabel, web_app: { url } }]],
-        },
+        reply_markup,
       });
+      // Track that we shifted to a reply keyboard so future turns know.
+      if (expectsWebappData) {
+        ctx.nextReplyKeyboardLabels = [buttonLabel];
+      }
       return null;
     }
 
