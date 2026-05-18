@@ -54,7 +54,7 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="hairline absolute left-0 top-[calc(100%+6px)] z-50 w-[280px] overflow-hidden rounded-lg bg-surface shadow-xl">
+        <div className="hairline absolute left-0 top-[calc(100%+6px)] z-[100] w-[280px] overflow-hidden rounded-lg bg-background shadow-2xl ring-1 ring-black/5">
           {/* Header */}
           <div className="border-b border-hairline px-3 py-2.5">
             <div className="truncate text-[12px] font-medium text-foreground">{user.email}</div>
