@@ -213,6 +213,7 @@ export type Database = {
           kind: string
           owner_id: string | null
           payload: Json
+          read_at: string | null
           source_node_id: string | null
           status: string
           tg_chat_id: string
@@ -230,6 +231,7 @@ export type Database = {
           kind?: string
           owner_id?: string | null
           payload?: Json
+          read_at?: string | null
           source_node_id?: string | null
           status?: string
           tg_chat_id: string
@@ -247,6 +249,7 @@ export type Database = {
           kind?: string
           owner_id?: string | null
           payload?: Json
+          read_at?: string | null
           source_node_id?: string | null
           status?: string
           tg_chat_id?: string
