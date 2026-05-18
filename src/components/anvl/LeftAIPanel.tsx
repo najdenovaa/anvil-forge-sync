@@ -12,7 +12,9 @@ import {
   Cpu,
   PencilLine,
   ChevronRight,
+  X,
 } from "lucide-react";
+import { extractAttachment } from "@/lib/attachment-extractor";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
@@ -376,6 +378,11 @@ export function LeftAIPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendRef = useRef<(text?: string) => void>(() => {});
   const bootedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<
+    { id: string; filename: string; kind: string; text: string }[]
+  >([]);
+  const [attaching, setAttaching] = useState(false);
 
   const applyLocalQuickFix = (text: string) => {
     const normalized = normalizeNodeRef(text);
@@ -829,11 +836,22 @@ export function LeftAIPanel() {
   };
 
   const send = async (override?: string) => {
-    const text = (override ?? input).trim();
-    if (!text || isStreaming) return;
+    const rawText = (override ?? input).trim();
+    if ((!rawText && attachments.length === 0) || isStreaming) return;
 
     setError(null);
     if (!override) setInput("");
+
+    // Prepend extracted attachment contents so the architect sees them.
+    const attachBlock = attachments
+      .map((a) => {
+        const header =
+          a.kind === "image" ? `📎 Изображение: ${a.filename}` : `📎 Файл (${a.kind}): ${a.filename}`;
+        return `${header}\n\`\`\`\n${a.text || "[пусто]"}\n\`\`\``;
+      })
+      .join("\n\n");
+    const text = attachBlock ? (rawText ? `${attachBlock}\n\n${rawText}` : attachBlock) : rawText;
+    if (attachments.length) setAttachments([]);
 
     const userMsg: Msg = { role: "user", content: text };
     const localFix = applyLocalQuickFix(text);
@@ -1020,8 +1038,71 @@ export function LeftAIPanel() {
       </div>
 
       <div className="border-t border-hairline p-3">
+        {(attachments.length > 0 || attaching) && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {attachments.map((a) => (
+              <span
+                key={a.id}
+                className="hairline inline-flex max-w-[220px] items-center gap-1.5 rounded-full bg-surface px-2 py-1 text-[11px] text-foreground"
+                title={`${a.kind} · ${a.text.length} симв.`}
+              >
+                <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <span className="truncate">{a.filename}</span>
+                <button
+                  onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="remove"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {attaching && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2 py-1 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Распознаю…
+              </span>
+            )}
+          </div>
+        )}
         <div className="hairline flex items-end gap-2 rounded-xl bg-surface px-3 py-2 focus-within:border-foreground/30">
-          <button className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.yaml,.yml,.log,.tsv"
+            className="hidden"
+            onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              if (!files.length) return;
+              setAttaching(true);
+              setError(null);
+              for (const f of files) {
+                try {
+                  const res = await extractAttachment(f);
+                  setAttachments((prev) => [
+                    ...prev,
+                    {
+                      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                      filename: res.filename,
+                      kind: res.kind,
+                      text: res.text,
+                    },
+                  ]);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : String(err));
+                }
+              }
+              setAttaching(false);
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={attaching || isStreaming}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40"
+            title="Прикрепить картинку, PDF, DOCX, XLSX, CSV, TXT"
+          >
             <Paperclip className="h-3.5 w-3.5" />
           </button>
           <textarea
@@ -1034,7 +1115,7 @@ export function LeftAIPanel() {
           />
           <button
             onClick={() => send()}
-            disabled={!input.trim() || isStreaming}
+            disabled={(!input.trim() && attachments.length === 0) || isStreaming || attaching}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition disabled:opacity-30"
           >
             {isStreaming ? (
