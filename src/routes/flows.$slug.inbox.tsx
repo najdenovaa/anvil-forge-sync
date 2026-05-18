@@ -304,13 +304,16 @@ function SubmissionCard({
   sub,
   botId,
   onStatus,
+  onRead,
   onDelete,
 }: {
   sub: Submission;
   botId: string | null;
   onStatus: (s: Status) => void;
+  onRead: () => void;
   onDelete: () => void;
 }) {
+  const unread = !sub.read_at;
   const entries = Object.entries(sub.payload).filter(([k]) => !k.startsWith("__"));
   const name =
     sub.tg_user_full_name ||
