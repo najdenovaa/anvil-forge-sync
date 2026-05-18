@@ -64,6 +64,7 @@ export function DeployDialog({
   const [platform, setPlatform] = useState<"telegram" | "max">("telegram");
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [ownerUsername, setOwnerUsername] = useState("");
   const [consent, setConsent] = useState(false);
   const [validation, setValidation] = useState<ValidationState>({ kind: "idle" });
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +80,7 @@ export function DeployDialog({
     if (!open) {
       setToken("");
       setShowToken(false);
+      setOwnerUsername("");
       setConsent(false);
       setValidation({ kind: "idle" });
       setSubmitting(false);
@@ -135,15 +137,17 @@ export function DeployDialog({
     consent &&
     platform === "telegram" &&
     validation.kind === "ok" &&
-    !!flowId;
+    !!flowId &&
+    ownerUsername.trim().length >= 3;
 
   async function performDeploy() {
     if (!flowId) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const cleanOwner = ownerUsername.trim().replace(/^@/, "");
       const { data, error } = await supabase.functions.invoke("deploy-bot", {
-        body: { flow_id: flowId, platform, token },
+        body: { flow_id: flowId, platform, token, owner_tg_username: cleanOwner },
       });
       if (error || !data || data.error) {
         const msg = (data?.error as string) || error?.message || "unknown";
