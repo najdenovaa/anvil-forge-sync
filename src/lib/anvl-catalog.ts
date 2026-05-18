@@ -14,11 +14,13 @@ import {
   Variable,
   UserCog,
   TextCursorInput,
+  Inbox,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 import type { NodeKind } from "./anvl-types";
 
-export type NodeGroup = "Triggers" | "Messages" | "Keyboards" | "Mini App" | "Logic";
+export type NodeGroup = "Triggers" | "Messages" | "Keyboards" | "Mini App" | "Logic" | "CRM";
 
 export interface NodeMetaI18n {
   kind: NodeKind;
