@@ -111,6 +111,48 @@ function InboxScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
+  // Realtime: listen for inserts/updates/deletes on bot_submissions for this flow.
+  useEffect(() => {
+    if (!flowId) return;
+    const channel = supabase
+      .channel(`submissions:${flowId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bot_submissions", filter: `flow_id=eq.${flowId}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const row = payload.new as Submission;
+            setSubmissions((cur) => (cur.some((s) => s.id === row.id) ? cur : [row, ...cur]));
+            // Best-effort browser notification.
+            try {
+              if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+                new Notification("🆕 Новая заявка", {
+                  body: row.tg_user_full_name || row.tg_username || row.tg_chat_id,
+                });
+              }
+            } catch { /* ignore */ }
+          } else if (payload.eventType === "UPDATE") {
+            const row = payload.new as Submission;
+            setSubmissions((cur) => cur.map((s) => (s.id === row.id ? { ...s, ...row } : s)));
+          } else if (payload.eventType === "DELETE") {
+            const row = payload.old as { id: string };
+            setSubmissions((cur) => cur.filter((s) => s.id !== row.id));
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [flowId]);
+
+  // Ask for browser-notification permission once.
+  useEffect(() => {
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const filtered = useMemo(
     () => (filter === "all" ? submissions : submissions.filter((s) => s.status === filter)),
     [submissions, filter],
@@ -121,17 +163,35 @@ function InboxScreen() {
     await supabase.from("bot_submissions").update({ status }).eq("id", id);
   };
 
+  const markRead = async (id: string) => {
+    const now = new Date().toISOString();
+    setSubmissions((cur) => cur.map((s) => (s.id === id ? { ...s, read_at: now } : s)));
+    await supabase.from("bot_submissions").update({ read_at: now }).eq("id", id);
+  };
+
+  const markAllRead = async () => {
+    if (!flowId) return;
+    const now = new Date().toISOString();
+    const unreadIds = submissions.filter((s) => !s.read_at).map((s) => s.id);
+    if (unreadIds.length === 0) return;
+    setSubmissions((cur) => cur.map((s) => (s.read_at ? s : { ...s, read_at: now })));
+    await supabase.from("bot_submissions").update({ read_at: now }).in("id", unreadIds);
+  };
+
   const deleteSub = async (id: string) => {
     if (!confirm("Удалить заявку?")) return;
     setSubmissions((cur) => cur.filter((s) => s.id !== id));
     await supabase.from("bot_submissions").delete().eq("id", id);
   };
 
+  const unreadCount = useMemo(() => submissions.filter((s) => !s.read_at).length, [submissions]);
+
   const counts = useMemo(() => {
     const c = { all: submissions.length, new: 0, in_progress: 0, done: 0, archived: 0 };
     for (const s of submissions) c[s.status]++;
     return c;
   }, [submissions]);
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
