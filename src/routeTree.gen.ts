@@ -18,6 +18,7 @@ import { Route as FlowsIndexRouteImport } from './routes/flows.index'
 import { Route as MFlowIdRouteImport } from './routes/m.$flowId'
 import { Route as FlowsSlugRouteImport } from './routes/flows.$slug'
 import { Route as FlowsSlugInboxRouteImport } from './routes/flows.$slug.inbox'
+import { Route as FlowsSlugBroadcastsRouteImport } from './routes/flows.$slug.broadcasts'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -64,6 +65,11 @@ const FlowsSlugInboxRoute = FlowsSlugInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => FlowsSlugRoute,
 } as any)
+const FlowsSlugBroadcastsRoute = FlowsSlugBroadcastsRouteImport.update({
+  id: '/broadcasts',
+  path: '/broadcasts',
+  getParentRoute: () => FlowsSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
+  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
   '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows': typeof FlowsIndexRoute
+  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
   '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
+  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
   '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
+    | '/flows/$slug/broadcasts'
     | '/flows/$slug/inbox'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows'
+    | '/flows/$slug/broadcasts'
     | '/flows/$slug/inbox'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
+    | '/flows/$slug/broadcasts'
     | '/flows/$slug/inbox'
   fileRoutesById: FileRoutesById
 }
@@ -211,14 +223,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlowsSlugInboxRouteImport
       parentRoute: typeof FlowsSlugRoute
     }
+    '/flows/$slug/broadcasts': {
+      id: '/flows/$slug/broadcasts'
+      path: '/broadcasts'
+      fullPath: '/flows/$slug/broadcasts'
+      preLoaderRoute: typeof FlowsSlugBroadcastsRouteImport
+      parentRoute: typeof FlowsSlugRoute
+    }
   }
 }
 
 interface FlowsSlugRouteChildren {
+  FlowsSlugBroadcastsRoute: typeof FlowsSlugBroadcastsRoute
   FlowsSlugInboxRoute: typeof FlowsSlugInboxRoute
 }
 
 const FlowsSlugRouteChildren: FlowsSlugRouteChildren = {
+  FlowsSlugBroadcastsRoute: FlowsSlugBroadcastsRoute,
   FlowsSlugInboxRoute: FlowsSlugInboxRoute,
 }
 
@@ -239,3 +260,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
