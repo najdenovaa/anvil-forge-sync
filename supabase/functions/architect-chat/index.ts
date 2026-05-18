@@ -1181,7 +1181,7 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "x-api-key": apiKey,
+                "x-api-key": anthropicKey!,
                 "anthropic-version": "2023-06-01",
               },
               body: JSON.stringify(requestBody),
