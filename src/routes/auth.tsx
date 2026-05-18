@@ -115,7 +115,7 @@ function AuthPage() {
             className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50"
           >
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {tab === "login" ? "Sign in" : tab === "signup" ? "Create account" : "Send reset link"}
+            {tab === "login" ? "Войти" : tab === "signup" ? "Создать аккаунт" : "Отправить ссылку"}
           </button>
         </form>
 
