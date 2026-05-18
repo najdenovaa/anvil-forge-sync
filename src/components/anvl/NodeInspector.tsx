@@ -20,6 +20,8 @@ const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
   "action.set_user_var": new Set(["value"]),
   "action.input": new Set(["prompt"]),
   "action.api": new Set(["url", "body"]),
+  "action.save_submission": new Set(["fields"]),
+  "action.notify_admin": new Set(["text"]),
 };
 
 /**
