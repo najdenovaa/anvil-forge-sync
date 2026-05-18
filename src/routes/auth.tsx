@@ -82,7 +82,7 @@ function AuthPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "login" ? "Login" : t === "signup" ? "Sign up" : "Forgot"}
+              {t === "login" ? "Вход" : t === "signup" ? "Регистрация" : "Забыли?"}
             </button>
           ))}
         </div>
