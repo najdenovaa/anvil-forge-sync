@@ -110,7 +110,7 @@ trigger.command, trigger.message, trigger.callback, trigger.webapp_data, message
   • /clients — список пользователей бота
   • /broadcast <текст> — рассылка всем
   • /content — список глобальных переменных {var.*}
-  • /set <ключ> <значение> — изменить {var.ключ}
+  • /set <ключ> <значение> — изменить переменную
   • /stats — счётчики
 
 Что это значит для тебя как Архитектора:
