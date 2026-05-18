@@ -93,6 +93,11 @@ Deno.serve(async (req) => {
     const { error } = await supa.from("bots").update({
       bot_token_encrypted, bot_username, webhook_secret,
       status: "draft", last_error: null,
+      // When the owner re-deploys with a new TG handle, reset owner_tg_user_id
+      // so the next /start from the new owner re-captures it.
+      ...(owner_tg_username
+        ? { owner_tg_username, owner_tg_user_id: null }
+        : {}),
     }).eq("id", bot_id);
     if (error) return json({ error: `db: ${error.message}` }, 500);
   } else {
@@ -100,6 +105,7 @@ Deno.serve(async (req) => {
       flow_id, platform, bot_token_encrypted, bot_username,
       webhook_secret, status: "draft",
       ...(owner_id ? { owner_id } : {}),
+      ...(owner_tg_username ? { owner_tg_username } : {}),
     }).select("id").single();
     if (error) return json({ error: `db: ${error.message}` }, 500);
     bot_id = ins.id;
