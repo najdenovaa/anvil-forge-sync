@@ -3,6 +3,7 @@ import { ArrowUp, Bot, MessageSquare, Zap, Globe } from "lucide-react";
 import { useI18n } from "./I18nContext";
 import { useAnvlShell } from "./AnvlAppShellContext";
 import { usePlatform } from "./PlatformContext";
+import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 
