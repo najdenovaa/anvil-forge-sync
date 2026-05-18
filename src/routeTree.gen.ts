@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as FlowsIndexRouteImport } from './routes/flows.index'
 import { Route as MFlowIdRouteImport } from './routes/m.$flowId'
 import { Route as FlowsSlugRouteImport } from './routes/flows.$slug'
+import { Route as FlowsSlugInboxRouteImport } from './routes/flows.$slug.inbox'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -58,6 +59,11 @@ const FlowsSlugRoute = FlowsSlugRouteImport.update({
   path: '/flows/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FlowsSlugInboxRoute = FlowsSlugInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => FlowsSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,9 +71,10 @@ export interface FileRoutesByFullPath {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRoute
+  '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
+  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,9 +82,10 @@ export interface FileRoutesByTo {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRoute
+  '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows': typeof FlowsIndexRoute
+  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,9 +94,10 @@ export interface FileRoutesById {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRoute
+  '/flows/$slug': typeof FlowsSlugRouteWithChildren
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
+  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
+    | '/flows/$slug/inbox'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows'
+    | '/flows/$slug/inbox'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
+    | '/flows/$slug/inbox'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,7 +141,7 @@ export interface RootRouteChildren {
   BillingRoute: typeof BillingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
-  FlowsSlugRoute: typeof FlowsSlugRoute
+  FlowsSlugRoute: typeof FlowsSlugRouteWithChildren
   MFlowIdRoute: typeof MFlowIdRoute
   FlowsIndexRoute: typeof FlowsIndexRoute
 }
@@ -192,8 +204,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlowsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flows/$slug/inbox': {
+      id: '/flows/$slug/inbox'
+      path: '/inbox'
+      fullPath: '/flows/$slug/inbox'
+      preLoaderRoute: typeof FlowsSlugInboxRouteImport
+      parentRoute: typeof FlowsSlugRoute
+    }
   }
 }
+
+interface FlowsSlugRouteChildren {
+  FlowsSlugInboxRoute: typeof FlowsSlugInboxRoute
+}
+
+const FlowsSlugRouteChildren: FlowsSlugRouteChildren = {
+  FlowsSlugInboxRoute: FlowsSlugInboxRoute,
+}
+
+const FlowsSlugRouteWithChildren = FlowsSlugRoute._addFileChildren(
+  FlowsSlugRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -201,10 +232,19 @@ const rootRouteChildren: RootRouteChildren = {
   BillingRoute: BillingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
-  FlowsSlugRoute: FlowsSlugRoute,
+  FlowsSlugRoute: FlowsSlugRouteWithChildren,
   MFlowIdRoute: MFlowIdRoute,
   FlowsIndexRoute: FlowsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
