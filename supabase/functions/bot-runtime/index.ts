@@ -767,7 +767,23 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     .eq("chat_id", chatId)
     .maybeSingle();
 
-  const variables: Record<string, unknown> = (existing?.variables as any) ?? {};
+  const sessionVars: Record<string, unknown> = (existing?.variables as any) ?? {};
+  // Merge bot-wide globals (editable by admin in cabinet) under session vars.
+  // Session-level writes via action.set_variable still win over globals.
+  const globals: Record<string, unknown> = {};
+  try {
+    const { data: globalRows } = await supa
+      .from("bot_globals")
+      .select("key, value")
+      .eq("bot_id", botId);
+    for (const row of globalRows ?? []) {
+      const v = (row as any).value;
+      // value is jsonb — unwrap primitive scalars stored as JSON.
+      globals[(row as any).key] =
+        v && typeof v === "object" && "v" in v && Object.keys(v).length === 1 ? (v as any).v : v;
+    }
+  } catch { /* ignore global-load failures */ }
+  const variables: Record<string, unknown> = { ...globals, ...sessionVars };
 
   // Load per-Telegram-user persistent state. Keyed on (bot_id, tg_user_id),
   // independent of chat_id — so a user in a group still sees their own
