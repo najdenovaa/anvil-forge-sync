@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_admin_chats: {
+        Row: {
+          bot_id: string
+          created_at: string
+          id: string
+          label: string | null
+          owner_id: string | null
+          tg_chat_id: string
+          updated_at: string
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          owner_id?: string | null
+          tg_chat_id: string
+          updated_at?: string
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          owner_id?: string | null
+          tg_chat_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bot_events: {
         Row: {
           bot_id: string
@@ -115,6 +145,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      bot_submissions: {
+        Row: {
+          admin_note: string | null
+          bot_id: string
+          created_at: string
+          flow_id: string
+          id: string
+          kind: string
+          owner_id: string | null
+          payload: Json
+          source_node_id: string | null
+          status: string
+          tg_chat_id: string
+          tg_user_full_name: string | null
+          tg_user_id: string | null
+          tg_username: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          bot_id: string
+          created_at?: string
+          flow_id: string
+          id?: string
+          kind?: string
+          owner_id?: string | null
+          payload?: Json
+          source_node_id?: string | null
+          status?: string
+          tg_chat_id: string
+          tg_user_full_name?: string | null
+          tg_user_id?: string | null
+          tg_username?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          bot_id?: string
+          created_at?: string
+          flow_id?: string
+          id?: string
+          kind?: string
+          owner_id?: string | null
+          payload?: Json
+          source_node_id?: string | null
+          status?: string
+          tg_chat_id?: string
+          tg_user_full_name?: string | null
+          tg_user_id?: string | null
+          tg_username?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       bot_user_state: {
         Row: {
