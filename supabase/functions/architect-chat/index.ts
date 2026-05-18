@@ -1058,8 +1058,8 @@ Deno.serve(async (req: Request) => {
       return json({ error: "messages array required" }, 400);
     }
 
-    const resolved = resolveModel(model);
-    const aiModel = resolved.model;
+    let resolved = resolveModel(model);
+    let aiModel = resolved.model;
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const googleKey = Deno.env.get("GOOGLE_API_KEY");
     if (resolved.provider === "anthropic" && !anthropicKey) {
