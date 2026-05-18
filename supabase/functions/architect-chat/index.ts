@@ -324,29 +324,42 @@ const REAL_MODELS = {
   claude_haiku: "claude-haiku-4-5-20251001",
   claude_sonnet: "claude-sonnet-4-6",
   claude_opus: "claude-opus-4-7",
+  gemini_flash: "gemini-2.5-flash",
+  gemini_pro: "gemini-2.5-pro",
 } as const;
 
-// UI selector labels → real model.
-// Auto / Claude / GPT / Grok → Sonnet 4.6 (the workhorse: smart enough for
-// tool-use, cheap enough to run all day).
-// Gemini → Haiku 4.5 (a "fast & cheap" pseudo-fallback, ~3x cheaper).
-// Explicit names sonnet/haiku/opus are also accepted directly.
-const ALIASES: Record<string, keyof typeof REAL_MODELS> = {
-  auto: "claude_sonnet",
-  claude: "claude_sonnet",
-  gpt: "claude_sonnet",
-  grok: "claude_sonnet",
-  gemini: "claude_haiku",
-  sonnet: "claude_sonnet",
-  haiku: "claude_haiku",
-  opus: "claude_opus",
-};
+type Provider = "anthropic" | "google";
+type Resolved = { provider: Provider; model: string };
 
-function resolveModel(input?: string): string {
+// UI selector labels → real model + provider.
+// auto / claude / gpt / grok / sonnet → Anthropic Sonnet 4.6 (the workhorse).
+// gemini → Google Gemini 2.5 Flash via GOOGLE_API_KEY (OpenAI-compatible API).
+// haiku / opus → Anthropic explicit names.
+function resolveModel(input?: string): Resolved {
   const key = (input ?? "auto").toLowerCase();
-  if (key in REAL_MODELS) return REAL_MODELS[key as keyof typeof REAL_MODELS];
-  if (key in ALIASES) return REAL_MODELS[ALIASES[key]];
-  return REAL_MODELS.claude_sonnet;
+  switch (key) {
+    case "gemini":
+    case "gemini-flash":
+    case "gemini_flash":
+      return { provider: "google", model: REAL_MODELS.gemini_flash };
+    case "gemini-pro":
+    case "gemini_pro":
+      return { provider: "google", model: REAL_MODELS.gemini_pro };
+    case "haiku":
+    case "claude_haiku":
+      return { provider: "anthropic", model: REAL_MODELS.claude_haiku };
+    case "opus":
+    case "claude_opus":
+      return { provider: "anthropic", model: REAL_MODELS.claude_opus };
+    case "auto":
+    case "claude":
+    case "gpt":
+    case "grok":
+    case "sonnet":
+    case "claude_sonnet":
+    default:
+      return { provider: "anthropic", model: REAL_MODELS.claude_sonnet };
+  }
 }
 
 // ===== OpenAI ↔ Anthropic Messages API format converters =====
