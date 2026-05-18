@@ -340,6 +340,7 @@ function SubmissionCard({
       setReplyText("");
       setReplyOpen(false);
       setSentAt(Date.now());
+      if (unread) onRead();
     } catch (e: any) {
       setSendErr(e?.message ?? "Не удалось отправить");
     } finally {
