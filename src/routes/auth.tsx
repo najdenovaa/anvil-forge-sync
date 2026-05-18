@@ -7,7 +7,7 @@ import anvlLogo from "@/assets/anvl-logo.png";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
-    meta: [{ title: "Sign in — ANVL" }],
+    meta: [{ title: "Вход — ANVL" }],
   }),
   component: AuthPage,
 });
@@ -35,7 +35,7 @@ function AuthPage() {
       if (tab === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        setMsg({ type: "ok", text: "Signed in. Redirecting…" });
+        setMsg({ type: "ok", text: "Вход выполнен. Перенаправляем…" });
       } else if (tab === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -45,17 +45,17 @@ function AuthPage() {
         if (error) throw error;
         setMsg({
           type: "ok",
-          text: "Account created. Check your email to confirm, then log in.",
+          text: "Аккаунт создан. Проверьте почту для подтверждения, затем войдите.",
         });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        setMsg({ type: "ok", text: "Password reset email sent." });
+        setMsg({ type: "ok", text: "Письмо для сброса пароля отправлено." });
       }
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message ?? "Something went wrong" });
+      setMsg({ type: "err", text: err?.message ?? "Что-то пошло не так" });
     } finally {
       setBusy(false);
     }
@@ -82,7 +82,7 @@ function AuthPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "login" ? "Login" : t === "signup" ? "Sign up" : "Forgot"}
+              {t === "login" ? "Вход" : t === "signup" ? "Регистрация" : "Забыли?"}
             </button>
           ))}
         </div>
@@ -103,7 +103,7 @@ function AuthPage() {
               required
               minLength={6}
               autoComplete={tab === "login" ? "current-password" : "new-password"}
-              placeholder="Password"
+              placeholder="Пароль"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="hairline w-full rounded-md bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
@@ -115,7 +115,7 @@ function AuthPage() {
             className="flex w-full items-center justify-center gap-2 rounded-md bg-foreground py-2 text-sm font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50"
           >
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {tab === "login" ? "Sign in" : tab === "signup" ? "Create account" : "Send reset link"}
+            {tab === "login" ? "Войти" : tab === "signup" ? "Создать аккаунт" : "Отправить ссылку"}
           </button>
         </form>
 
@@ -131,7 +131,7 @@ function AuthPage() {
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground">
           <Link to="/" className="hover:text-foreground">
-            ← Back to home
+            ← На главную
           </Link>
         </p>
       </div>
