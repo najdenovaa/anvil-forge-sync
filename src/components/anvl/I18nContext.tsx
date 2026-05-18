@@ -372,6 +372,10 @@ const en: Dict = {
   "node.action.set_user_var.desc": "Save value to per-user cabinet",
   "node.action.input.label": "Input request",
   "node.action.input.desc": "Ask user and save reply",
+  "node.action.save_submission.label": "Save submission",
+  "node.action.save_submission.desc": "Store user data into Inbox",
+  "node.action.notify_admin.label": "Notify admin",
+  "node.action.notify_admin.desc": "Send message to admin chats",
 
   "settings.cloud_status": "Cloud status",
   "settings.production": "Production",
