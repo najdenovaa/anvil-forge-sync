@@ -66,7 +66,7 @@ export function TopBar() {
           <FlowSlugLabel />
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </Link>
-        <InboxLink />
+        <FlowSubLinks />
       </div>
 
 
