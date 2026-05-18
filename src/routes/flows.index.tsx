@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FlowsList } from "@/components/anvl/FlowsList";
+import { AuthGate } from "@/components/anvl/AuthGate";
 
 export const Route = createFileRoute("/flows/")({
   head: () => ({
@@ -10,5 +11,13 @@ export const Route = createFileRoute("/flows/")({
       { property: "og:description", content: "Manage all your Telegram and Max bot workspaces." },
     ],
   }),
-  component: FlowsList,
+  component: GatedFlows,
 });
+
+function GatedFlows() {
+  return (
+    <AuthGate>
+      <FlowsList />
+    </AuthGate>
+  );
+}
