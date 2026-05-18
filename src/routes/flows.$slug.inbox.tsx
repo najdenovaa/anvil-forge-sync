@@ -213,6 +213,7 @@ function InboxScreen() {
               <SubmissionCard
                 key={s.id}
                 sub={s}
+                botId={botId}
                 onStatus={(st) => updateStatus(s.id, st)}
                 onDelete={() => deleteSub(s.id)}
               />
