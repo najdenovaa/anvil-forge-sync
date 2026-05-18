@@ -17,9 +17,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as FlowsIndexRouteImport } from './routes/flows.index'
 import { Route as MFlowIdRouteImport } from './routes/m.$flowId'
 import { Route as FlowsSlugRouteImport } from './routes/flows.$slug'
-import { Route as FlowsSlugInboxRouteImport } from './routes/flows.$slug.inbox'
-import { Route as FlowsSlugContentRouteImport } from './routes/flows.$slug.content'
-import { Route as FlowsSlugBroadcastsRouteImport } from './routes/flows.$slug.broadcasts'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -61,21 +58,6 @@ const FlowsSlugRoute = FlowsSlugRouteImport.update({
   path: '/flows/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FlowsSlugInboxRoute = FlowsSlugInboxRouteImport.update({
-  id: '/inbox',
-  path: '/inbox',
-  getParentRoute: () => FlowsSlugRoute,
-} as any)
-const FlowsSlugContentRoute = FlowsSlugContentRouteImport.update({
-  id: '/content',
-  path: '/content',
-  getParentRoute: () => FlowsSlugRoute,
-} as any)
-const FlowsSlugBroadcastsRoute = FlowsSlugBroadcastsRouteImport.update({
-  id: '/broadcasts',
-  path: '/broadcasts',
-  getParentRoute: () => FlowsSlugRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -83,12 +65,9 @@ export interface FileRoutesByFullPath {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRouteWithChildren
+  '/flows/$slug': typeof FlowsSlugRoute
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
-  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
-  '/flows/$slug/content': typeof FlowsSlugContentRoute
-  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -96,12 +75,9 @@ export interface FileRoutesByTo {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRouteWithChildren
+  '/flows/$slug': typeof FlowsSlugRoute
   '/m/$flowId': typeof MFlowIdRoute
   '/flows': typeof FlowsIndexRoute
-  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
-  '/flows/$slug/content': typeof FlowsSlugContentRoute
-  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -110,12 +86,9 @@ export interface FileRoutesById {
   '/billing': typeof BillingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/flows/$slug': typeof FlowsSlugRouteWithChildren
+  '/flows/$slug': typeof FlowsSlugRoute
   '/m/$flowId': typeof MFlowIdRoute
   '/flows/': typeof FlowsIndexRoute
-  '/flows/$slug/broadcasts': typeof FlowsSlugBroadcastsRoute
-  '/flows/$slug/content': typeof FlowsSlugContentRoute
-  '/flows/$slug/inbox': typeof FlowsSlugInboxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -128,9 +101,6 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
-    | '/flows/$slug/broadcasts'
-    | '/flows/$slug/content'
-    | '/flows/$slug/inbox'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -141,9 +111,6 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows'
-    | '/flows/$slug/broadcasts'
-    | '/flows/$slug/content'
-    | '/flows/$slug/inbox'
   id:
     | '__root__'
     | '/'
@@ -154,9 +121,6 @@ export interface FileRouteTypes {
     | '/flows/$slug'
     | '/m/$flowId'
     | '/flows/'
-    | '/flows/$slug/broadcasts'
-    | '/flows/$slug/content'
-    | '/flows/$slug/inbox'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -165,7 +129,7 @@ export interface RootRouteChildren {
   BillingRoute: typeof BillingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
-  FlowsSlugRoute: typeof FlowsSlugRouteWithChildren
+  FlowsSlugRoute: typeof FlowsSlugRoute
   MFlowIdRoute: typeof MFlowIdRoute
   FlowsIndexRoute: typeof FlowsIndexRoute
 }
@@ -228,45 +192,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FlowsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/flows/$slug/inbox': {
-      id: '/flows/$slug/inbox'
-      path: '/inbox'
-      fullPath: '/flows/$slug/inbox'
-      preLoaderRoute: typeof FlowsSlugInboxRouteImport
-      parentRoute: typeof FlowsSlugRoute
-    }
-    '/flows/$slug/content': {
-      id: '/flows/$slug/content'
-      path: '/content'
-      fullPath: '/flows/$slug/content'
-      preLoaderRoute: typeof FlowsSlugContentRouteImport
-      parentRoute: typeof FlowsSlugRoute
-    }
-    '/flows/$slug/broadcasts': {
-      id: '/flows/$slug/broadcasts'
-      path: '/broadcasts'
-      fullPath: '/flows/$slug/broadcasts'
-      preLoaderRoute: typeof FlowsSlugBroadcastsRouteImport
-      parentRoute: typeof FlowsSlugRoute
-    }
   }
 }
-
-interface FlowsSlugRouteChildren {
-  FlowsSlugBroadcastsRoute: typeof FlowsSlugBroadcastsRoute
-  FlowsSlugContentRoute: typeof FlowsSlugContentRoute
-  FlowsSlugInboxRoute: typeof FlowsSlugInboxRoute
-}
-
-const FlowsSlugRouteChildren: FlowsSlugRouteChildren = {
-  FlowsSlugBroadcastsRoute: FlowsSlugBroadcastsRoute,
-  FlowsSlugContentRoute: FlowsSlugContentRoute,
-  FlowsSlugInboxRoute: FlowsSlugInboxRoute,
-}
-
-const FlowsSlugRouteWithChildren = FlowsSlugRoute._addFileChildren(
-  FlowsSlugRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -274,7 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   BillingRoute: BillingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
-  FlowsSlugRoute: FlowsSlugRouteWithChildren,
+  FlowsSlugRoute: FlowsSlugRoute,
   MFlowIdRoute: MFlowIdRoute,
   FlowsIndexRoute: FlowsIndexRoute,
 }
