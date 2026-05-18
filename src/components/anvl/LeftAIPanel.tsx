@@ -376,6 +376,11 @@ export function LeftAIPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendRef = useRef<(text?: string) => void>(() => {});
   const bootedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<
+    { id: string; filename: string; kind: string; text: string }[]
+  >([]);
+  const [attaching, setAttaching] = useState(false);
 
   const applyLocalQuickFix = (text: string) => {
     const normalized = normalizeNodeRef(text);
