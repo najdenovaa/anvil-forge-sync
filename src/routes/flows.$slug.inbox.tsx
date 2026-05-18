@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Inbox as InboxIcon, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Inbox as InboxIcon, RefreshCw, Plus, Trash2, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGate } from "@/components/anvl/AuthGate";
 import { cn } from "@/lib/utils";
@@ -213,6 +213,7 @@ function InboxScreen() {
               <SubmissionCard
                 key={s.id}
                 sub={s}
+                botId={botId}
                 onStatus={(st) => updateStatus(s.id, st)}
                 onDelete={() => deleteSub(s.id)}
               />
@@ -226,10 +227,12 @@ function InboxScreen() {
 
 function SubmissionCard({
   sub,
+  botId,
   onStatus,
   onDelete,
 }: {
   sub: Submission;
+  botId: string | null;
   onStatus: (s: Status) => void;
   onDelete: () => void;
 }) {
@@ -238,6 +241,34 @@ function SubmissionCard({
     sub.tg_user_full_name ||
     (sub.tg_username ? `@${sub.tg_username}` : null) ||
     `tg:${sub.tg_user_id ?? sub.tg_chat_id}`;
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendErr, setSendErr] = useState<string | null>(null);
+  const [sentAt, setSentAt] = useState<number | null>(null);
+
+  const send = async () => {
+    if (!botId) return;
+    const t = replyText.trim();
+    if (!t) return;
+    setSending(true);
+    setSendErr(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("bot-reply", {
+        body: { bot_id: botId, chat_id: sub.tg_chat_id, text: t },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setReplyText("");
+      setReplyOpen(false);
+      setSentAt(Date.now());
+    } catch (e: any) {
+      setSendErr(e?.message ?? "Не удалось отправить");
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="hairline rounded-lg bg-surface p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -251,6 +282,14 @@ function SubmissionCard({
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setReplyOpen((v) => !v)}
+            disabled={!botId}
+            className="flex items-center gap-1 rounded-md bg-foreground/10 px-2 py-1 text-[11px] font-medium transition hover:bg-foreground/20 disabled:opacity-40"
+            title="Ответить пользователю"
+          >
+            <Send className="h-3 w-3" /> Ответить
+          </button>
           <select
             value={sub.status}
             onChange={(e) => onStatus(e.target.value as Status)}
@@ -282,6 +321,44 @@ function SubmissionCard({
             </div>
           ))}
         </dl>
+      )}
+      {replyOpen && (
+        <div className="mt-3 border-t border-hairline pt-3">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            disabled={sending}
+            rows={3}
+            maxLength={4000}
+            placeholder={`Сообщение для ${name}…`}
+            className="hairline w-full rounded-md bg-background px-3 py-2 text-[13px]"
+          />
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{replyText.length}/4000</span>
+            <div className="flex items-center gap-2">
+              {sendErr && <span className="text-[11px] text-destructive">{sendErr}</span>}
+              <button
+                onClick={() => { setReplyOpen(false); setReplyText(""); setSendErr(null); }}
+                className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={send}
+                disabled={sending || !replyText.trim()}
+                className="flex items-center gap-1 rounded-md bg-foreground px-3 py-1 text-[11px] font-medium text-background transition hover:opacity-90 disabled:opacity-40"
+              >
+                {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                Отправить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {sentAt && !replyOpen && (
+        <div className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+          Ответ отправлен.
+        </div>
       )}
     </div>
   );
