@@ -12,7 +12,9 @@ import {
   Cpu,
   PencilLine,
   ChevronRight,
+  X,
 } from "lucide-react";
+import { extractAttachment } from "@/lib/attachment-extractor";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
