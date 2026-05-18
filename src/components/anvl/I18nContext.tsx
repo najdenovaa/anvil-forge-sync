@@ -142,6 +142,10 @@ const ru: Dict = {
   "node.action.set_user_var.desc": "Сохранить значение в личный кабинет пользователя",
   "node.action.input.label": "Запрос ввода",
   "node.action.input.desc": "Спросить пользователя и сохранить ответ",
+  "node.action.save_submission.label": "Сохранить заявку",
+  "node.action.save_submission.desc": "Записать данные пользователя во «Входящие»",
+  "node.action.notify_admin.label": "Уведомить админа",
+  "node.action.notify_admin.desc": "Отправить сообщение в чаты администраторов",
 
   // Settings pane
   "settings.cloud_status": "Статус облака",
