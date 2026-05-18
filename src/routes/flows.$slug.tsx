@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnvlApp } from "@/components/anvl/AnvlApp";
+import { AuthGate } from "@/components/anvl/AuthGate";
 
 export const Route = createFileRoute("/flows/$slug")({
   head: ({ params }) => ({
@@ -13,5 +14,9 @@ export const Route = createFileRoute("/flows/$slug")({
 
 function FlowWorkspace() {
   const { slug } = Route.useParams();
-  return <AnvlApp slug={slug} />;
+  return (
+    <AuthGate>
+      <AnvlApp slug={slug} />
+    </AuthGate>
+  );
 }

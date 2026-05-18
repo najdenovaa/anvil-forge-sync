@@ -5,6 +5,7 @@ import { useI18n, type Lang } from "./I18nContext";
 import { useAnvlWorkspace } from "./AnvlWorkspaceContext";
 import { VersionHistory } from "./VersionHistory";
 import { DeployButton } from "./DeployButton";
+import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 import maxLogo from "@/assets/max-logo.png";
@@ -102,6 +103,7 @@ export function TopBar() {
           {t("topbar.preview")}
         </button>
         <DeployButton />
+        <UserMenu />
       </div>
     </header>
   );

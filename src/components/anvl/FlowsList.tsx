@@ -2,8 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Send, AppWindow, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, Trash2, Send, AppWindow, ArrowRight, Loader2, Link2 } from "lucide-react";
 import { listFlows, deleteFlow, upsertFlow, type FlowSnapshot } from "@/lib/anvl-flow-storage";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./AuthContext";
+import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
 import anvlLogo from "@/assets/anvl-logo.png";
 import maxLogo from "@/assets/max-logo.png";
@@ -21,11 +24,43 @@ function slugify(input: string): string {
 export function FlowsList() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [newTitle, setNewTitle] = useState("");
 
   const { data: flows = [], isLoading } = useQuery({
-    queryKey: ["anvl-flows-list"],
+    queryKey: ["anvl-flows-list", user?.id],
     queryFn: listFlows,
+  });
+
+  // Orphan resources (owner_id IS NULL) — visible only while Phase-1 public RLS
+  // is still active. After Phase-2 RLS tightens and orphans are claimed, this
+  // count goes to zero and the banner disappears.
+  const { data: orphanCounts = { flows: 0, bots: 0 } } = useQuery({
+    queryKey: ["orphan-counts", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const [{ count: f }, { count: b }] = await Promise.all([
+        (supabase as any).from("flows").select("*", { count: "exact", head: true }).is("owner_id", null),
+        (supabase as any).from("bots").select("*", { count: "exact", head: true }).is("owner_id", null),
+      ]);
+      return { flows: f ?? 0, bots: b ?? 0 };
+    },
+  });
+
+  const claimMut = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Not authenticated");
+      const [{ error: e1 }, { error: e2 }] = await Promise.all([
+        (supabase as any).from("flows").update({ owner_id: user.id }).is("owner_id", null),
+        (supabase as any).from("bots").update({ owner_id: user.id }).is("owner_id", null),
+      ]);
+      if (e1) throw e1;
+      if (e2) throw e2;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orphan-counts"] });
+      qc.invalidateQueries({ queryKey: ["anvl-flows-list"] });
+    },
   });
 
   const createMut = useMutation({
@@ -41,6 +76,7 @@ export function FlowsList() {
         preview: {},
         miniapp: {},
         generatedCode: "",
+        ownerId: user?.id ?? null,
       });
     },
     onSuccess: (snap) => {
@@ -63,7 +99,7 @@ export function FlowsList() {
         <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           Workspaces
         </div>
-        <div className="w-9" />
+        <UserMenu />
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
@@ -78,6 +114,31 @@ export function FlowsList() {
             Each flow is a separate bot workspace with its own canvas, preview and version history.
           </p>
         </motion.div>
+
+        {(orphanCounts.flows > 0 || orphanCounts.bots > 0) && (
+          <div className="hairline mb-6 flex items-center justify-between gap-4 rounded-xl bg-surface p-4">
+            <div className="flex items-start gap-3">
+              <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+              <div className="text-sm">
+                <div className="font-medium">
+                  Found {orphanCounts.flows} flow{orphanCounts.flows === 1 ? "" : "s"} and{" "}
+                  {orphanCounts.bots} bot{orphanCounts.bots === 1 ? "" : "s"} without an owner
+                </div>
+                <div className="mt-0.5 text-[12px] text-muted-foreground">
+                  Created before user accounts existed. Claim them to attach to your account.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => claimMut.mutate()}
+              disabled={claimMut.isPending}
+              className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 text-[13px] font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50"
+            >
+              {claimMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Claim
+            </button>
+          </div>
+        )}
 
         <form
           onSubmit={(e) => {

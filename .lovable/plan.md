@@ -1,69 +1,85 @@
-## Шаг 10, раунд 2.5 — починка цикла обхода и переход на trigger.callback
+## Big-bang: личные кабинеты ANVL
 
-### Корневая причина
-
-`bot-runtime` обходит граф через `goNext()` после `keyboard.inline` и `message.text`. Существующая структура меню («keyboard → message → back_kb → message → keyboard …») образует цикл, который ограничивается только хардкап-капом 50 шагов. На каждый /start бот шлёт ~10–25 сообщений подряд. Composite tool из раунда 1 повторил тот же паттерн и добавил ещё одну ветку цикла.
-
-Корректная архитектура: `keyboard.inline` — терминальный узел (после прикрепления клавиатуры обход останавливается). Маршрутизация нажатий идёт через `trigger.callback`-ноды, у которых `params.data` совпадает с `callback_data` кнопки.
+Email-аккаунт владельца: **najdenovaa@gmail.com**, auto-confirm **OFF** (нужна верификация по письму).
 
 ---
 
-### Изменения
+### 1. БД-миграция
 
-**1. `supabase/functions/bot-runtime/index.ts` — keyboard.inline терминальный**
+- `flows.owner_id uuid NULL` (FK на `auth.users(id)`, ON DELETE SET NULL)
+- `bots.owner_id uuid NULL` (FK на `auth.users(id)`, ON DELETE SET NULL)
+- Индексы по `owner_id` на обеих таблицах
+- `flow_versions` — owner-фильтр идёт через `flow_id → flows.owner_id` (доп. колонку не добавляем)
+- `bot_sessions`, `bot_events`, `bot_user_state`, `bot_globals` — owner-фильтр идёт через `bot_id → bots.owner_id` (доп. колонок не добавляем; runtime эти таблицы уже пишет от service-role)
 
-В `runNode` для `case "keyboard.inline"`: после установки `pendingKeyboard` возвращать `null` (а не `goNext()`). Это останавливает автообход. Идентично для `keyboard.reply`.
+### 2. RLS — переписываем с публичных на owner-scoped
 
-Пограничный случай: ранее `keyboard.inline` ставил клавиатуру и шёл дальше к `message.text`, который её и прикреплял. Теперь правильный порядок: `message.text` → `keyboard.inline` (терминал). Но runtime читает `pendingKeyboard` ВНУТРИ `message.text`, т.е. клавиатура должна быть установлена ДО сообщения. Меняю порядок: для каждой пары (msg, kb) делаем `kb` родителем msg в графе, либо — проще — переписываю `message.text`: если у узла есть исходящее ребро к `keyboard.inline`, заглядываем туда наперёд, читаем buttons, прикрепляем; затем после отправки возвращаем `null` (не идём дальше через keyboard, чтобы не зациклиться).
+- **`flows`**: SELECT/UPDATE/DELETE — `owner_id = auth.uid() OR owner_id IS NULL`. INSERT — `owner_id = auth.uid()`. Условие `OR IS NULL` нужно ровно для одноразового claim; после claim ни одной NULL-строки не останется.
+- **`bots`**: то же самое.
+- **`flow_versions`**: SELECT/INSERT через EXISTS-subquery к `flows` (owner совпадает).
+- **`bot_sessions`, `bot_events`, `bot_user_state`, `bot_globals`**: SELECT для owner'а бота, остальные операции (INSERT/UPDATE/DELETE) только сервис-роль (runtime использует service-role-key, поэтому RLS на запись не нужен → политики только `SELECT WHERE owner совпадает`).
 
-Решение чище: в `runNode/message.text` искать «сосед-keyboard» в исходящих рёбрах, если есть — рендерить его кнопки прямо здесь, отправить с reply_markup, вернуть `null`. Старый `pendingKeyboard`-поток удаляется.
+### 3. Auth UI
 
-**2. `AnvlWorkspaceContext.tsx` — переписать composite tools**
+- Маршрут `/auth` — табы Signup / Login / Forgot password
+- Маршрут `/reset-password` (обязателен для recovery flow)
+- `signUp` с `emailRedirectTo: window.location.origin + '/auth'`
+- TopBar: показывает email текущего юзера + кнопка Logout
+- Глобальный `onAuthStateChange` listener (single source of truth)
 
-`addMenuSection` теперь принимает дополнительный `menu_msg_id` (msg-узел, который пара к `menu_id`-keyboard). Создаёт:
+### 4. Защита роутов
 
-```
-trigger.callback (data=callback_data)  →  section_msg  →  back_kb
-trigger.callback (data="back_to_menu") →  menu_msg     →  menu_kb     [идемпотентно]
-```
+- `_authenticated` layout-route с `beforeLoad` → redirect `/auth` если не залогинен
+- Переносим внутрь: `flows.index`, `flows.$slug`
+- Публичными остаются: `/`, `/auth`, `/reset-password`, `/m/$flowId` (Mini App для конечных юзеров бота — НЕ для ANVL-аккаунтов)
 
-Кнопка возврата в `back_kb` имеет `callback_data="back_to_menu"`. Кнопка раздела в `menu_kb` имеет `action=callback_data` (без префикса `screen:`).
+### 5. Claim существующих ресурсов
 
-`removeMenuSection` — удаляет section trigger.callback, msg, back_kb и их рёбра.
+Один раз, после первой регистрации najdenovaa@gmail.com:
 
-`updateMenuSection` — без структурных изменений (только лейбл/контент).
+- В `FlowsList` показываем баннер: «Найдено N flows без владельца. Привязать к моему аккаунту» → кнопка вызывает server fn `claimOrphanResources` (`createServerFn` + `requireSupabaseAuth` + `supabaseAdmin`), которая делает `UPDATE flows/bots SET owner_id = userId WHERE owner_id IS NULL`.
+- Баннер пропадает когда NULL-строк нет.
 
-**3. `supabase/functions/architect-chat/index.ts` — обновить описание tool'ов в BASE_PROMPT**
+### 6. Wire-up создания
 
-Зафиксировать: `keyboard.inline` — терминальный, маршрутизация через `trigger.callback`. Добавить параметр `menu_msg_id` в схему `add_menu_section`.
+- `useFlowPersistence` / места создания flow и bot: при INSERT передаём `owner_id: session.user.id`
+- Architect (`architect-chat`) и `deploy-bot` — проверить, что они не создают записи без owner_id (если создают — берём owner_id из auth-контекста запроса)
 
-**4. Миграция канваса барбершопа** (`flow-34b84919`)
+### 7. Что НЕ трогаем в этот раунд
 
-Одноразовое SQL-обновление поля `flows.nodes/edges`:
-- Удалить рёбра `n4_main_kb → {n7_booking,n5_prices,n6_contacts,promos_msg}`.
-- Удалить рёбра `back_kb → menu_msg`.
-- Заменить `action:"screen:n7_booking"` в кнопках `n4_main_kb` на `callback_data:"go_booking"` и т.п. (короткие данные ≤64 байт).
-- Создать 5 `trigger.callback`-нод: 4 для разделов (data=`go_booking|go_prices|go_contacts|go_promos`) → соответствующий msg, и 1 для возврата (data=`back_to_menu`) → `n3_main_menu`.
-- Заменить кнопки в `n8_back_kb`/`n10_back_booking`/`promos_back_kb` на `callback_data:"back_to_menu"`.
-
-Применяется через `supabase--migration` (UPDATE flows SET nodes=..., edges=...).
+- Существующая логика bot-runtime (он на service-role, RLS его не аффектит)
+- TG Mini App страница `/m/$flowId` — публичная, без auth
+- Расшаринг flows между несколькими ANVL-юзерами (пока единоличное владение)
 
 ---
 
-### Валидация
+### Технические детали
 
-1. Деплой `bot-runtime`. На `/start` бот барбершопа отправляет ровно одно сообщение «Привет, …» с 4 кнопками — без флуда.
-2. Тап «📅 Записаться» → одно сообщение «Запись принята» с кнопкой «Назад». Тап «Назад» → одно сообщение главного меню.
-3. Канвас на `/flows/flow-34b84919` визуально показывает 5 новых `trigger.callback`-нод и пересобранные рёбра.
-4. История канваса (кнопка History) хранит предыдущую версию для отката.
-5. Typecheck чист.
+**Файлы (новые)**:
+- `supabase/migrations/<ts>_owner_id_and_rls.sql`
+- `src/routes/auth.tsx`, `src/routes/reset-password.tsx`
+- `src/routes/_authenticated.tsx` (pathless layout)
+- `src/routes/_authenticated/flows.index.tsx`, `src/routes/_authenticated/flows.$slug.tsx` (move)
+- `src/lib/owner.functions.ts` (server fn `claimOrphanResources`)
+- `src/hooks/useAuth.tsx` (context + `onAuthStateChange`)
 
-### Технические детали для Architect (раунд 3)
+**Файлы (edit)**:
+- `src/routes/__root.tsx` — повесить `onAuthStateChange` + `router.invalidate()`
+- `src/components/anvl/TopBar.tsx` — email + Logout
+- `src/components/anvl/FlowsList.tsx` — claim-баннер, INSERT с owner_id
+- `src/components/anvl/useFlowPersistence.ts` — owner_id при создании
+- `src/start.ts` — убедиться что `attachSupabaseAuth` подключён
+- удаляем старые `src/routes/flows.index.tsx`, `src/routes/flows.$slug.tsx`
 
-Сигнатура `add_menu_section` после фикса:
-```
-{ menu_id, menu_msg_id, button_label, callback_data, content_kind, content, section_id, back_label? }
-```
+**Порядок применения** (важно для big-bang без даунтайма):
+1. Миграция: добавляем owner_id колонки (NULL), индексы. RLS пока НЕ трогаем.
+2. Деплоим UI с auth + claim-баннером.
+3. Ты регистрируешься najdenovaa@gmail.com → верифицируешь email → жмёшь Claim.
+4. **Вторая миграция** (после шага 3): переписываем RLS на owner-scoped. До этого момента анонимный доступ продолжает работать.
 
-Architect в режиме BUILD должен сначала создать `trigger.command → action.input → message.text(menu_msg) → keyboard.inline(menu_kb)` (терминальная цепочка), затем для каждого раздела звать `add_menu_section` с обоими id.
+Если шаг 4 откатить, всё остаётся рабочим (просто без owner-проверки).
 
+### Что ты подтверждаешь, прежде чем я начну
+
+- Email **najdenovaa@gmail.com** — корректный, доступен для получения письма верификации
+- Двухшаговый порядок (UI → claim → RLS-tighten) — ОК, или жмёшь big-bang за один проход (рискованно, NULL-строки могут потеряться если что-то пойдёт не так)
