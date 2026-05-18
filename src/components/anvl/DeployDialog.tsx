@@ -315,6 +315,31 @@ export function DeployDialog({
               <ValidationLine state={validation} />
             </div>
 
+            {/* Owner Telegram username — who will manage this bot from Telegram */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="owner-username"
+                className="text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                Ваш Telegram (владелец бота)
+              </Label>
+              <Input
+                id="owner-username"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="@username"
+                value={ownerUsername}
+                onChange={(e) => setOwnerUsername(e.target.value.trim())}
+                className="font-mono text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground/80">
+                Этот аккаунт получит доступ к админ-командам бота: <code>/admin</code>,{" "}
+                <code>/leads</code>, <code>/broadcast</code>, <code>/content</code>,{" "}
+                <code>/stats</code>. Управление ботом теперь происходит прямо в Telegram.
+              </p>
+            </div>
+
             {/* Consent */}
             <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-hairline bg-surface p-3 text-sm">
               <Checkbox
