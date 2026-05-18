@@ -25,6 +25,15 @@ export interface TemplateContext {
     language_code?: string;
   };
   var: Record<string, TemplatePrimitive | unknown>;
+  /**
+   * Per-Telegram-user persistent vars. Same shape as `var` but isolated per
+   * tg_user_id — what Маша sets here is never visible to Петя, even in the
+   * same bot. Loaded from bot_user_state by bot-runtime and rendered as
+   * {user_var.X} in templates. Use this for personal data (name, phone,
+   * loyalty tier, last_order_total). Use plain `var` (global) only for
+   * bot-wide config / counters.
+   */
+  user_var?: Record<string, TemplatePrimitive | unknown>;
   /** Last incoming user message text, if any. */
   text?: string;
   system: {
@@ -62,10 +71,12 @@ const USER_ALIASES = new Set(["first_name", "last_name", "username"]);
 /**
  * Supported placeholder syntax:
  *   {first_name}, {last_name}, {username}    aliases for {user.X}
- *   {user.X}                                 user fields
- *   {var.X}                                  session/user variable
+ *   {user.X}                                 Telegram user fields
+ *   {var.X}                                  bot-wide global variable
+ *   {user_var.X}                             per-Telegram-user persistent var
  *   {text}                                   last user message
  *   {system.now}, {system.today}, {system.bot_username}
+ *   {webapp.action|total|currency|count|items_summary|raw}
  *
  * Missing keys render as the empty string — never throw, so a typo
  * in the AI Architect's output doesn't crash a live bot.

@@ -12,6 +12,7 @@ import {
   GitBranch,
   Webhook,
   Variable,
+  UserCog,
   TextCursorInput,
   type LucideIcon,
 } from "lucide-react";
@@ -120,6 +121,13 @@ export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
     labelKey: "node.action.set_var.label",
     descKey: "node.action.set_var.desc",
     icon: Variable,
+  },
+  "action.set_user_var": {
+    kind: "action.set_user_var",
+    group: "Logic",
+    labelKey: "node.action.set_user_var.label",
+    descKey: "node.action.set_user_var.desc",
+    icon: UserCog,
   },
   "action.input": {
     kind: "action.input",
