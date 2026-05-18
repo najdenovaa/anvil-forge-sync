@@ -760,6 +760,33 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     return new Response("decrypt failed", { status: 500 });
   }
 
+  // Admin router: intercept owner commands (/admin, /leads, /broadcast, /content,
+  // /set, /stats, /clients, /help_admin) BEFORE running the user's flow. The
+  // owner is identified by bots.owner_tg_username/owner_tg_user_id.
+  if (message?.text && !callback) {
+    try {
+      const handled = await handleAdminCommand(
+        supa,
+        {
+          id: bot.id,
+          flow_id: bot.flow_id,
+          owner_tg_username: (bot as any).owner_tg_username ?? null,
+          owner_tg_user_id: (bot as any).owner_tg_user_id ?? null,
+        },
+        token,
+        chatId,
+        fromUser,
+        message.text,
+      );
+      if (handled) {
+        await logEvent(botId, chatId, "admin.command", null, { text: message.text });
+        return new Response("ok", { status: 200 });
+      }
+    } catch (err) {
+      await logEvent(botId, chatId, "admin.error", null, { err: String(err) });
+    }
+  }
+
   // Load or create session
   const { data: existing } = await supa
     .from("bot_sessions")
