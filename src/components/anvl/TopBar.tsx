@@ -1,4 +1,4 @@
-import { ChevronDown, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen, Inbox } from "lucide-react";
+import { ChevronDown, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen, Inbox, Megaphone, Variable } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
