@@ -43,6 +43,34 @@ export function TopBar() {
           <FlowSlugLabel />
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </Link>
+        <InboxLink />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="hairline flex items-center rounded-full bg-surface p-0.5">
+          <PlatformPill
+            active={platform === "telegram"}
+            onClick={() => setPlatform("telegram")}
+            label={t("platform.telegram")}
+            icon={<Send className="h-3.5 w-3.5" />}
+          />
+          <PlatformPill
+            active={platform === "max"}
+            onClick={() => setPlatform("max")}
+            label={t("platform.max")}
+            icon={
+              <img
+                src={maxLogo}
+                alt="Max"
+                className={cn(
+                  "h-3.5 w-3.5 object-contain transition",
+                  platform === "max" ? "invert brightness-0" : "opacity-60",
+                )}
+                draggable={false}
+              />
+            }
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
