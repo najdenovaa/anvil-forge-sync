@@ -24,6 +24,22 @@ function AnvlMark() {
   );
 }
 
+function InboxLink() {
+  const { slug } = useAnvlWorkspace();
+  if (!slug) return null;
+  return (
+    <Link
+      to="/flows/$slug/inbox"
+      params={{ slug }}
+      className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground md:flex"
+      title="Входящие заявки"
+    >
+      <Inbox className="h-3.5 w-3.5 opacity-70" />
+      <span>Входящие</span>
+    </Link>
+  );
+}
+
 export function TopBar() {
   const { platform, setPlatform, miniAppEnabled, setMiniAppEnabled } = usePlatform();
   const { t, lang, setLang } = useI18n();
