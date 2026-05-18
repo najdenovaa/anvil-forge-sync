@@ -30,6 +30,9 @@ export interface FlowSavePayload {
   miniapp: Partial<AnvlMiniAppState>;
   generatedCode: string;
   variables?: VariableDef[];
+  /** Owner user id — written only on initial INSERT; ignored on updates by Postgres
+   *  (upsert sends it but RLS / app logic doesn't change ownership later). */
+  ownerId?: string | null;
 }
 
 function rowToSnapshot(row: Record<string, unknown>): FlowSnapshot {
@@ -138,23 +141,25 @@ export async function loadFlowBySlug(slug: string): Promise<FlowSnapshot | null>
 
 /** Upsert the flow (create on first save, update on subsequent saves). */
 export async function upsertFlow(payload: FlowSavePayload): Promise<FlowSnapshot> {
+  const row: Record<string, unknown> = {
+    slug: payload.slug,
+    title: payload.title ?? "Untitled flow",
+    platform: payload.platform ?? "telegram",
+    miniapp_enabled: payload.miniappEnabled ?? false,
+    nodes: payload.nodes,
+    edges: payload.edges,
+    preview: payload.preview,
+    miniapp: payload.miniapp,
+    generated_code: payload.generatedCode,
+    variables: payload.variables ?? [],
+  };
+  // Only attach owner_id when explicitly provided — undefined would clobber
+  // existing ownership on update via upsert.
+  if (payload.ownerId !== undefined) row.owner_id = payload.ownerId;
+
   const { data, error } = await (supabase as any)
     .from("flows")
-    .upsert(
-      {
-        slug: payload.slug,
-        title: payload.title ?? "Untitled flow",
-        platform: payload.platform ?? "telegram",
-        miniapp_enabled: payload.miniappEnabled ?? false,
-        nodes: payload.nodes,
-        edges: payload.edges,
-        preview: payload.preview,
-        miniapp: payload.miniapp,
-        generated_code: payload.generatedCode,
-        variables: payload.variables ?? [],
-      },
-      { onConflict: "slug" },
-    )
+    .upsert(row, { onConflict: "slug" })
     .select("*")
     .single();
 
