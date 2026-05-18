@@ -104,7 +104,6 @@ export function TopBar() {
           {t("topbar.preview")}
         </button>
         <DeployButton />
-        <UserMenu />
       </div>
     </header>
   );
