@@ -209,9 +209,22 @@ function InboxScreen() {
           <h1 className="flex items-center gap-2 text-sm font-semibold">
             <InboxIcon className="h-4 w-4" /> Входящие
             <span className="font-mono text-[11px] text-muted-foreground">{slug}</span>
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                {unreadCount} новых
+              </span>
+            )}
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              className="hairline rounded-md bg-surface px-3 py-1.5 text-[12px] text-muted-foreground transition hover:text-foreground"
+            >
+              Прочитать все
+            </button>
+          )}
           <button
             onClick={() => setShowAdmins((v) => !v)}
             className="hairline rounded-md bg-surface px-3 py-1.5 text-[12px] text-muted-foreground transition hover:text-foreground"
