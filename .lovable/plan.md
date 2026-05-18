@@ -1,85 +1,72 @@
-## Big-bang: личные кабинеты ANVL
 
-Email-аккаунт владельца: **najdenovaa@gmail.com**, auto-confirm **OFF** (нужна верификация по письму).
+# Перенос управления в Telegram
+
+Конструктор используется один раз — чтобы Архитектор собрал бота под задачу. Дальше владелец живёт в Telegram: бот сам показывает ему `/leads`, `/clients`, `/broadcast`, `/stats` и т.п. Веб-вкладки «Входящие / Рассылки / Контент» убираем.
+
+## 1. Удаляем веб-управление
+
+- Удалить роуты: `src/routes/flows.$slug.inbox.tsx`, `src/routes/flows.$slug.broadcasts.tsx`, `src/routes/flows.$slug.content.tsx`
+- Убрать ссылки на них из топбара/меню сценария (там, где сейчас три кнопки)
+- Edge-функцию `bot-broadcast` оставляем — она станет внутренним инструментом, который вызывает сам бот, когда владелец пишет `/broadcast`
+- Таблицы `bot_submissions`, `bot_broadcasts`, `bot_globals` **оставляем** — на них теперь опирается админ-режим внутри бота
+
+## 2. Назначение владельца при деплое (Вариант B)
+
+В `DeployDialog.tsx` добавляем поле **Telegram username владельца** (`@username` или `tg_user_id`). Сохраняем в `bots.owner_tg_user_id`:
+
+```sql
+ALTER TABLE bots ADD COLUMN owner_tg_username text;
+ALTER TABLE bots ADD COLUMN owner_tg_user_id text;
+```
+
+При первом `/start` от владельца (узнаём по `username`) мы записываем его `tg_user_id`, чтобы потом сверять по ID, а не по username (его можно поменять).
+
+## 3. Админ-команды в рантайме бота
+
+В `supabase/functions/bot-runtime/index.ts` перед обычной обработкой сценария добавляем «admin router». Если `from.id === bot.owner_tg_user_id` И текст начинается с админ-команды → отрабатываем её, **не пропуская в пользовательский сценарий**.
+
+Базовый набор команд (универсальный, работает для любого бота):
+
+| Команда | Что делает |
+| --- | --- |
+| `/admin` | Меню с инлайн-кнопками: Лиды, Клиенты, Рассылка, Контент, Статистика |
+| `/leads` | Последние 10 заявок из `bot_submissions`, инлайн-кнопки «Ответить», «В работу», «Закрыто» |
+| `/clients` | Список уникальных `tg_user_id` из `bot_user_state`, поиск по имени |
+| `/broadcast <текст>` | Запускает `bot-broadcast` (или вызывает его логику inline), показывает прогресс |
+| `/content` | Список `bot_globals`, инлайн-кнопка на каждую переменную → бот просит ввести новое значение → сохраняет в `bot_globals.value` |
+| `/stats` | Сколько пользователей, сколько лидов за сегодня/неделю |
+| `/help_admin` | Список всех команд |
+
+Для обычных пользователей эти команды просто игнорируются (или отвечают «команда не найдена»).
+
+## 4. Архитектор сам собирает CRM-бота
+
+Сейчас Архитектор в `architect-chat` умеет редактировать ноды сценария. Расширяем системный промпт и tool-set:
+
+- В системном промпте: «Ты собираешь не только сценарий разговора, но и **админ-функции** для владельца. Спрашивай у пользователя: это CRM / магазин / запись на услугу / опросник? — и предлагай конкретный набор сущностей.»
+- Новый tool `set_bot_template`: `crm | shop | booking | survey | custom`. По шаблону Архитектор знает, какие глобальные переменные создать в `bot_globals` (например, для booking — `services`, `working_hours`), какие поля собирать в `bot_submissions.payload` (имя, телефон, дата встречи).
+- Новый tool `add_admin_command` — расширенный набор админ-команд сверх базового (например, `/schedule` для booking-бота, который показывает таблицу встреч на неделю).
+- Архитектор объясняет владельцу простым языком: «Я сделал бота-CRM. Зайди в Telegram, напиши `/admin` — увидишь меню управления».
+
+## 5. Хранение «встреч» / доменных сущностей
+
+Для встреч/записей (типичный CRM-кейс) — переиспользуем уже существующую `bot_submissions` с `kind = 'appointment'` и `payload = { date, time, service, status }`. Команды `/schedule`, `/today` читают её. Если позже понадобится отдельная таблица — добавим, но MVP делаем на `bot_submissions`.
+
+## 6. Что меняем по файлам
+
+- `supabase/functions/bot-runtime/index.ts` — admin router + обработчики команд
+- `supabase/functions/architect-chat/index.ts` — расширенный системный промпт + новые tools (`set_bot_template`, `add_admin_command`)
+- `src/components/anvl/DeployDialog.tsx` — поле «Telegram владельца»
+- `src/components/anvl/AnvlApp.tsx` / `TopBar.tsx` — убрать ссылки на inbox/broadcasts/content
+- Удалить три route-файла
+- Миграция: `ALTER TABLE bots ADD COLUMN owner_tg_username text, owner_tg_user_id text`
+
+## 7. Что НЕ делаем в этой итерации
+
+- Не делаем сложный UI расписания внутри Telegram (только текст + инлайн-кнопки)
+- Не делаем оплату/счета
+- Не делаем веб-морду «вместо Telegram» как fallback (ты сказал — выкидываем)
 
 ---
 
-### 1. БД-миграция
-
-- `flows.owner_id uuid NULL` (FK на `auth.users(id)`, ON DELETE SET NULL)
-- `bots.owner_id uuid NULL` (FK на `auth.users(id)`, ON DELETE SET NULL)
-- Индексы по `owner_id` на обеих таблицах
-- `flow_versions` — owner-фильтр идёт через `flow_id → flows.owner_id` (доп. колонку не добавляем)
-- `bot_sessions`, `bot_events`, `bot_user_state`, `bot_globals` — owner-фильтр идёт через `bot_id → bots.owner_id` (доп. колонок не добавляем; runtime эти таблицы уже пишет от service-role)
-
-### 2. RLS — переписываем с публичных на owner-scoped
-
-- **`flows`**: SELECT/UPDATE/DELETE — `owner_id = auth.uid() OR owner_id IS NULL`. INSERT — `owner_id = auth.uid()`. Условие `OR IS NULL` нужно ровно для одноразового claim; после claim ни одной NULL-строки не останется.
-- **`bots`**: то же самое.
-- **`flow_versions`**: SELECT/INSERT через EXISTS-subquery к `flows` (owner совпадает).
-- **`bot_sessions`, `bot_events`, `bot_user_state`, `bot_globals`**: SELECT для owner'а бота, остальные операции (INSERT/UPDATE/DELETE) только сервис-роль (runtime использует service-role-key, поэтому RLS на запись не нужен → политики только `SELECT WHERE owner совпадает`).
-
-### 3. Auth UI
-
-- Маршрут `/auth` — табы Signup / Login / Forgot password
-- Маршрут `/reset-password` (обязателен для recovery flow)
-- `signUp` с `emailRedirectTo: window.location.origin + '/auth'`
-- TopBar: показывает email текущего юзера + кнопка Logout
-- Глобальный `onAuthStateChange` listener (single source of truth)
-
-### 4. Защита роутов
-
-- `_authenticated` layout-route с `beforeLoad` → redirect `/auth` если не залогинен
-- Переносим внутрь: `flows.index`, `flows.$slug`
-- Публичными остаются: `/`, `/auth`, `/reset-password`, `/m/$flowId` (Mini App для конечных юзеров бота — НЕ для ANVL-аккаунтов)
-
-### 5. Claim существующих ресурсов
-
-Один раз, после первой регистрации najdenovaa@gmail.com:
-
-- В `FlowsList` показываем баннер: «Найдено N flows без владельца. Привязать к моему аккаунту» → кнопка вызывает server fn `claimOrphanResources` (`createServerFn` + `requireSupabaseAuth` + `supabaseAdmin`), которая делает `UPDATE flows/bots SET owner_id = userId WHERE owner_id IS NULL`.
-- Баннер пропадает когда NULL-строк нет.
-
-### 6. Wire-up создания
-
-- `useFlowPersistence` / места создания flow и bot: при INSERT передаём `owner_id: session.user.id`
-- Architect (`architect-chat`) и `deploy-bot` — проверить, что они не создают записи без owner_id (если создают — берём owner_id из auth-контекста запроса)
-
-### 7. Что НЕ трогаем в этот раунд
-
-- Существующая логика bot-runtime (он на service-role, RLS его не аффектит)
-- TG Mini App страница `/m/$flowId` — публичная, без auth
-- Расшаринг flows между несколькими ANVL-юзерами (пока единоличное владение)
-
----
-
-### Технические детали
-
-**Файлы (новые)**:
-- `supabase/migrations/<ts>_owner_id_and_rls.sql`
-- `src/routes/auth.tsx`, `src/routes/reset-password.tsx`
-- `src/routes/_authenticated.tsx` (pathless layout)
-- `src/routes/_authenticated/flows.index.tsx`, `src/routes/_authenticated/flows.$slug.tsx` (move)
-- `src/lib/owner.functions.ts` (server fn `claimOrphanResources`)
-- `src/hooks/useAuth.tsx` (context + `onAuthStateChange`)
-
-**Файлы (edit)**:
-- `src/routes/__root.tsx` — повесить `onAuthStateChange` + `router.invalidate()`
-- `src/components/anvl/TopBar.tsx` — email + Logout
-- `src/components/anvl/FlowsList.tsx` — claim-баннер, INSERT с owner_id
-- `src/components/anvl/useFlowPersistence.ts` — owner_id при создании
-- `src/start.ts` — убедиться что `attachSupabaseAuth` подключён
-- удаляем старые `src/routes/flows.index.tsx`, `src/routes/flows.$slug.tsx`
-
-**Порядок применения** (важно для big-bang без даунтайма):
-1. Миграция: добавляем owner_id колонки (NULL), индексы. RLS пока НЕ трогаем.
-2. Деплоим UI с auth + claim-баннером.
-3. Ты регистрируешься najdenovaa@gmail.com → верифицируешь email → жмёшь Claim.
-4. **Вторая миграция** (после шага 3): переписываем RLS на owner-scoped. До этого момента анонимный доступ продолжает работать.
-
-Если шаг 4 откатить, всё остаётся рабочим (просто без owner-проверки).
-
-### Что ты подтверждаешь, прежде чем я начну
-
-- Email **najdenovaa@gmail.com** — корректный, доступен для получения письма верификации
-- Двухшаговый порядок (UI → claim → RLS-tighten) — ОК, или жмёшь big-bang за один проход (рискованно, NULL-строки могут потеряться если что-то пойдёт не так)
+После апрува: миграция → удаление веб-вкладок → admin router в рантайме → расширение Архитектора → поле владельца в DeployDialog.

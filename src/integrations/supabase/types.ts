@@ -304,6 +304,8 @@ export type Database = {
           id: string
           last_error: string | null
           owner_id: string | null
+          owner_tg_user_id: string | null
+          owner_tg_username: string | null
           platform: string
           status: string
           updated_at: string
@@ -317,6 +319,8 @@ export type Database = {
           id?: string
           last_error?: string | null
           owner_id?: string | null
+          owner_tg_user_id?: string | null
+          owner_tg_username?: string | null
           platform: string
           status?: string
           updated_at?: string
@@ -330,6 +334,8 @@ export type Database = {
           id?: string
           last_error?: string | null
           owner_id?: string | null
+          owner_tg_user_id?: string | null
+          owner_tg_username?: string | null
           platform?: string
           status?: string
           updated_at?: string
