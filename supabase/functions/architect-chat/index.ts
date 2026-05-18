@@ -1155,7 +1155,163 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
           // saw a half-built bot and a confident summary text. 30 gives us 4×
           // headroom on realistic asks while still capping runaway loops.
           for (let round = 0; round < 30; round++) {
-            console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}`);
+            console.log(`[architect-chat] round=${round} starting, conversation.length=${conversation.length}, toolDefs=${toolDefs?.length ?? 0}, model=${aiModel}, provider=${resolved.provider}`);
+
+            // ===== Google Gemini branch (OpenAI-compatible endpoint) =====
+            if (resolved.provider === "google") {
+              const gBody: any = {
+                model: aiModel,
+                stream: true,
+                temperature: 0.7,
+                max_tokens: summaryOnly ? 700 : 8192,
+                messages: conversation,
+              };
+              if (toolDefs && toolDefs.length > 0) {
+                gBody.tools = toolDefs;
+                gBody.tool_choice = "required";
+              }
+              const gUp = await fetch(
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${googleKey}`,
+                  },
+                  body: JSON.stringify(gBody),
+                },
+              );
+              if (!gUp.ok || !gUp.body) {
+                const text = await gUp.text().catch(() => "");
+                console.error("Google API error:", gUp.status, text);
+                const errMsg = `⚠️ Google Gemini API ${gUp.status}\n\n${text.slice(0, 1500) || "(empty body)"}`;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  choices: [{ delta: { content: errMsg } }],
+                })}\n\n`));
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+                return;
+              }
+
+              const gReader = gUp.body.getReader();
+              let gBuf = "";
+              let gAssistantContent = "";
+              // Tool calls accumulated by upstream "index" (Gemini emits OpenAI-style
+              // tool_calls deltas). We buffer the JSON arguments until [DONE] then flush.
+              const gCalls = new Map<number, { id: string; name: string; argsJson: string; localIdx: number }>();
+              let gNextLocal = 0;
+              let gMaxLocal = -1;
+              let gFinish: string | null = null;
+
+              streamLoop: for (;;) {
+                const { value, done } = await gReader.read();
+                if (done) break;
+                gBuf += decoder.decode(value, { stream: true });
+                let nl: number;
+                while ((nl = gBuf.indexOf("\n")) !== -1) {
+                  let line = gBuf.slice(0, nl);
+                  gBuf = gBuf.slice(nl + 1);
+                  if (line.endsWith("\r")) line = line.slice(0, -1);
+                  if (!line.startsWith("data: ")) continue;
+                  const payload = line.slice(6).trim();
+                  if (!payload) continue;
+                  if (payload === "[DONE]") break streamLoop;
+                  let evt: any;
+                  try { evt = JSON.parse(payload); } catch { continue; }
+                  const choice = evt?.choices?.[0];
+                  if (!choice) continue;
+                  const delta = choice.delta ?? {};
+                  if (typeof delta.content === "string" && delta.content.length > 0) {
+                    gAssistantContent += delta.content;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      choices: [{ delta: { content: delta.content } }],
+                    })}\n\n`));
+                  }
+                  if (Array.isArray(delta.tool_calls)) {
+                    for (const tc of delta.tool_calls) {
+                      const upIdx = typeof tc.index === "number" ? tc.index : 0;
+                      let entry = gCalls.get(upIdx);
+                      if (!entry) {
+                        const localIdx = gNextLocal++;
+                        gMaxLocal = Math.max(gMaxLocal, localIdx);
+                        entry = {
+                          id: String(tc.id ?? `call_${round}_${localIdx}`),
+                          name: String(tc.function?.name ?? ""),
+                          argsJson: "",
+                          localIdx,
+                        };
+                        gCalls.set(upIdx, entry);
+                      }
+                      if (tc.id && !entry.id.startsWith("call_")) entry.id = String(tc.id);
+                      if (tc.function?.name) entry.name = String(tc.function.name);
+                      if (typeof tc.function?.arguments === "string") {
+                        entry.argsJson += tc.function.arguments;
+                      }
+                    }
+                  }
+                  if (typeof choice.finish_reason === "string") gFinish = choice.finish_reason;
+                }
+              }
+
+              // Flush completed tool_calls to the client.
+              for (const tc of Array.from(gCalls.values()).sort((a, b) => a.localIdx - b.localIdx)) {
+                let argsForClient = tc.argsJson || "{}";
+                try { JSON.parse(argsForClient); } catch { argsForClient = "{}"; }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  choices: [{ delta: { tool_calls: [{
+                    index: tc.localIdx + indexOffset,
+                    id: tc.id,
+                    type: "function",
+                    function: { name: tc.name, arguments: argsForClient },
+                  }] } }],
+                })}\n\n`));
+              }
+
+              console.log(`[architect-chat] round=${round} (gemini) stream done, finish=${gFinish ?? "none"}, tool_calls=${gCalls.size}, content_len=${gAssistantContent.length}`);
+
+              if (gCalls.size === 0 && gAssistantContent.length === 0) {
+                const diag = `⚠️ [DEBUG round=${round}] Gemini вернул пустой ответ.\nfinish=${gFinish ?? "unknown"}`;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  choices: [{ delta: { content: diag } }],
+                })}\n\n`));
+              }
+
+              if (gCalls.size === 0) {
+                console.log(`[architect-chat] FINISHED at round=${round} (gemini), exit_reason=empty_round`);
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+                return;
+              }
+
+              const orderedCalls = Array.from(gCalls.values())
+                .sort((a, b) => a.localIdx - b.localIdx)
+                .map((c) => ({
+                  id: c.id,
+                  type: "function" as const,
+                  function: {
+                    name: c.name,
+                    arguments: c.argsJson && c.argsJson.length > 0 ? c.argsJson : "{}",
+                  },
+                }));
+
+              conversation.push({
+                role: "assistant",
+                content: gAssistantContent || "",
+                tool_calls: orderedCalls,
+              });
+              for (const call of orderedCalls) {
+                conversation.push({
+                  role: "tool",
+                  tool_call_id: call.id,
+                  name: call.function.name,
+                  content: call.function.name === "get_canvas" ? canvasResult : `{"ok":true}`,
+                });
+              }
+              indexOffset += gMaxLocal + 1;
+              continue; // next round
+            }
+            // ===== /Google branch =====
+
 
             const { system, messages: anthropicMessages } = convertMessagesToAnthropic(conversation);
             const anthropicTools = convertToolsToAnthropic(toolDefs);
