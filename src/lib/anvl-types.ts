@@ -15,7 +15,9 @@ export type NodeKind =
   | "action.api"
   | "action.set_var"
   | "action.set_user_var"
-  | "action.input";
+  | "action.input"
+  | "action.save_submission"
+  | "action.notify_admin";
 
 export interface NodeMeta {
   kind: NodeKind;
