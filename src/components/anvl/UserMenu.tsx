@@ -69,9 +69,13 @@ export function UserMenu() {
             </div>
             <div className="flex items-baseline justify-between">
               <span className="text-[15px] font-semibold text-foreground">0 ₽</span>
-              <button className="text-[11px] text-muted-foreground hover:text-foreground">
+              <Link
+                to="/billing"
+                onClick={() => setOpen(false)}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+              >
                 Пополнить
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -120,13 +124,14 @@ export function UserMenu() {
 
           {/* Actions */}
           <div className="py-1">
-            <button
+            <Link
+              to="/settings"
               onClick={() => setOpen(false)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-foreground hover:bg-surface-elevated"
             >
               <Settings className="h-3.5 w-3.5" />
               Настройки
-            </button>
+            </Link>
             <button
               onClick={() => {
                 setOpen(false);
