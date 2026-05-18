@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_broadcasts: {
+        Row: {
+          bot_id: string
+          created_at: string
+          error: string | null
+          fail_count: number
+          flow_id: string
+          id: string
+          owner_id: string | null
+          recipients_total: number
+          sent_at: string | null
+          sent_count: number
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          error?: string | null
+          fail_count?: number
+          flow_id: string
+          id?: string
+          owner_id?: string | null
+          recipients_total?: number
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          error?: string | null
+          fail_count?: number
+          flow_id?: string
+          id?: string
+          owner_id?: string | null
+          recipients_total?: number
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bot_events: {
         Row: {
           bot_id: string
@@ -85,19 +133,28 @@ export type Database = {
       bot_globals: {
         Row: {
           bot_id: string
+          id: string
           key: string
+          label: string | null
+          owner_id: string | null
           updated_at: string
           value: Json
         }
         Insert: {
           bot_id: string
+          id?: string
           key: string
+          label?: string | null
+          owner_id?: string | null
           updated_at?: string
           value: Json
         }
         Update: {
           bot_id?: string
+          id?: string
           key?: string
+          label?: string | null
+          owner_id?: string | null
           updated_at?: string
           value?: Json
         }
