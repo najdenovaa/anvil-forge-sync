@@ -1058,10 +1058,15 @@ Deno.serve(async (req: Request) => {
       return json({ error: "messages array required" }, 400);
     }
 
-    const aiModel = resolveModel(model);
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
+    const resolved = resolveModel(model);
+    const aiModel = resolved.model;
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const googleKey = Deno.env.get("GOOGLE_API_KEY");
+    if (resolved.provider === "anthropic" && !anthropicKey) {
       return json({ error: "ANTHROPIC_API_KEY is not configured" }, 500);
+    }
+    if (resolved.provider === "google" && !googleKey) {
+      return json({ error: "GOOGLE_API_KEY is not configured" }, 500);
     }
 
     let systemPrompt: string;
