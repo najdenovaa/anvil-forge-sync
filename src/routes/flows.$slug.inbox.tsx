@@ -33,6 +33,7 @@ interface Submission {
   status: Status;
   payload: Record<string, unknown>;
   admin_note: string | null;
+  read_at: string | null;
   created_at: string;
 }
 
