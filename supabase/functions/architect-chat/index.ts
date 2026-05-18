@@ -1170,21 +1170,51 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                 gBody.tools = toolDefs;
                 gBody.tool_choice = "required";
               }
-              const gUp = await fetch(
-                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${googleKey}`,
+              // Retry with exponential backoff on transient errors (503/429/502/504)
+              let gUp: Response | null = null;
+              let lastErrText = "";
+              let lastStatus = 0;
+              const maxAttempts = 4;
+              for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                gUp = await fetch(
+                  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${googleKey}`,
+                    },
+                    body: JSON.stringify(gBody),
                   },
-                  body: JSON.stringify(gBody),
-                },
-              );
-              if (!gUp.ok || !gUp.body) {
-                const text = await gUp.text().catch(() => "");
-                console.error("Google API error:", gUp.status, text);
-                const errMsg = `⚠️ Google Gemini API ${gUp.status}\n\n${text.slice(0, 1500) || "(empty body)"}`;
+                );
+                if (gUp.ok && gUp.body) break;
+                lastStatus = gUp.status;
+                lastErrText = await gUp.text().catch(() => "");
+                console.error(`Google API error (attempt ${attempt + 1}/${maxAttempts}):`, gUp.status, lastErrText.slice(0, 300));
+                const transient = [429, 500, 502, 503, 504].includes(gUp.status);
+                if (!transient || attempt === maxAttempts - 1) break;
+                // Backoff: 1s, 2s, 4s
+                await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+                gUp = null;
+              }
+
+              if (!gUp || !gUp.ok || !gUp.body) {
+                // Fallback to Anthropic Sonnet if Google is unavailable and ANTHROPIC_API_KEY is set
+                const transient = [429, 500, 502, 503, 504].includes(lastStatus);
+                if (transient && anthropicKey) {
+                  console.log(`[architect-chat] Gemini ${lastStatus} after retries — falling back to Anthropic Sonnet`);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    choices: [{ delta: { content: `⚠️ Gemini временно перегружен (${lastStatus}). Переключаюсь на Claude Sonnet...\n\n` } }],
+                  })}\n\n`));
+                  // Switch provider for the rest of this round
+                  resolved = { provider: "anthropic", model: REAL_MODELS.claude_sonnet };
+                  aiModel = resolved.model;
+                  // Fall through to Anthropic branch below by continuing the outer loop
+                  continue;
+                }
+                const errMsg = lastStatus === 503
+                  ? `⚠️ Google Gemini перегружен (503). Попробуйте через минуту или переключитесь на Claude в селекторе модели.`
+                  : `⚠️ Google Gemini API ${lastStatus}\n\n${lastErrText.slice(0, 1500) || "(empty body)"}`;
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                   choices: [{ delta: { content: errMsg } }],
                 })}\n\n`));
