@@ -115,6 +115,31 @@ export function FlowsList() {
           </p>
         </motion.div>
 
+        {(orphanCounts.flows > 0 || orphanCounts.bots > 0) && (
+          <div className="hairline mb-6 flex items-center justify-between gap-4 rounded-xl bg-surface p-4">
+            <div className="flex items-start gap-3">
+              <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+              <div className="text-sm">
+                <div className="font-medium">
+                  Found {orphanCounts.flows} flow{orphanCounts.flows === 1 ? "" : "s"} and{" "}
+                  {orphanCounts.bots} bot{orphanCounts.bots === 1 ? "" : "s"} without an owner
+                </div>
+                <div className="mt-0.5 text-[12px] text-muted-foreground">
+                  Created before user accounts existed. Claim them to attach to your account.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => claimMut.mutate()}
+              disabled={claimMut.isPending}
+              className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 text-[13px] font-medium text-background transition hover:bg-foreground/90 disabled:opacity-50"
+            >
+              {claimMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Claim
+            </button>
+          </div>
+        )}
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
