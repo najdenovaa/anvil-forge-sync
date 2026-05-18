@@ -1,4 +1,4 @@
-import { ChevronDown, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen } from "lucide-react";
+import { ChevronDown, Send, AppWindow, Check, Loader2, AlertCircle, FolderOpen, Inbox } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { usePlatform } from "./PlatformContext";
 import { useI18n, type Lang } from "./I18nContext";
@@ -43,7 +43,9 @@ export function TopBar() {
           <FlowSlugLabel />
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </Link>
+        <InboxLink />
       </div>
+
 
       <div className="flex items-center gap-3">
         <div className="hairline flex items-center rounded-full bg-surface p-0.5">
@@ -212,5 +214,21 @@ function PlatformPill({
       {icon}
       {label}
     </button>
+  );
+}
+
+function InboxLink() {
+  const { slug } = useAnvlWorkspace();
+  if (!slug) return null;
+  return (
+    <Link
+      to="/flows/$slug/inbox"
+      params={{ slug }}
+      className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground md:flex"
+      title="Входящие заявки"
+    >
+      <Inbox className="h-3.5 w-3.5 opacity-70" />
+      <span>Входящие</span>
+    </Link>
   );
 }

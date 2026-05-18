@@ -14,11 +14,13 @@ import {
   Variable,
   UserCog,
   TextCursorInput,
+  Inbox,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 import type { NodeKind } from "./anvl-types";
 
-export type NodeGroup = "Triggers" | "Messages" | "Keyboards" | "Mini App" | "Logic";
+export type NodeGroup = "Triggers" | "Messages" | "Keyboards" | "Mini App" | "Logic" | "CRM";
 
 export interface NodeMetaI18n {
   kind: NodeKind;
@@ -136,6 +138,20 @@ export const NODE_CATALOG: Record<NodeKind, NodeMetaI18n> = {
     descKey: "node.action.input.desc",
     icon: TextCursorInput,
   },
+  "action.save_submission": {
+    kind: "action.save_submission",
+    group: "CRM",
+    labelKey: "node.action.save_submission.label",
+    descKey: "node.action.save_submission.desc",
+    icon: Inbox,
+  },
+  "action.notify_admin": {
+    kind: "action.notify_admin",
+    group: "CRM",
+    labelKey: "node.action.notify_admin.label",
+    descKey: "node.action.notify_admin.desc",
+    icon: BellRing,
+  },
 };
 
-export const NODE_GROUPS: NodeGroup[] = ["Triggers", "Messages", "Keyboards", "Mini App", "Logic"];
+export const NODE_GROUPS: NodeGroup[] = ["Triggers", "Messages", "Keyboards", "Mini App", "Logic", "CRM"];

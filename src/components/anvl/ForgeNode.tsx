@@ -44,6 +44,7 @@ const GROUP_ACCENT: Record<NodeGroup, string> = {
   Keyboards: "var(--accent-keyboard)",
   "Mini App": "var(--accent-miniapp)",
   Logic: "var(--accent-logic)",
+  CRM: "var(--accent-crm, oklch(0.78 0.15 30))",
 };
 
 export function ForgeNode({ id, data, selected }: NodeProps<AnvlNodeData>) {

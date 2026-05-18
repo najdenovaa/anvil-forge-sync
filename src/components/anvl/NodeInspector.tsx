@@ -20,6 +20,8 @@ const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
   "action.set_user_var": new Set(["value"]),
   "action.input": new Set(["prompt"]),
   "action.api": new Set(["url", "body"]),
+  "action.save_submission": new Set(["fields"]),
+  "action.notify_admin": new Set(["text"]),
 };
 
 /**
@@ -130,6 +132,34 @@ const FIELD_SCHEMAS: Record<
       placeholder: "Неверный формат, попробуйте ещё раз",
     },
     { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
+  "action.save_submission": [
+    {
+      key: "kind",
+      label: "Тип заявки",
+      type: "select",
+      options: ["lead", "booking", "order", "feedback", "custom"],
+    },
+    {
+      key: "fields",
+      label: "Поля (по одному на строку: подпись=значение)",
+      type: "textarea",
+      placeholder: "Имя={user_var.name}\nТелефон={user_var.phone}\nДата={user_var.date}",
+    },
+  ],
+  "action.notify_admin": [
+    {
+      key: "text",
+      label: "Текст уведомления (поддерживает плейсхолдеры)",
+      type: "textarea",
+      placeholder: "🆕 Новая заявка от {first_name}\nТелефон: {user_var.phone}",
+    },
+    {
+      key: "parseMode",
+      label: "Parse mode",
+      type: "select",
+      options: ["None", "HTML", "MarkdownV2"],
+    },
   ],
 };
 

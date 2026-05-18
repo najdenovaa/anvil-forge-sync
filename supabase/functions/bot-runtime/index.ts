@@ -552,6 +552,82 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
     }
 
+    case "action.save_submission": {
+      // Pipe collected user data into the CRM Inbox (bot_submissions).
+      // params.kind: lead/booking/order/feedback/custom
+      // params.fields: multiline "Label={template}" lines — rendered with the
+      //   normal template engine so {user_var.X}, {var.X}, {text}, {first_name}
+      //   all work out of the box.
+      const kind = String(params.kind ?? "lead").trim() || "lead";
+      const fieldsRaw = String(params.fields ?? "").trim();
+      const payload: Record<string, string> = {};
+      if (fieldsRaw) {
+        for (const line of fieldsRaw.split(/\r?\n/)) {
+          const idx = line.indexOf("=");
+          if (idx <= 0) continue;
+          const label = line.slice(0, idx).trim();
+          const tpl = line.slice(idx + 1);
+          if (!label) continue;
+          payload[label] = await interpolateAndLog(tpl, ctx, node.id);
+        }
+      }
+      // Always also dump full user_var snapshot for traceability.
+      payload.__user_vars = JSON.parse(JSON.stringify(ctx.userVars ?? {}));
+      try {
+        const { data: flowRow } = await db()
+          .from("flows").select("owner_id").eq("id", ctx.bot.flow_id).maybeSingle();
+        const { error } = await db().from("bot_submissions").insert({
+          bot_id: ctx.bot.id,
+          flow_id: ctx.bot.flow_id,
+          owner_id: flowRow?.owner_id ?? null,
+          tg_user_id: String(ctx.user.id ?? ""),
+          tg_chat_id: ctx.chatId,
+          tg_username: (ctx.user.username as string) ?? null,
+          tg_user_full_name:
+            [ctx.user.first_name, ctx.user.last_name].filter(Boolean).join(" ") || null,
+          kind,
+          status: "new",
+          payload: payload as never,
+          source_node_id: node.id,
+        });
+        if (error) {
+          await logEvent(ctx.bot.id, ctx.chatId, "submission.error", node.id, { err: error.message });
+        } else {
+          await logEvent(ctx.bot.id, ctx.chatId, "submission.saved", node.id, { kind, keys: Object.keys(payload) });
+        }
+      } catch (err) {
+        await logEvent(ctx.bot.id, ctx.chatId, "submission.error", node.id, { err: String(err) });
+      }
+      return goNext();
+    }
+
+    case "action.notify_admin": {
+      // Broadcast a templated message to all configured admin chats for this bot.
+      const tpl = String(params.text ?? "").trim();
+      if (!tpl) return goNext();
+      const text = await interpolateAndLog(tpl, ctx, node.id);
+      const parseMode = String(params.parseMode ?? "None");
+      try {
+        const { data: admins } = await db()
+          .from("bot_admin_chats").select("tg_chat_id").eq("bot_id", ctx.bot.id);
+        const targets = (admins ?? []).map((a) => String(a.tg_chat_id)).filter(Boolean);
+        if (targets.length === 0) {
+          await logEvent(ctx.bot.id, ctx.chatId, "notify_admin.no_targets", node.id, {});
+        }
+        for (const chat_id of targets) {
+          const body: Record<string, unknown> = { chat_id, text };
+          if (parseMode === "HTML" || parseMode === "MarkdownV2") body.parse_mode = parseMode;
+          await tgCall(ctx.token, "sendMessage", body);
+        }
+        await logEvent(ctx.bot.id, ctx.chatId, "notify_admin.sent", node.id, {
+          target_count: targets.length,
+        });
+      } catch (err) {
+        await logEvent(ctx.bot.id, ctx.chatId, "notify_admin.error", node.id, { err: String(err) });
+      }
+      return goNext();
+    }
+
     case "action.input": {
       const variable = String(params.variable ?? "").trim();
       const awaitingFlag = `__awaiting_${node.id}`;
