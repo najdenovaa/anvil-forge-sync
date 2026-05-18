@@ -30,8 +30,9 @@ export function TopBar() {
 
   return (
     <header className="glass relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-hairline px-4">
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <AnvlMark />
+        <UserMenu />
         <div className="hidden h-5 w-px bg-hairline md:block" />
         <Link
           to="/flows"
