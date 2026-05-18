@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Inbox as InboxIcon, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Inbox as InboxIcon, RefreshCw, Plus, Trash2, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGate } from "@/components/anvl/AuthGate";
 import { cn } from "@/lib/utils";
