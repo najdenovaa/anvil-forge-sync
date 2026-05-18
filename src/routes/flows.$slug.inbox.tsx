@@ -348,9 +348,17 @@ function SubmissionCard({
   };
 
   return (
-    <div className="hairline rounded-lg bg-surface p-4">
+    <div
+      className={cn(
+        "hairline rounded-lg bg-surface p-4 transition",
+        unread && "ring-1 ring-primary/40 bg-primary/[0.04]",
+      )}
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          {unread && (
+            <span className="h-2 w-2 rounded-full bg-primary" title="Не прочитано" />
+          )}
           <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
             {sub.kind}
           </span>
@@ -358,6 +366,14 @@ function SubmissionCard({
           <span className="font-mono text-[10px] text-muted-foreground">
             {new Date(sub.created_at).toLocaleString("ru-RU")}
           </span>
+          {unread && (
+            <button
+              onClick={onRead}
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              отметить прочитанным
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button
