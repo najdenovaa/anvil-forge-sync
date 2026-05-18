@@ -43,6 +43,9 @@ Deno.serve(async (req) => {
   const platform = String(body?.platform ?? "telegram").trim();
   const token = String(body?.token ?? "").trim();
   const owner_id = body?.owner_id ? String(body.owner_id) : null;
+  const owner_tg_username = body?.owner_tg_username
+    ? String(body.owner_tg_username).trim().replace(/^@/, "")
+    : null;
 
   if (!flow_id) return json({ error: "flow_id is required" }, 400);
   if (!token) return json({ error: "token is required" }, 400);
