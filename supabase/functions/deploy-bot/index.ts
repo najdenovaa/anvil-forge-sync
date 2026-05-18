@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
   const flow_id = String(body?.flow_id ?? "").trim();
   const platform = String(body?.platform ?? "telegram").trim();
   const token = String(body?.token ?? "").trim();
+  const owner_id = body?.owner_id ? String(body.owner_id) : null;
 
   if (!flow_id) return json({ error: "flow_id is required" }, 400);
   if (!token) return json({ error: "token is required" }, 400);
@@ -95,6 +96,7 @@ Deno.serve(async (req) => {
     const { data: ins, error } = await supa.from("bots").insert({
       flow_id, platform, bot_token_encrypted, bot_username,
       webhook_secret, status: "draft",
+      ...(owner_id ? { owner_id } : {}),
     }).select("id").single();
     if (error) return json({ error: `db: ${error.message}` }, 500);
     bot_id = ins.id;
