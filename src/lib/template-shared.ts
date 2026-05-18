@@ -25,6 +25,9 @@ export interface TemplateContext {
     language_code?: string;
   };
   var: Record<string, TemplatePrimitive | unknown>;
+  /** Per-Telegram-user persistent vars; isolated per tg_user_id. Loaded by
+   *  bot-runtime from bot_user_state. Rendered as {user_var.X} in templates. */
+  user_var?: Record<string, TemplatePrimitive | unknown>;
   /** Last incoming user message text, if any. */
   text?: string;
   system: {

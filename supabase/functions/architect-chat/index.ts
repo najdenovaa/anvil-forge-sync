@@ -101,12 +101,45 @@ remove_menu_section и update_menu_section работают ТОЛЬКО с ра
 - back_label: опционально, по умолчанию «« Назад в меню»
 
 == ДОСТУПНЫЕ NODE KINDS ==
-trigger.command, trigger.message, trigger.callback, trigger.webapp_data, message.text, message.photo, message.document, keyboard.inline, keyboard.reply, logic.condition, action.api, action.set_var, action.input. (miniapp.screen — только в Mini App режиме.)
+trigger.command, trigger.message, trigger.callback, trigger.webapp_data, message.text, message.photo, message.document, keyboard.inline, keyboard.reply, logic.condition, action.api, action.set_var, action.set_user_var, action.input. (miniapp.screen — только в Mini App режиме.)
 
 == ПЕРЕМЕННЫЕ ==
 Объявляйте через set_variables один раз сразу после reset_canvas (в BUILD) или через set_variables с полным списком (в EDIT). Читайте через {var.X} в любом тексте / URL / кнопке. Системные плейсхолдеры: {first_name}, {last_name}, {username}, {system.now}, {system.today}, {text}. Все используемые {var.X} ключи ОБЯЗАНЫ быть в set_variables — иначе рендерится пустая строка.
 
 Дополнительный namespace {webapp.*} доступен ТОЛЬКО внутри message.text-нод, которые подключены after a trigger.webapp_data. Поля: {webapp.action} (имя действия из sendData), {webapp.total} (численная сумма заказа), {webapp.currency} (валюта, например '₽'), {webapp.count} (количество позиций), {webapp.items_summary} (готовая строка 'Латте × 2, Раф × 1'), {webapp.raw} (исходный JSON для отладки). {webapp.*} НЕ нужно объявлять через set_variables — runtime подкладывает их сам.
+
+== ЛИЧНЫЙ КАБИНЕТ ПОЛЬЗОВАТЕЛЯ ==
+Namespace {user_var.X} — это переменные конкретного Telegram-пользователя, изолированные per tg_user_id. То что Маша сохранила в user_var.phone, Петя не видит — даже в одном чате. Сохраняются между сессиями (между перезапусками бота).
+
+КОГДА использовать {user_var.X} вместо {var.X}:
+- Личные данные клиента (имя, телефон, адрес, email, дата рождения)
+- Состояние лояльности (тариф, остаток баллов, дата окончания подписки)
+- История (последний заказ, любимый товар, последняя сумма)
+- Любые поля «личного кабинета» / «профиля» / «анкеты»
+
+КОГДА оставлять {var.X} (глобальные):
+- Бот-wide счётчики, конфигурация
+- Промежуточные/служебные значения в одном турне
+- Когда автору явно нужно «одно значение на всех»
+
+КАК ЗАПИСЫВАТЬ в личный кабинет:
+- action.set_user_var с params { variable: "phone", value: "{text}" } сохранит ответ пользователя в его user_var.phone
+- ИЛИ action.input с scope="user" (если в FIELD_SCHEMAS будет добавлено в будущем)
+- ИЛИ через webapp_data из Mini App: при наличии user_var-полей в форме — пользователь редактирует профиль из Mini App, бот ловит payload через trigger.webapp_data + цепочку action.set_user_var
+
+ПАТТЕРН «АНКЕТА» (онбординг):
+trigger.command "/start"
+  → message.text "Привет! Как вас зовут?" + action.input(scope=user, variable=name)
+  → message.text "Какой ваш телефон?" + action.input(scope=user, variable=phone)
+  → message.text "Спасибо, {user_var.name}! Записали ваш номер {user_var.phone}."
+
+ПАТТЕРН «УЗНАЛ ВЕРНУВШЕГОСЯ»:
+trigger.command "/start"
+  → logic.condition if "{user_var.name}" != ""
+     YES → message.text "С возвращением, {user_var.name}!"
+     NO  → запустить онбординг как выше
+
+Сейчас читать user_var из Mini App пока нельзя (только запись через webapp_data). UI «личного кабинета» в Mini App с реальными данными — следующий шаг, в этой версии его нет.
 
 == УСЛОВИЯ (logic.condition) ==
 Параметр condition — JSON-строка структуры:
@@ -469,7 +502,7 @@ function buildTools(miniAppEnabled: boolean) {
                 "message.text", "message.photo", "message.document",
                 "keyboard.inline", "keyboard.reply",
                 "miniapp.screen", "logic.condition", "action.api",
-                "action.set_var", "action.input",
+                "action.set_var", "action.set_user_var", "action.input",
               ],
             },
             title: { type: "string" },

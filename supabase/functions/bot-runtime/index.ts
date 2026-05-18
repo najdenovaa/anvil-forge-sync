@@ -88,6 +88,7 @@ function buildTplCtx(ctx: RunCtx): TemplateContext {
   return {
     user: ctx.user as TemplateContext["user"],
     var: ctx.variables as Record<string, unknown>,
+    user_var: ctx.userVars as Record<string, unknown>,
     text: ctx.text,
     system: buildSystemContext(ctx.bot.bot_username ?? undefined),
     webapp: ctx.webapp,
@@ -201,6 +202,11 @@ interface RunCtx {
   flow: Flow;
   chatId: string;
   variables: Record<string, unknown>;
+  /** Per-Telegram-user persistent vars, loaded from bot_user_state at turn
+   *  start and flushed back at turn end if userVarsDirty is true. Powers
+   *  {user_var.X} in templates and the action.set_user_var node. */
+  userVars: Record<string, unknown>;
+  userVarsDirty: boolean;
   user: Record<string, unknown>;
   text: string;
   pendingKeyboard?: OutgoingKeyboard;
@@ -527,6 +533,25 @@ async function runNode(ctx: RunCtx, node: FlowNode): Promise<string | null | "PA
       return goNext();
     }
 
+    case "action.set_user_var": {
+      // Per-user persistent variable. Same shape as set_var, but writes into
+      // ctx.userVars instead of ctx.variables — these get saved to
+      // bot_user_state at end of turn and reload next time the same tg user
+      // talks to the same bot. Used for personal-cabinet fields: name, phone,
+      // loyalty tier, last_order_total, etc.
+      const variable = String(params.variable ?? "").trim();
+      if (!variable) return goNext();
+      const rendered = await interpolateAndLog(String(params.value ?? ""), ctx, node.id);
+      ctx.userVars[variable] = rendered;
+      ctx.userVarsDirty = true;
+      await logEvent(ctx.bot.id, ctx.chatId, "user_variable_set", node.id, {
+        variable,
+        tg_user_id: String(ctx.user.id ?? ""),
+        value_length: rendered.length,
+      });
+      return goNext();
+    }
+
     case "action.input": {
       const variable = String(params.variable ?? "").trim();
       const awaitingFlag = `__awaiting_${node.id}`;
@@ -667,6 +692,25 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     .maybeSingle();
 
   const variables: Record<string, unknown> = (existing?.variables as any) ?? {};
+
+  // Load per-Telegram-user persistent state. Keyed on (bot_id, tg_user_id),
+  // independent of chat_id — so a user in a group still sees their own
+  // profile, and a user who switches chats with the same bot keeps theirs.
+  // Missing row means "first time we see this user"; we don't insert until
+  // the turn actually writes something (userVarsDirty).
+  const tgUserId = String(fromUser.id ?? "");
+  let userVars: Record<string, unknown> = {};
+  if (tgUserId) {
+    const { data: userRow } = await supa
+      .from("bot_user_state")
+      .select("vars")
+      .eq("bot_id", botId)
+      .eq("tg_user_id", tgUserId)
+      .maybeSingle();
+    if (userRow?.vars && typeof userRow.vars === "object") {
+      userVars = userRow.vars as Record<string, unknown>;
+    }
+  }
   const replyKeyboardLabels: string[] = Array.isArray(existing?.last_reply_keyboard)
     ? (existing!.last_reply_keyboard as string[]).map(String)
     : [];
@@ -696,6 +740,8 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     flow,
     chatId,
     variables,
+    userVars,
+    userVarsDirty: false,
     user: {
       id: fromUser.id,
       first_name: fromUser.first_name,
@@ -748,6 +794,18 @@ async function handleTelegram(botId: string, secret: string | null, update: any)
     last_reply_keyboard: ctx.nextReplyKeyboardLabels as never,
     last_seen_at: new Date().toISOString(),
   });
+
+  // Persist per-user vars only if this turn actually changed them. Avoids
+  // an upsert on every Telegram update for users whose flow doesn't use
+  // action.set_user_var at all.
+  if (ctx.userVarsDirty && tgUserId) {
+    await supa.from("bot_user_state").upsert({
+      bot_id: botId,
+      tg_user_id: tgUserId,
+      vars: ctx.userVars as never,
+      updated_at: new Date().toISOString(),
+    });
+  }
 
   // Always answer callback queries to dismiss the loading spinner in TG client.
   if (callback?.id) {

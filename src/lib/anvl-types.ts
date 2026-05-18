@@ -14,6 +14,7 @@ export type NodeKind =
   | "logic.condition"
   | "action.api"
   | "action.set_var"
+  | "action.set_user_var"
   | "action.input";
 
 export interface NodeMeta {

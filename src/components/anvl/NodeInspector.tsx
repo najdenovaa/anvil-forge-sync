@@ -17,6 +17,7 @@ const TEMPLATE_FIELDS: Partial<Record<NodeKind, Set<string>>> = {
   "message.text": new Set(["text"]),
   "message.photo": new Set(["caption"]),
   "action.set_var": new Set(["value"]),
+  "action.set_user_var": new Set(["value"]),
   "action.input": new Set(["prompt"]),
   "action.api": new Set(["url", "body"]),
 };
@@ -98,6 +99,15 @@ const FIELD_SCHEMAS: Record<
     { key: "variable", label: "Variable", type: "text", placeholder: "user_name" },
     { key: "value", label: "Value", type: "textarea", placeholder: "{first_name} or static value" },
     { key: "scope", label: "Scope", type: "select", options: ["session", "user"] },
+  ],
+  "action.set_user_var": [
+    { key: "variable", label: "User variable name", type: "text", placeholder: "name" },
+    {
+      key: "value",
+      label: "Value (templates allowed)",
+      type: "textarea",
+      placeholder: "{text} or {first_name}",
+    },
   ],
   "action.input": [
     { key: "variable", label: "Save to variable", type: "text", placeholder: "user_phone" },

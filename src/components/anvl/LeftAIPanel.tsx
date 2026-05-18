@@ -105,6 +105,7 @@ function describeToolStep(name: string, args: Record<string, any>): string {
         "trigger.command": "команда",
         "trigger.message": "входящее сообщение",
         "trigger.callback": "callback",
+        "trigger.webapp_data": "заказ из Mini App",
         "message.text": "текстовое сообщение",
         "message.photo": "фото",
         "message.document": "документ",
@@ -113,6 +114,9 @@ function describeToolStep(name: string, args: Record<string, any>): string {
         "miniapp.screen": "экран Mini App",
         "logic.condition": "условие",
         "action.api": "API-вызов",
+        "action.set_var": "переменную",
+        "action.set_user_var": "поле личного кабинета",
+        "action.input": "запрос ввода",
       };
       return `Добавляю ${kindLabel[kind] ?? kind}: «${title}»`;
     }
