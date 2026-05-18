@@ -288,7 +288,8 @@ function InboxScreen() {
                 key={s.id}
                 sub={s}
                 botId={botId}
-                onStatus={(st) => updateStatus(s.id, st)}
+                onStatus={(st) => { updateStatus(s.id, st); if (!s.read_at) markRead(s.id); }}
+                onRead={() => markRead(s.id)}
                 onDelete={() => deleteSub(s.id)}
               />
             ))}
