@@ -834,11 +834,22 @@ export function LeftAIPanel() {
   };
 
   const send = async (override?: string) => {
-    const text = (override ?? input).trim();
-    if (!text || isStreaming) return;
+    const rawText = (override ?? input).trim();
+    if ((!rawText && attachments.length === 0) || isStreaming) return;
 
     setError(null);
     if (!override) setInput("");
+
+    // Prepend extracted attachment contents so the architect sees them.
+    const attachBlock = attachments
+      .map((a) => {
+        const header =
+          a.kind === "image" ? `📎 Изображение: ${a.filename}` : `📎 Файл (${a.kind}): ${a.filename}`;
+        return `${header}\n\`\`\`\n${a.text || "[пусто]"}\n\`\`\``;
+      })
+      .join("\n\n");
+    const text = attachBlock ? (rawText ? `${attachBlock}\n\n${rawText}` : attachBlock) : rawText;
+    if (attachments.length) setAttachments([]);
 
     const userMsg: Msg = { role: "user", content: text };
     const localFix = applyLocalQuickFix(text);
