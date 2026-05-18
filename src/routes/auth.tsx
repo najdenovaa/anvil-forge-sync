@@ -103,7 +103,7 @@ function AuthPage() {
               required
               minLength={6}
               autoComplete={tab === "login" ? "current-password" : "new-password"}
-              placeholder="Password"
+              placeholder="Пароль"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="hairline w-full rounded-md bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
