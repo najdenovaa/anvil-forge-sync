@@ -7,7 +7,7 @@ import anvlLogo from "@/assets/anvl-logo.png";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
-    meta: [{ title: "Sign in — ANVL" }],
+    meta: [{ title: "Вход — ANVL" }],
   }),
   component: AuthPage,
 });
