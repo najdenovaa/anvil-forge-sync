@@ -116,6 +116,41 @@ export type Database = {
           },
         ]
       }
+      bot_user_state: {
+        Row: {
+          bot_id: string
+          created_at: string
+          last_seen_at: string
+          tg_user_id: string
+          updated_at: string
+          vars: Json
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          last_seen_at?: string
+          tg_user_id: string
+          updated_at?: string
+          vars?: Json
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          last_seen_at?: string
+          tg_user_id?: string
+          updated_at?: string
+          vars?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_user_state_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bots: {
         Row: {
           bot_token_encrypted: string
