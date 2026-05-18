@@ -35,7 +35,7 @@ function AuthPage() {
       if (tab === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        setMsg({ type: "ok", text: "Signed in. Redirecting…" });
+        setMsg({ type: "ok", text: "Вход выполнен. Перенаправляем…" });
       } else if (tab === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -45,17 +45,17 @@ function AuthPage() {
         if (error) throw error;
         setMsg({
           type: "ok",
-          text: "Account created. Check your email to confirm, then log in.",
+          text: "Аккаунт создан. Проверьте почту для подтверждения, затем войдите.",
         });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        setMsg({ type: "ok", text: "Password reset email sent." });
+        setMsg({ type: "ok", text: "Письмо для сброса пароля отправлено." });
       }
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message ?? "Something went wrong" });
+      setMsg({ type: "err", text: err?.message ?? "Что-то пошло не так" });
     } finally {
       setBusy(false);
     }
