@@ -159,6 +159,7 @@ export type Database = {
           flow_id: string
           id: string
           last_error: string | null
+          owner_id: string | null
           platform: string
           status: string
           updated_at: string
@@ -171,6 +172,7 @@ export type Database = {
           flow_id: string
           id?: string
           last_error?: string | null
+          owner_id?: string | null
           platform: string
           status?: string
           updated_at?: string
@@ -183,6 +185,7 @@ export type Database = {
           flow_id?: string
           id?: string
           last_error?: string | null
+          owner_id?: string | null
           platform?: string
           status?: string
           updated_at?: string
@@ -255,6 +258,7 @@ export type Database = {
           miniapp: Json
           miniapp_enabled: boolean
           nodes: Json
+          owner_id: string | null
           platform: string
           preview: Json
           slug: string
@@ -271,6 +275,7 @@ export type Database = {
           miniapp?: Json
           miniapp_enabled?: boolean
           nodes?: Json
+          owner_id?: string | null
           platform?: string
           preview?: Json
           slug: string
@@ -287,6 +292,7 @@ export type Database = {
           miniapp?: Json
           miniapp_enabled?: boolean
           nodes?: Json
+          owner_id?: string | null
           platform?: string
           preview?: Json
           slug?: string
