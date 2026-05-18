@@ -131,7 +131,7 @@ function AuthPage() {
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground">
           <Link to="/" className="hover:text-foreground">
-            ← Back to home
+            ← На главную
           </Link>
         </p>
       </div>
