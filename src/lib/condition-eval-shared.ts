@@ -65,10 +65,16 @@ function readSource(side: ConditionLeaf["left"], ctx: TemplateContext): unknown 
 }
 
 function evalLeaf(leaf: ConditionLeaf, ctx: TemplateContext): boolean {
-  const leftVal = readSource(leaf.left, ctx);
-  const rightVal = leaf.right.kind === "literal"
-    ? leaf.right.value
-    : (ctx.var as Record<string, unknown>)[leaf.right.key] ?? "";
+  // Defensive: half-built/partial nodes can lack `left` or `right` (architect
+  // mid-edit, or imported legacy data). Falling through with `undefined` here
+  // crashes the BotSimulatorProvider tree and bricks the whole /flows/$slug
+  // route. Default to empty literals — condition just evaluates falsy.
+  const leftVal = readSource(leaf.left ?? { source: "text" }, ctx);
+  const right = leaf.right ?? { kind: "literal" as const, value: "" };
+  const rightVal = right.kind === "literal"
+    ? right.value
+    : (ctx.var as Record<string, unknown>)[right.key] ?? "";
+
 
   switch (leaf.operator) {
     case "eq": return String(leftVal) === String(rightVal);
