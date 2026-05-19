@@ -386,8 +386,16 @@ export function LeftAIPanel() {
 
   const applyLocalQuickFix = (text: string) => {
     const normalized = normalizeNodeRef(text);
+    // Quick-fix is ONLY for short, explicit "wire X to Y" asks. Длинные брифы
+    // (цены, услуги, «бренд», полная сборка) обязаны идти в архитектор —
+    // иначе модель никогда не видит запрос и пользователь получает заглушку.
+    if (text.length > 200) return null;
+    const briefMarkers = /(₽|руб|\$|usd|eur|€|бренд|цен[аы]|услуг|меню|корзин|\/start|шесть|пять|четыре|новый бот|собери|построй|сделай бот|create bot|build bot)/i;
+    if (briefMarkers.test(text)) return null;
+    // Need an EXPLICIT connect verb — не просто упоминание «mini» или «заказ».
+    const hasConnectVerb = /\b(соедин|связ|протян|подключ|wire|connect)/i.test(normalized);
+    if (!hasConnectVerb) return null;
     const asksForMiniAppOrderWire =
-      /соедин|связ|протян|подключ|мини|mini|webapp|заказ|order|trigger|триггер/.test(normalized) &&
       /мини|mini|webapp/.test(normalized) &&
       /заказ|order|trigger|триггер|senddata/.test(normalized);
     if (!asksForMiniAppOrderWire) return null;
