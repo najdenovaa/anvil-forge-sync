@@ -1183,19 +1183,53 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
       // Removing the tool entirely is the only reliable defence — prompt
       // discipline alone has been insufficient.
       const canvasHasNodes = canvasNodes.length > 0;
-      const rebuildKeywords = /(пересобер|собери заново|начни заново|с нуля|забудь старый|reset|rebuild|from scratch|wipe)/i;
-      const explicitRebuild = rebuildKeywords.test(lastUserMsg);
+      // Explicit rebuild words (точные триггеры на reset_canvas).
+      const rebuildKeywords = /(пересобер|собери заново|начни заново|с нуля|забудь старый|reset|rebuild|from scratch|wipe|пересоздай|перепиши|удали всё|удали все|очисти канвас)/i;
+      // "Build a bot" phrasing — пользователь даёт развёрнутый бриф нового
+      // бота, даже если не сказал «пересобери». Сюда же — «сделай бот», «новый бот».
+      const buildBotPhrase = /\b(собери|построй|постро[йи]те|сделай|сделайте|создай|create|build|make)\b[^.]{0,80}\bбот/i;
+      // Бриф-маркеры: несколько конкретных фич = «полный билд», не точечная правка.
+      const briefMarkers = [
+        /\bMini\s*App\b/i,
+        /\bкорзин/i,
+        /\/start\b/i,
+        /\bменю\b/i,
+        /\bуслуг/i,
+        /\d+\s*(₽|руб|rub|\$|usd|eur|€)/i,
+        /\bбренд\b/i,
+        /\bgrid\b|\blayout\b/i,
+      ];
+      const briefScore = briefMarkers.reduce((n, re) => n + (re.test(lastUserMsg) ? 1 : 0), 0);
+      const looksLikeBrief = lastUserMsg.length >= 250 && briefScore >= 3;
+      const explicitRebuild =
+        rebuildKeywords.test(lastUserMsg) ||
+        buildBotPhrase.test(lastUserMsg) ||
+        looksLikeBrief;
+      console.log(
+        `[architect-chat] mode_decision canvasNodes=${canvasNodes.length} ` +
+        `rebuildKw=${rebuildKeywords.test(lastUserMsg)} buildBot=${buildBotPhrase.test(lastUserMsg)} ` +
+        `briefScore=${briefScore} msgLen=${lastUserMsg.length} → explicitRebuild=${explicitRebuild}`,
+      );
       if (canvasHasNodes && !explicitRebuild && toolDefs) {
         toolDefs = toolDefs.filter((t) => t?.function?.name !== "reset_canvas");
         systemPrompt =
           `== HARD CONSTRAINT (system enforced) ==\n` +
-          `На канвасе уже есть ${canvasNodes.length} нод. Пользователь НЕ просил пересборки.\n` +
-          `Это EDIT-режим. Инструмент reset_canvas УДАЛЁН — его нельзя вызвать.\n` +
-          `Делай МИНИМАЛЬНУЮ точечную правку: get_canvas → 1-3 операции (connect / set_param / add_node) → готово.\n` +
-          `НЕ пересобирай существующие ноды. НЕ повторяй set_variables / set_preview / set_code, если правка их не затрагивает.\n` +
-          `Если запрос звучит как «соедини X с Y» / «протяни ноду» / «исправь связь» — это ОДИН вызов connect и всё.\n\n` +
-          `Если X/Y описаны словами, найди реальные ID через get_canvas: Mini App = kind miniapp.screen, триггер заказа = kind trigger.webapp_data с params.action='order'.\n` +
-          `Для Mini App → заказ используй connect(from=<miniapp.screen id>, to=<trigger.webapp_data id>) и больше ничего не меняй.\n\n` +
+          `На канвасе уже есть ${canvasNodes.length} нод. Пользователь НЕ просил пересборки и не дал развёрнутый бриф нового бота.\n` +
+          `Это EDIT-режим. Инструмент reset_canvas УДАЛЁН.\n` +
+          `Делай ТОЧЕЧНУЮ правку: get_canvas → нужные операции (connect / set_param / add_node / remove_node) → готово.\n` +
+          `НЕ пересобирай существующие ноды без необходимости. НЕ повторяй set_variables / set_preview / set_code, если правка их не затрагивает.\n` +
+          `Если запрос «соедини X с Y» / «протяни ноду» / «исправь связь» — это ОДИН вызов connect и всё.\n` +
+          `Mini App = kind miniapp.screen, триггер заказа = kind trigger.webapp_data с params.action='order'.\n\n` +
+          `ЗАПРЕЩЕНО завершать раунд текстом «Готово» БЕЗ единого tool_call. Если действительно нечего менять — задай уточняющий вопрос, а не пиши «Готово».\n\n` +
+          systemPrompt;
+      } else if (canvasHasNodes && explicitRebuild) {
+        // BUILD-режим поверх существующего канваса: чётко скажем модели,
+        // что от неё ждут полную пересборку по брифу, а не точечную правку.
+        systemPrompt =
+          `== BUILD MODE (system enforced) ==\n` +
+          `Пользователь дал развёрнутый бриф нового бота. На канвасе ${canvasNodes.length} старых нод — их нужно стереть.\n` +
+          `Алгоритм: reset_canvas() → set_variables → ноды и связи по брифу → set_miniapp_* (если Mini App) → set_preview + set_code в конце.\n` +
+          `Реализуй ВСЕ пункты брифа (цены, услуги, корзина, /start-логика, sendAction и т.д.) — не сокращай.\n\n` +
           systemPrompt;
       }
     }
