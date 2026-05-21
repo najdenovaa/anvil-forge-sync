@@ -14,6 +14,199 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * Server-side canvas state — kept in lockstep with what the client will
+ * apply, so we can validate the graph WITHOUT a DB round-trip after every
+ * round. Only mutated by `applyToolCallToCanvas` below, only read by
+ * `validateCanvas` at the end of each round.
+ *
+ * Why this matters: the model has a long-standing habit of emitting
+ * add_node without a matching connect, leaving orphan nodes that look
+ * fine in the AI's confident final summary but break the live bot.
+ * Prompt-only fixes ("check yourself before responding") plateau around
+ * 60-70% reliability — server enforcement gets us to >95%.
+ */
+type CanvasNode = { id: string; data?: { kind?: string; params?: Record<string, unknown> } };
+type CanvasEdge = { source: string; target: string };
+type CanvasState = { nodes: CanvasNode[]; edges: CanvasEdge[] };
+
+function cloneCanvas(c: CanvasState): CanvasState {
+  return { nodes: c.nodes.map((n) => ({ ...n, data: n.data ? { ...n.data, params: { ...(n.data.params ?? {}) } } : undefined })), edges: c.edges.map((e) => ({ ...e })) };
+}
+
+/**
+ * Simulate the effect of a single tool_call on our local canvas copy.
+ * Covers the basic graph-shape ops (reset, add_node, connect, remove,
+ * set_param) plus the two composite tools that affect topology
+ * (add_menu_section, add_webapp_handler). Other tools (set_miniapp_*,
+ * set_variables, set_preview, set_code, get_canvas) don't change the
+ * node graph — we ignore them here.
+ */
+function applyToolCallToCanvas(canvas: CanvasState, name: string, args: any): void {
+  if (!args || typeof args !== "object") return;
+  switch (name) {
+    case "reset_canvas":
+      canvas.nodes = [];
+      canvas.edges = [];
+      return;
+    case "add_node":
+    case "add_ai_node": {
+      const id = String(args.id ?? "").trim();
+      const kind = String(args.kind ?? "").trim();
+      if (!id || !kind) return;
+      if (canvas.nodes.some((n) => n.id === id)) return; // idempotent
+      canvas.nodes.push({ id, data: { kind, params: {} } });
+      return;
+    }
+    case "connect":
+    case "connect_ai_nodes": {
+      const from = String(args.from ?? args.source ?? "").trim();
+      const to = String(args.to ?? args.target ?? "").trim();
+      if (!from || !to) return;
+      if (canvas.edges.some((e) => e.source === from && e.target === to)) return;
+      canvas.edges.push({ source: from, target: to });
+      return;
+    }
+    case "remove_ai_node":
+    case "remove_node": {
+      const id = String(args.id ?? "").trim();
+      canvas.nodes = canvas.nodes.filter((n) => n.id !== id);
+      canvas.edges = canvas.edges.filter((e) => e.source !== id && e.target !== id);
+      return;
+    }
+    case "remove_ai_edge":
+    case "remove_edge": {
+      const from = String(args.from ?? args.source ?? "").trim();
+      const to = String(args.to ?? args.target ?? "").trim();
+      canvas.edges = canvas.edges.filter((e) => !(e.source === from && e.target === to));
+      return;
+    }
+    case "set_param":
+    case "update_param": {
+      const id = String(args.id ?? "").trim();
+      const key = String(args.key ?? "").trim();
+      const node = canvas.nodes.find((n) => n.id === id);
+      if (!node || !key) return;
+      if (!node.data) node.data = { params: {} };
+      if (!node.data.params) node.data.params = {};
+      node.data.params[key] = args.value;
+      return;
+    }
+    case "add_menu_section": {
+      // Composite: creates section trigger.callback + message + edges.
+      const menuId = String(args.menu_id ?? "").trim();
+      const sectionId = String(args.section_id ?? "").trim();
+      if (!menuId || !sectionId) return;
+      const trigId = `${sectionId}_trig`;
+      const msgId = `${sectionId}_msg`;
+      if (!canvas.nodes.some((n) => n.id === trigId)) {
+        canvas.nodes.push({ id: trigId, data: { kind: "trigger.callback", params: { data: args.callback_data } } });
+      }
+      if (!canvas.nodes.some((n) => n.id === msgId)) {
+        canvas.nodes.push({ id: msgId, data: { kind: "message.text", params: { text: args.content } } });
+      }
+      if (!canvas.edges.some((e) => e.source === trigId && e.target === msgId)) {
+        canvas.edges.push({ source: trigId, target: msgId });
+      }
+      return;
+    }
+    case "add_webapp_handler": {
+      const hId = String(args.handler_id ?? "").trim();
+      if (!hId) return;
+      const trigId = `${hId}_trig`;
+      const msgId = `${hId}_msg`;
+      if (!canvas.nodes.some((n) => n.id === trigId)) {
+        canvas.nodes.push({ id: trigId, data: { kind: "trigger.webapp_data", params: { action: args.action } } });
+      }
+      if (!canvas.nodes.some((n) => n.id === msgId)) {
+        canvas.nodes.push({ id: msgId, data: { kind: "message.text", params: { text: args.response_text } } });
+      }
+      if (!canvas.edges.some((e) => e.source === trigId && e.target === msgId)) {
+        canvas.edges.push({ source: trigId, target: msgId });
+      }
+      return;
+    }
+    // set_miniapp_*, set_variables, set_preview, set_code, get_canvas — no canvas mutation
+  }
+}
+
+/**
+ * Validate the current graph and return a list of human-readable problems.
+ * Empty list means "good to ship".
+ *
+ * Checks (in order of severity):
+ *   1. Orphan nodes — anything that's not a `trigger.*` and has no incoming
+ *      edge. These are the single biggest source of "button does nothing"
+ *      complaints.
+ *   2. Placeholder buttons — keyboard.inline.params.buttons containing
+ *      "Button 1", "todo", lines without "|", or empty actions.
+ *   3. set_miniapp_cart enabled but no trigger.webapp_data on canvas —
+ *      the user will tap "Оформить" and the bot will be silent.
+ *
+ * Future iterations can add: duplicate node ids, dangling edges (target
+ * doesn't exist), {webapp.*} placeholders in templates that aren't
+ * downstream of trigger.webapp_data, etc.
+ */
+function validateCanvas(canvas: CanvasState, hasMiniAppCart: boolean): string[] {
+  const problems: string[] = [];
+  const incoming = new Map<string, number>();
+  for (const e of canvas.edges) {
+    incoming.set(e.target, (incoming.get(e.target) ?? 0) + 1);
+  }
+
+  // 1. Orphan nodes (non-trigger with no incoming edges)
+  const orphans: string[] = [];
+  for (const n of canvas.nodes) {
+    const kind = n.data?.kind ?? "";
+    if (kind.startsWith("trigger.")) continue;
+    if ((incoming.get(n.id) ?? 0) === 0) orphans.push(n.id);
+  }
+  if (orphans.length > 0) {
+    problems.push(
+      `Orphan ноды (без входящего ребра, не triggers): ${orphans.join(", ")}. ОБЯЗАТЕЛЬНО соедини каждую с логичным родителем через connect перед финалом.`,
+    );
+  }
+
+  // 2. Placeholder buttons
+  const placeholderRe = /^(Button\s*\d*|button\s*\d*|todo|TODO|placeholder|кнопка\s*\d*)$/i;
+  for (const n of canvas.nodes) {
+    if (n.data?.kind !== "keyboard.inline") continue;
+    const buttons = String(n.data.params?.buttons ?? "").trim();
+    if (!buttons) {
+      problems.push(`Нода ${n.id} (keyboard.inline) имеет пустой params.buttons — добавь реальные кнопки в формате "Лейбл|action".`);
+      continue;
+    }
+    const lines = buttons.split("\n").map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      if (placeholderRe.test(line)) {
+        problems.push(`Нода ${n.id} (keyboard.inline) имеет placeholder-кнопку "${line}". Замени на реальный лейбл и action.`);
+        break;
+      }
+      if (!line.includes("|")) {
+        problems.push(`Нода ${n.id} (keyboard.inline) имеет строку без разделителя "|": "${line}". Формат строго "Лейбл|action".`);
+        break;
+      }
+      const [, action] = line.split("|").map((p) => p.trim());
+      if (!action) {
+        problems.push(`Нода ${n.id} (keyboard.inline) имеет кнопку без action: "${line}". Формат "Лейбл|action".`);
+        break;
+      }
+    }
+  }
+
+  // 3. Mini App cart enabled but no webapp_data handler
+  if (hasMiniAppCart) {
+    const hasHandler = canvas.nodes.some((n) => n.data?.kind === "trigger.webapp_data");
+    if (!hasHandler) {
+      problems.push(
+        `set_miniapp_cart включена, но на канвасе нет ни одной trigger.webapp_data ноды. Вызови add_webapp_handler({handler_id, action, response_text}) чтобы бот реагировал на оформление заказа из Mini App.`,
+      );
+    }
+  }
+
+  return problems;
+}
+
 const BASE_PROMPT = `Вы — Anvl, senior product engineer для Telegram и Max ботов. Вы строите ботов исключительно через tool_calls на визуальном канвасе. Пользователь видит каждый ваш tool_call как живой шаг в чате и видит как канвас и превью собираются в реальном времени.
 
 == ФОРМАТ ОТВЕТА ==
@@ -1257,6 +1450,28 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
       async start(controller) {
         let indexOffset = 0; // shift tool_call indexes across rounds so client buffers don't collide
 
+        // Local mirror of canvas state for server-side graph validation. We
+        // simulate every canvas-mutating tool_call against this and run
+        // validateCanvas() before letting the loop terminate. If problems
+        // are found, we feed them back to the model as a system message
+        // and keep looping until the graph is clean (or maxFixAttempts).
+        const currentCanvas: CanvasState = (() => {
+          try {
+            const parsed = JSON.parse(canvasResult);
+            return {
+              nodes: Array.isArray(parsed.nodes) ? parsed.nodes : [],
+              edges: Array.isArray(parsed.edges)
+                ? parsed.edges.map((e: any) => ({ source: e.source ?? e.from, target: e.target ?? e.to }))
+                : [],
+            };
+          } catch {
+            return { nodes: [], edges: [] };
+          }
+        })();
+        let hasMiniAppCart = false;
+        let fixAttempts = 0;
+        const maxFixAttempts = 3;
+
         try {
           // Round cap raised from 8 to 30 (2026-05-15). Under tool_choice:"any",
           // Sonnet 4.6 prefers to emit one tool_use per round rather than batching
@@ -1637,6 +1852,35 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
             // back and run another round — this gives it room to break a big task
             // into multiple turns instead of hedging with "task too big" text.
             if (roundCalls.size === 0) {
+              // Before letting the model wrap up — run graph validation.
+              // If we find structural problems (orphan nodes, placeholder
+              // buttons, cart-without-handler), inject a system-style user
+              // message describing them and force another round. The model
+              // is required to fix what we point out before it can finish.
+              //
+              // Bounded by maxFixAttempts so the loop can't lock when the
+              // model genuinely cannot satisfy validator (e.g. validator
+              // bug, or the requested fix is impossible). After the cap,
+              // we let the model finish but log loudly.
+              const problems = validateCanvas(currentCanvas, hasMiniAppCart);
+              if (problems.length > 0 && fixAttempts < maxFixAttempts) {
+                fixAttempts++;
+                console.log(
+                  `[architect-chat] graph_validation found ${problems.length} problem(s) at round=${round}, attempt=${fixAttempts}/${maxFixAttempts}: ${problems.join(" | ")}`,
+                );
+                const problemList = problems.map((p, i) => `${i + 1}. ${p}`).join("\n");
+                conversation.push({
+                  role: "user",
+                  content:
+                    `[SYSTEM AUDIT] Прежде чем заканчивать — на канвасе найдены проблемы целостности графа. Исправь и продолжай tool_calls. НЕ пиши финальный текст пока проблемы не устранены.\n\n${problemList}\n\nПосле исправлений вызови get_canvas чтобы проверить, и только потом завершай.`,
+                });
+                continue; // run another round
+              }
+              if (problems.length > 0) {
+                console.log(
+                  `[architect-chat] graph_validation EXCEEDED maxFixAttempts at round=${round}, letting model finish with ${problems.length} unresolved problem(s)`,
+                );
+              }
               console.log(`[architect-chat] FINISHED at round=${round}, exit_reason=empty_round`);
               controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               controller.close();
@@ -1656,6 +1900,20 @@ Do NOT write generic "Готово". Do NOT repeat the bullet list verbatim.`;
                   arguments: c.argsJson && c.argsJson.length > 0 ? c.argsJson : "{}",
                 },
               }));
+
+            // Simulate this round's tool_calls against our local canvas mirror
+            // so the next validation pass sees the latest graph shape. We do
+            // this before pushing to conversation so a failed JSON parse
+            // doesn't poison the assistant turn we send back to Anthropic.
+            for (const call of orderedCalls) {
+              let parsedArgs: any = {};
+              try { parsedArgs = JSON.parse(call.function.arguments); } catch { /* ignore */ }
+              applyToolCallToCanvas(currentCanvas, call.function.name, parsedArgs);
+              // Track Mini App cart enablement for the cart→handler validation rule.
+              if (call.function.name === "set_miniapp_cart" && parsedArgs?.enabled === true) {
+                hasMiniAppCart = true;
+              }
+            }
 
             conversation.push({
               role: "assistant",

@@ -65,7 +65,7 @@ function PublicMiniApp() {
       <PlatformProvider>
         <MiniAppProvider>
           <div className="h-screen w-screen overflow-hidden">
-            <DynamicMiniAppView miniApp={miniApp} />
+            <DynamicMiniAppView miniApp={miniApp} flowId={flowId} />
           </div>
         </MiniAppProvider>
       </PlatformProvider>
