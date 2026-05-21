@@ -61,6 +61,7 @@ import {
   type MiniAppItem,
   type MiniAppLayout,
   type MiniAppPlanCard,
+  type MiniAppProfileField,
   type MiniAppStat,
   type MiniAppTabSpec,
 } from "@/lib/anvl-blueprint";
@@ -425,6 +426,7 @@ export function DynamicMiniAppView({
                 accentColor={accentColor}
                 brandTitle={brandTitle}
                 stats={miniApp.stats}
+                profileFields={miniApp.profileFields}
                 flowId={flowId}
               />
             )}
@@ -1184,12 +1186,14 @@ function ProfileTab({
   accentColor,
   brandTitle,
   stats,
+  profileFields,
   flowId,
 }: {
   isTg: boolean;
   accentColor: string;
   brandTitle: string;
   stats?: MiniAppStat[];
+  profileFields?: MiniAppProfileField[];
   flowId?: string;
 }) {
   /**
@@ -1205,12 +1209,8 @@ function ProfileTab({
    *      placeholder. We never make up data, never show another user's
    *      data, never trust client-side tg_user_id.
    *
-   * Fields rendered: name, phone, email, last_action. These are the
-   * canonical keys the Architect's system prompt teaches it to use via
-   * action.set_user_var. Bots that store other keys (e.g. address,
-   * loyalty_tier) won't surface them here yet — that's the next
-   * iteration where the Architect declares which user_var keys are
-   * "profile-visible" via a composite tool.
+   * Fields rendered: explicit miniApp.profileFields first. Legacy bots fall
+   * back to common keys (name/user_name, phone/user_phone, email, last_action).
    */
   const [profile, setProfile] = useState<{
     loading: boolean;
