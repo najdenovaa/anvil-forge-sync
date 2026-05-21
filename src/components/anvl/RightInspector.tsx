@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X, ScrollText } from "lucide-react";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X, ScrollText, Smartphone } from "lucide-react";
 import { DebugLogPanel } from "./DebugLogPanel";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
@@ -10,10 +10,11 @@ import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
 import { IssuesPanel } from "./IssuesPanel";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
+import type { MiniAppItem, MiniAppLayout, MiniAppProfileField, MiniAppTabSpec } from "@/lib/anvl-blueprint";
 import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "node" | "variables" | "settings" | "code" | "logs";
+type Tab = "components" | "node" | "miniapp" | "variables" | "settings" | "code" | "logs";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
@@ -29,9 +30,10 @@ export function RightInspector() {
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-l border-hairline bg-sidebar">
-      <div className="grid grid-cols-6 gap-0.5 border-b border-hairline px-1.5 py-2">
+      <div className="grid grid-cols-7 gap-0.5 border-b border-hairline px-1.5 py-2">
         <TabBtn active={tab === "components"} onClick={() => setTab("components")} icon={<LayoutGrid className="h-3.5 w-3.5" />} label="Comp" title={t("inspector.components")} />
         <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />} label="Node" title="Node" />
+        <TabBtn active={tab === "miniapp"} onClick={() => setTab("miniapp")} icon={<Smartphone className="h-3.5 w-3.5" />} label="Mini" title="Mini App" />
         <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />} label="Vars" title="Variables" />
         <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />} label="Set" title={t("inspector.settings")} />
         <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />} label="Code" title={t("inspector.code")} />
@@ -47,7 +49,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : tab === "logs" ? <DebugLogPanel /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "miniapp" ? <MiniAppBuilderPane /> : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : tab === "logs" ? <DebugLogPanel /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -134,6 +136,218 @@ function ComponentsPane() {
         );
       })}
     </div>
+  );
+}
+
+function MiniAppBuilderPane() {
+  const {
+    miniApp,
+    mergeMiniApp,
+    setMiniAppTabs,
+    setMiniAppProfileFields,
+    clearMiniAppItems,
+    addMiniAppItem,
+    setMiniAppCart,
+  } = useAnvlWorkspace();
+  const [draftItem, setDraftItem] = useState<MiniAppItem>({ title: "", meta: "", priceNumeric: undefined });
+
+  const tabsText = (miniApp.tabs ?? [])
+    .map((tab) => [tab.label, tab.id, tab.icon].filter(Boolean).join("|"))
+    .join("\n");
+  const profileText = (miniApp.profileFields ?? [])
+    .map((field) => [field.label, field.key ?? field.value, field.icon].filter(Boolean).join("|"))
+    .join("\n");
+
+  const setHero = (patch: Partial<NonNullable<typeof miniApp.hero>>) => {
+    mergeMiniApp({
+      hero: {
+        title: miniApp.hero?.title ?? miniApp.title ?? "Mini App",
+        cta: miniApp.hero?.cta ?? "Открыть",
+        ...miniApp.hero,
+        ...patch,
+      },
+    });
+  };
+
+  const addItem = () => {
+    const title = draftItem.title.trim();
+    if (!title) return;
+    addMiniAppItem({
+      title,
+      subtitle: draftItem.subtitle?.trim() || undefined,
+      meta: draftItem.meta?.trim() || undefined,
+      emoji: draftItem.emoji?.trim() || undefined,
+      badge: draftItem.badge?.trim() || undefined,
+      priceNumeric: typeof draftItem.priceNumeric === "number" ? draftItem.priceNumeric : undefined,
+    });
+    setDraftItem({ title: "", meta: "", priceNumeric: undefined });
+  };
+
+  return (
+    <div className="h-full overflow-y-auto px-3 py-3">
+      <SectionHeader title="Mini App builder" />
+      <MiniText label="Title" value={miniApp.title ?? ""} onChange={(title) => mergeMiniApp({ title })} />
+      <MiniText label="Subtitle" value={miniApp.subtitle ?? ""} onChange={(subtitle) => mergeMiniApp({ subtitle })} />
+      <div className="grid grid-cols-2 gap-2">
+        <MiniText label="Accent hex" value={miniApp.accentHex ?? ""} onChange={(accentHex) => mergeMiniApp({ accentHex })} placeholder="#16a34a" />
+        <MiniSelect label="Layout" value={miniApp.layout ?? "list"} options={["list", "grid", "compact"]} onChange={(layout) => mergeMiniApp({ layout: layout as MiniAppLayout })} />
+      </div>
+
+      <SectionHeader title="Hero" className="mt-4" />
+      <MiniText label="Hero title" value={miniApp.hero?.title ?? ""} onChange={(title) => setHero({ title })} />
+      <MiniText label="CTA" value={miniApp.hero?.cta ?? ""} onChange={(cta) => setHero({ cta })} />
+
+      <SectionHeader title="Tabs" className="mt-4" />
+      <MiniArea
+        label="One per line: label|id|icon"
+        value={tabsText}
+        placeholder="Главная|home|home\nУслуги|items|list\nПрофиль|profile|user"
+        onChange={(value) => setMiniAppTabs(parseTabsLines(value))}
+      />
+
+      <SectionHeader title="Profile fields" className="mt-4" />
+      <MiniArea
+        label="One per line: label|user_var key|icon"
+        value={profileText}
+        placeholder="Имя|user_name|user\nТелефон|user_phone|phone"
+        onChange={(value) => setMiniAppProfileFields(parseProfileLines(value))}
+      />
+
+      <SectionHeader title="Items" className="mt-4" />
+      <div className="mb-2 space-y-1">
+        {(miniApp.items ?? []).map((item, index) => (
+          <div key={`${item.title}-${index}`} className="hairline rounded-md bg-surface px-2 py-1.5">
+            <div className="truncate text-[11.5px] font-medium">{item.emoji} {item.title}</div>
+            <div className="truncate text-[10px] text-muted-foreground">{item.meta} {item.badge ? `· ${item.badge}` : ""}</div>
+          </div>
+        ))}
+      </div>
+      <div className="hairline space-y-2 rounded-lg bg-surface p-2">
+        <MiniText label="New item" value={draftItem.title} onChange={(title) => setDraftItem((cur) => ({ ...cur, title }))} placeholder="Аренда корта вечером" />
+        <div className="grid grid-cols-2 gap-2">
+          <MiniText label="Meta" value={draftItem.meta ?? ""} onChange={(meta) => setDraftItem((cur) => ({ ...cur, meta }))} placeholder="1200 ₽" />
+          <MiniText label="Price" value={draftItem.priceNumeric?.toString() ?? ""} onChange={(price) => setDraftItem((cur) => ({ ...cur, priceNumeric: price ? Number(price) : undefined }))} placeholder="1200" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={addItem} className="flex-1 rounded-md bg-foreground px-2 py-1.5 text-[12px] font-medium text-background">Add item</button>
+          <button onClick={clearMiniAppItems} className="rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-accent">Clear</button>
+        </div>
+      </div>
+
+      <SectionHeader title="Cart" className="mt-4" />
+      <div className="hairline space-y-2 rounded-lg bg-surface p-2">
+        <MiniSelect label="Enabled" value={miniApp.cart?.enabled ? "true" : "false"} options={["true", "false"]} onChange={(enabled) => setMiniAppCart({ ...miniApp.cart, enabled: enabled === "true" })} />
+        <MiniText label="sendAction" value={miniApp.cart?.sendAction ?? "booking"} onChange={(sendAction) => setMiniAppCart({ ...miniApp.cart, enabled: miniApp.cart?.enabled ?? true, sendAction })} />
+        <MiniText label="CTA label" value={miniApp.cart?.ctaLabel ?? "Оформить"} onChange={(ctaLabel) => setMiniAppCart({ ...miniApp.cart, enabled: miniApp.cart?.enabled ?? true, ctaLabel })} />
+      </div>
+    </div>
+  );
+}
+
+function parseTabsLines(value: string): MiniAppTabSpec[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, id, icon] = line.split("|").map((part) => part.trim());
+      return { label, id: id || "items", icon: icon || undefined };
+    })
+    .filter((tab) => tab.label && tab.id)
+    .slice(0, 4);
+}
+
+function parseProfileLines(value: string): MiniAppProfileField[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, keyOrValue, icon] = line.split("|").map((part) => part.trim());
+      const isTemplate = keyOrValue?.startsWith("{user_var.");
+      return {
+        label,
+        key: keyOrValue && !isTemplate ? keyOrValue : undefined,
+        value: keyOrValue && isTemplate ? keyOrValue : undefined,
+        icon: icon || undefined,
+      };
+    })
+    .filter((field) => field.label)
+    .slice(0, 8);
+}
+
+function MiniText({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none focus:border-foreground/30"
+      />
+    </label>
+  );
+}
+
+function MiniArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <textarea
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline min-h-20 w-full resize-none rounded-md bg-surface-elevated px-2 py-1.5 font-mono text-[11px] outline-none focus:border-foreground/30"
+      />
+    </label>
+  );
+}
+
+function MiniSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

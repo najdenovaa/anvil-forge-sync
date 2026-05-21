@@ -160,6 +160,8 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Установил статистику (${Array.isArray(args.stats) ? args.stats.length : 0} блока)`;
     case "set_miniapp_tabs":
       return `Установил ${Array.isArray(args.tabs) ? args.tabs.length : 0} табов`;
+    case "set_miniapp_profile_fields":
+      return `Привязал ${Array.isArray(args.fields) ? args.fields.length : 0} полей профиля`;
     case "add_miniapp_item":
       return `Добавил элемент «${args.title ?? ""}»`;
     case "add_miniapp_plan":
@@ -350,6 +352,7 @@ export function LeftAIPanel() {
     setMiniAppHero,
     setMiniAppStats,
     setMiniAppTabs,
+    setMiniAppProfileFields,
     addMiniAppItem,
     addMiniAppPlan,
     clearMiniAppItems,
@@ -571,6 +574,8 @@ export function LeftAIPanel() {
           setMiniAppStats(Array.isArray(args.stats) ? args.stats : []);
         else if (name === "set_miniapp_tabs")
           setMiniAppTabs(Array.isArray(args.tabs) ? args.tabs : []);
+        else if (name === "set_miniapp_profile_fields")
+          setMiniAppProfileFields(Array.isArray(args.fields) ? args.fields : []);
         else if (name === "add_miniapp_item") addMiniAppItem(args as any);
         else if (name === "add_miniapp_plan") addMiniAppPlan(args as any);
         else if (name === "clear_miniapp_items") clearMiniAppItems();
@@ -1363,6 +1368,8 @@ function ToolOpsFeed({ ops, live = false }: { ops: ToolOp[]; live?: boolean }) {
         return t("ai.tools.set_preview");
       case "set_miniapp":
         return t("ai.tools.set_miniapp");
+      case "set_miniapp_profile_fields":
+        return `Mini App profile fields: ${Array.isArray(a.fields) ? a.fields.length : 0}`;
       default:
         return op.name;
     }

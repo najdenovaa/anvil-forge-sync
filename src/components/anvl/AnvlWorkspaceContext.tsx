@@ -17,6 +17,7 @@ import type {
   MiniAppHero,
   MiniAppItem,
   MiniAppPlanCard,
+  MiniAppProfileField,
   MiniAppStat,
   MiniAppTabSpec,
 } from "@/lib/anvl-blueprint";
@@ -164,6 +165,7 @@ interface WorkspaceCtx {
   setMiniAppHero: (hero: MiniAppHero) => void;
   setMiniAppStats: (stats: MiniAppStat[]) => void;
   setMiniAppTabs: (tabs: MiniAppTabSpec[]) => void;
+  setMiniAppProfileFields: (fields: MiniAppProfileField[]) => void;
   addMiniAppItem: (item: MiniAppItem) => void;
   addMiniAppPlan: (plan: MiniAppPlanCard) => void;
   clearMiniAppItems: () => void;
@@ -781,6 +783,13 @@ export function AnvlWorkspaceProvider({
     },
     [mergeMiniApp, setMiniAppEnabled],
   );
+  const setMiniAppProfileFields = useCallback(
+    (profileFields: MiniAppProfileField[]) => {
+      mergeMiniApp({ profileFields });
+      setMiniAppEnabled(true);
+    },
+    [mergeMiniApp, setMiniAppEnabled],
+  );
   const addMiniAppItem = useCallback(
     (item: MiniAppItem) => {
       setMiniApp((cur) => ({ ...cur, items: [...(cur.items ?? []), item] }));
@@ -883,6 +892,7 @@ export function AnvlWorkspaceProvider({
       setMiniAppHero,
       setMiniAppStats,
       setMiniAppTabs,
+      setMiniAppProfileFields,
       addMiniAppItem,
       addMiniAppPlan,
       clearMiniAppItems,
@@ -923,6 +933,7 @@ export function AnvlWorkspaceProvider({
       setMiniAppHero,
       setMiniAppStats,
       setMiniAppTabs,
+      setMiniAppProfileFields,
       addMiniAppItem,
       addMiniAppPlan,
       clearMiniAppItems,

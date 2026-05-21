@@ -61,6 +61,7 @@ import {
   type MiniAppItem,
   type MiniAppLayout,
   type MiniAppPlanCard,
+  type MiniAppProfileField,
   type MiniAppStat,
   type MiniAppTabSpec,
 } from "@/lib/anvl-blueprint";
@@ -425,6 +426,7 @@ export function DynamicMiniAppView({
                 accentColor={accentColor}
                 brandTitle={brandTitle}
                 stats={miniApp.stats}
+                profileFields={miniApp.profileFields}
                 flowId={flowId}
               />
             )}
@@ -1184,12 +1186,14 @@ function ProfileTab({
   accentColor,
   brandTitle,
   stats,
+  profileFields,
   flowId,
 }: {
   isTg: boolean;
   accentColor: string;
   brandTitle: string;
   stats?: MiniAppStat[];
+  profileFields?: MiniAppProfileField[];
   flowId?: string;
 }) {
   /**
@@ -1205,12 +1209,8 @@ function ProfileTab({
    *      placeholder. We never make up data, never show another user's
    *      data, never trust client-side tg_user_id.
    *
-   * Fields rendered: name, phone, email, last_action. These are the
-   * canonical keys the Architect's system prompt teaches it to use via
-   * action.set_user_var. Bots that store other keys (e.g. address,
-   * loyalty_tier) won't surface them here yet — that's the next
-   * iteration where the Architect declares which user_var keys are
-   * "profile-visible" via a composite tool.
+   * Fields rendered: explicit miniApp.profileFields first. Legacy bots fall
+   * back to common keys (name/user_name, phone/user_phone, email, last_action).
    */
   const [profile, setProfile] = useState<{
     loading: boolean;
@@ -1284,16 +1284,24 @@ function ProfileTab({
 
   const vars = profile.vars ?? {};
   const displayName =
-    (vars.name as string | undefined) ?? profile.tgFirstName ?? "Гость";
+    readProfileValue(vars, { key: "name" }) ??
+    readProfileValue(vars, { key: "user_name" }) ??
+    profile.tgFirstName ??
+    "Гость";
   const displayHandle = profile.tgUsername ? `@${profile.tgUsername}` : "";
 
-  // Canonical fields rendered, in this order. Empty values are skipped
-  // rather than shown as "—" so the card stays clean.
-  const fields: { label: string; value: string | undefined }[] = [
-    { label: "Телефон", value: vars.phone as string | undefined },
-    { label: "Email", value: vars.email as string | undefined },
-    { label: "Последнее действие", value: vars.last_action as string | undefined },
-  ];
+  const configuredFields = profileFields?.length
+    ? profileFields
+    : [
+        { label: "Имя", key: "user_name" },
+        { label: "Телефон", key: "user_phone" },
+        { label: "Email", key: "email" },
+        { label: "Последнее действие", key: "last_action" },
+      ];
+  const fields = configuredFields.map((field) => ({
+    label: field.label,
+    value: readProfileValue(vars, field),
+  }));
   const visibleFields = fields.filter((f) => f.value && String(f.value).trim());
 
   return (
@@ -1390,6 +1398,14 @@ function ProfileTab({
       )}
     </div>
   );
+}
+
+function readProfileValue(vars: Record<string, unknown>, field: Pick<MiniAppProfileField, "key" | "value">) {
+  const direct = field.key ? vars[field.key] : undefined;
+  if (direct != null && String(direct).trim()) return String(direct);
+  const template = field.value?.match(/^\{user_var\.([^}]+)\}$/)?.[1];
+  const templated = template ? vars[template] : undefined;
+  return templated != null && String(templated).trim() ? String(templated) : undefined;
 }
 
 function EmptyState({ isTg, text }: { isTg: boolean; text: ReactNode }) {

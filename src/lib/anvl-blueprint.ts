@@ -116,6 +116,15 @@ export interface MiniAppTabSpec {
   icon?: string;
 }
 
+export interface MiniAppProfileField {
+  label: string;
+  /** bot_user_state.vars key, e.g. "user_phone" or "phone" */
+  key?: string;
+  /** Optional template fallback, e.g. "{user_var.user_phone}" */
+  value?: string;
+  icon?: string;
+}
+
 export interface AnvlMiniAppState {
   /** Brand title shown in the mini-app header */
   title: string;
@@ -150,6 +159,8 @@ export interface AnvlMiniAppState {
   tabs: MiniAppTabSpec[];
   /** Label of the items tab (e.g. "Menu", "Servers", "Catalog") */
   itemsLabel: string;
+  /** Explicit profile/contact bindings for the Profile tab. */
+  profileFields?: MiniAppProfileField[];
   /**
    * Optional cart configuration. When `cart.enabled` is true, items with
    * `priceNumeric` become addable and a sticky bar with the order total
@@ -317,6 +328,23 @@ function parseTabs(v: unknown): MiniAppTabSpec[] | undefined {
   return out.length >= 2 ? out : undefined;
 }
 
+function parseProfileFields(v: unknown): MiniAppProfileField[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(
+      (f): f is MiniAppProfileField =>
+        !!f && typeof f === "object" && isStr((f as MiniAppProfileField).label),
+    )
+    .map((f) => ({
+      label: f.label,
+      key: isStr(f.key) ? f.key : undefined,
+      value: isStr(f.value) ? f.value : undefined,
+      icon: isStr(f.icon) ? f.icon : undefined,
+    }))
+    .slice(0, 8);
+  return out.length ? out : undefined;
+}
+
 function parsePreviewButtons(v: unknown): AnvlPreviewButton[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v
@@ -422,6 +450,7 @@ export function safeParseAnvlBlueprint(raw: string): AnvlBlueprint | null {
         plans: parsePlanCards(m.plans),
         tabs: parseTabs(m.tabs),
         itemsLabel: isStr(m.itemsLabel) ? m.itemsLabel : undefined,
+        profileFields: parseProfileFields(m.profileFields),
         cart: parseCart(m.cart),
       };
     }
