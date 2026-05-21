@@ -1183,6 +1183,35 @@ function buildTools(miniAppEnabled: boolean) {
     {
       type: "function",
       function: {
+        name: "set_miniapp_profile_fields",
+        description:
+          "Явно привязать поля вкладки Профиль Mini App к user_var. Перезаписывает массив profileFields целиком. Используй это когда пользователь просит привязать контакты/профиль/личный кабинет. key — имя переменной в bot_user_state.vars без префикса user_var (например 'user_name', 'user_phone', 'name', 'phone'). value — опциональный template fallback вроде '{user_var.user_phone}'. НЕ используй произвольные поля profileName/profilePhone/userVars — рендер читает только profileFields.",
+        parameters: {
+          type: "object",
+          properties: {
+            fields: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  key: { type: "string" },
+                  value: { type: "string" },
+                  icon: { type: "string" },
+                },
+                required: ["label"],
+                additionalProperties: true,
+              },
+            },
+          },
+          required: ["fields"],
+          additionalProperties: true,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
         name: "add_miniapp_item",
         description:
           "Добавить ОДИН элемент в список items Mini App (товар, услуга, локация). title — обязателен, subtitle — описание, meta — визуальная цена / длительность / любое мета-поле строкой ('590 ₽', '30 мин'), priceNumeric — численная цена для подсчёта суммы в корзине (число, без валюты): если задан И корзина включена через set_miniapp_cart, на плитке появится кнопка '+' для добавления в корзину; если не задан — элемент остаётся декоративным. emoji — короткий эмодзи в левом углу карточки, badge — текст бейджа ('Хит', 'Новинка'), badgeColor — hex-цвет фона бейджа (например '#22c55e' зелёный для 'Новинка', '#ef4444' красный для 'Скидка'), image — URL квадратной картинки товара. Вызывай ОТДЕЛЬНО для каждого элемента.",
