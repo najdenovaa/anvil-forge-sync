@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Home,
   List,
@@ -150,6 +151,7 @@ export function DynamicMiniApp() {
 export function DynamicMiniAppView({
   miniApp,
   onWebappSubmit,
+  flowId,
 }: {
   miniApp: Partial<import("@/lib/anvl-blueprint").AnvlMiniAppState>;
   /** Optional preview-only hook: invoked alongside Telegram.WebApp.sendData
@@ -162,6 +164,11 @@ export function DynamicMiniAppView({
     total?: number | string;
     currency?: string;
   }) => void;
+  /** flow slug or id — used by ProfileTab to fetch the user's
+   *  bot_user_state.vars via the get-user-profile edge function. Only
+   *  present on the public Mini App route /m/$flowId; undefined in
+   *  in-canvas preview mode. */
+  flowId?: string;
 }) {
   const { t } = useI18n();
   const { view, targetTab, close } = useMiniApp();
@@ -418,6 +425,7 @@ export function DynamicMiniAppView({
                 accentColor={accentColor}
                 brandTitle={brandTitle}
                 stats={miniApp.stats}
+                flowId={flowId}
               />
             )}
           </motion.div>
@@ -1176,12 +1184,118 @@ function ProfileTab({
   accentColor,
   brandTitle,
   stats,
+  flowId,
 }: {
   isTg: boolean;
   accentColor: string;
   brandTitle: string;
   stats?: MiniAppStat[];
+  flowId?: string;
 }) {
+  /**
+   * Profile loading strategy:
+   *
+   *   1. If we're inside real Telegram (window.Telegram.WebApp.initData is
+   *      a non-empty string) AND we have a flowId — POST it to the
+   *      get-user-profile edge function. That function HMAC-verifies the
+   *      initData against the bot's token and returns the matching
+   *      bot_user_state.vars row (or {}).
+   *
+   *   2. Otherwise (Anvl preview, or initData missing) — show a generic
+   *      placeholder. We never make up data, never show another user's
+   *      data, never trust client-side tg_user_id.
+   *
+   * Fields rendered: name, phone, email, last_action. These are the
+   * canonical keys the Architect's system prompt teaches it to use via
+   * action.set_user_var. Bots that store other keys (e.g. address,
+   * loyalty_tier) won't surface them here yet — that's the next
+   * iteration where the Architect declares which user_var keys are
+   * "profile-visible" via a composite tool.
+   */
+  const [profile, setProfile] = useState<{
+    loading: boolean;
+    vars: Record<string, unknown> | null;
+    tgFirstName: string | null;
+    tgUsername: string | null;
+  }>({ loading: true, vars: null, tgFirstName: null, tgUsername: null });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      // Pull what Telegram exposes locally (initData is the raw query
+      // string; initDataUnsafe.user has parsed fields — but unsafe to
+      // trust for any auth decision). We still use unsafe for display
+      // niceties (avatar initial, fallback name) because there's
+      // nothing security-sensitive about those.
+      const tg: any =
+        typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+      const initData: string | undefined = tg?.initData;
+      const tgUser = tg?.initDataUnsafe?.user;
+
+      if (!initData || !flowId) {
+        // Preview mode or page opened outside Telegram — show placeholder.
+        if (alive) {
+          setProfile({
+            loading: false,
+            vars: null,
+            tgFirstName: tgUser?.first_name ?? null,
+            tgUsername: tgUser?.username ?? null,
+          });
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.functions.invoke("get-user-profile", {
+          body: { flow_id: flowId, init_data: initData },
+        });
+        if (!alive) return;
+        if (error || !data) {
+          setProfile({
+            loading: false,
+            vars: {},
+            tgFirstName: tgUser?.first_name ?? null,
+            tgUsername: tgUser?.username ?? null,
+          });
+          return;
+        }
+        const vars = (data as { vars?: Record<string, unknown> }).vars ?? {};
+        setProfile({
+          loading: false,
+          vars,
+          tgFirstName: tgUser?.first_name ?? null,
+          tgUsername: tgUser?.username ?? null,
+        });
+      } catch {
+        if (alive) {
+          setProfile({
+            loading: false,
+            vars: {},
+            tgFirstName: tgUser?.first_name ?? null,
+            tgUsername: tgUser?.username ?? null,
+          });
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [flowId]);
+
+  const vars = profile.vars ?? {};
+  const displayName =
+    (vars.name as string | undefined) ?? profile.tgFirstName ?? "Гость";
+  const displayHandle = profile.tgUsername ? `@${profile.tgUsername}` : "";
+
+  // Canonical fields rendered, in this order. Empty values are skipped
+  // rather than shown as "—" so the card stays clean.
+  const fields: { label: string; value: string | undefined }[] = [
+    { label: "Телефон", value: vars.phone as string | undefined },
+    { label: "Email", value: vars.email as string | undefined },
+    { label: "Последнее действие", value: vars.last_action as string | undefined },
+  ];
+  const visibleFields = fields.filter((f) => f.value && String(f.value).trim());
+
   return (
     <div className="space-y-3 px-3 py-4">
       <div
@@ -1194,14 +1308,70 @@ function ProfileTab({
           className="flex h-12 w-12 items-center justify-center rounded-full text-[14px] font-bold text-white"
           style={{ background: accentColor }}
         >
-          {brandTitle.slice(0, 1).toUpperCase()}
+          {displayName.slice(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12.5px] font-semibold">@user</div>
-          <div className="truncate text-[10px] opacity-60">{brandTitle}</div>
+          <div className="truncate text-[12.5px] font-semibold">{displayName}</div>
+          <div className="truncate text-[10px] opacity-60">
+            {displayHandle || brandTitle}
+          </div>
         </div>
         <Settings className="h-4 w-4 opacity-50" />
       </div>
+
+      {/* Real profile fields from bot_user_state.vars. Loading + empty +
+          populated are three separate visual states so the card never
+          looks broken. */}
+      {profile.loading && (
+        <div
+          className={cn(
+            "rounded-lg px-3 py-3 text-[11px] opacity-50",
+            isTg ? "bg-white/5" : "bg-white shadow-sm",
+          )}
+        >
+          Загружаем профиль…
+        </div>
+      )}
+
+      {!profile.loading && visibleFields.length > 0 && (
+        <div className={cn("rounded-xl", isTg ? "bg-white/5" : "bg-white shadow-sm")}>
+          {visibleFields.map((f, i) => (
+            <div
+              key={f.label}
+              className={cn(
+                "flex items-center justify-between px-3 py-2.5 text-[11.5px]",
+                i < visibleFields.length - 1 && "border-b border-black/5",
+              )}
+            >
+              <span className="opacity-50">{f.label}</span>
+              <span className="ml-3 truncate font-medium">{f.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!profile.loading && profile.vars !== null && visibleFields.length === 0 && (
+        <div
+          className={cn(
+            "rounded-lg px-3 py-3 text-[11px] opacity-60",
+            isTg ? "bg-white/5" : "bg-white shadow-sm",
+          )}
+        >
+          Профиль появится после первой записи через бота.
+        </div>
+      )}
+
+      {!profile.loading && profile.vars === null && (
+        <div
+          className={cn(
+            "rounded-lg px-3 py-3 text-[11px] opacity-50",
+            isTg ? "bg-white/5" : "bg-white shadow-sm",
+          )}
+        >
+          Откройте Mini App из Telegram, чтобы увидеть свой профиль.
+        </div>
+      )}
+
       {stats && stats.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
           {stats.slice(0, 4).map((s, i) => (
