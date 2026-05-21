@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X, ScrollText } from "lucide-react";
+import { Settings2, LayoutGrid, Cloud, Check, AlertCircle, Code2, MousePointer2, Variable, Trash2, Plus, X, ScrollText, Smartphone } from "lucide-react";
 import { DebugLogPanel } from "./DebugLogPanel";
 import { usePlatform } from "./PlatformContext";
 import { useI18n } from "./I18nContext";
@@ -10,10 +10,11 @@ import { useSelection } from "./SelectionContext";
 import { NodeInspector } from "./NodeInspector";
 import { IssuesPanel } from "./IssuesPanel";
 import { NODE_CATALOG, NODE_GROUPS } from "@/lib/anvl-catalog";
+import type { MiniAppItem, MiniAppLayout, MiniAppProfileField, MiniAppTabSpec } from "@/lib/anvl-blueprint";
 import type { NodeKind, VariableDef, VariableScope, VariableType } from "@/lib/anvl-types";
 import { cn } from "@/lib/utils";
 
-type Tab = "components" | "node" | "variables" | "settings" | "code" | "logs";
+type Tab = "components" | "node" | "miniapp" | "variables" | "settings" | "code" | "logs";
 
 export function RightInspector() {
   const [tab, setTab] = useState<Tab>("components");
@@ -29,9 +30,10 @@ export function RightInspector() {
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-l border-hairline bg-sidebar">
-      <div className="grid grid-cols-6 gap-0.5 border-b border-hairline px-1.5 py-2">
+      <div className="grid grid-cols-7 gap-0.5 border-b border-hairline px-1.5 py-2">
         <TabBtn active={tab === "components"} onClick={() => setTab("components")} icon={<LayoutGrid className="h-3.5 w-3.5" />} label="Comp" title={t("inspector.components")} />
         <TabBtn active={tab === "node"} onClick={() => setTab("node")} icon={<MousePointer2 className="h-3.5 w-3.5" />} label="Node" title="Node" />
+        <TabBtn active={tab === "miniapp"} onClick={() => setTab("miniapp")} icon={<Smartphone className="h-3.5 w-3.5" />} label="Mini" title="Mini App" />
         <TabBtn active={tab === "variables"} onClick={() => setTab("variables")} icon={<Variable className="h-3.5 w-3.5" />} label="Vars" title="Variables" />
         <TabBtn active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings2 className="h-3.5 w-3.5" />} label="Set" title={t("inspector.settings")} />
         <TabBtn active={tab === "code"} onClick={() => setTab("code")} icon={<Code2 className="h-3.5 w-3.5" />} label="Code" title={t("inspector.code")} />
@@ -47,7 +49,7 @@ export function RightInspector() {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             className="absolute inset-0"
           >
-            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : tab === "logs" ? <DebugLogPanel /> : <CodePane />}
+            {tab === "components" ? <ComponentsPane /> : tab === "node" ? (showIssues ? <IssuesPanel /> : <NodeInspector />) : tab === "miniapp" ? <MiniAppBuilderPane /> : tab === "variables" ? <VariablesPane /> : tab === "settings" ? <SettingsPane /> : tab === "logs" ? <DebugLogPanel /> : <CodePane />}
           </motion.div>
         </AnimatePresence>
       </div>
