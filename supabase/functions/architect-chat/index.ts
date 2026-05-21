@@ -1053,7 +1053,8 @@ function buildTools(miniAppEnabled: boolean) {
         "REQUIRED whenever the flow contains a miniapp.screen node. Merges a patch into flows.miniapp. " +
         "Provide a complete spec: { title, subtitle, accent, itemsLabel, hero:{title,subtitle,cta,icon}, " +
         "stats:[{label,value,unit?}], items:[{title,subtitle?,meta?,emoji?,badge?}], " +
-        "plans:[{id,name,price,unit?,description?,highlight?,features?[]}], tabs:[{id,label,icon?}] }. " +
+        "plans:[{id,name,price,unit?,description?,highlight?,features?[]}], tabs:[{id,label,icon?}], " +
+        "profileFields:[{label,key?,value?,icon?}] }. " +
         "Domain-specific values only — never leave it empty.",
       parameters: {
         type: "object",
@@ -1068,6 +1069,7 @@ function buildTools(miniAppEnabled: boolean) {
           items: { type: "array", items: { type: "object", additionalProperties: true } },
           plans: { type: "array", items: { type: "object", additionalProperties: true } },
           tabs: { type: "array", items: { type: "object", additionalProperties: true } },
+          profileFields: { type: "array", items: { type: "object", additionalProperties: true } },
         },
         additionalProperties: true,
       },
