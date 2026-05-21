@@ -350,6 +350,7 @@ export function LeftAIPanel() {
     setMiniAppHero,
     setMiniAppStats,
     setMiniAppTabs,
+    setMiniAppProfileFields,
     addMiniAppItem,
     addMiniAppPlan,
     clearMiniAppItems,
@@ -571,6 +572,8 @@ export function LeftAIPanel() {
           setMiniAppStats(Array.isArray(args.stats) ? args.stats : []);
         else if (name === "set_miniapp_tabs")
           setMiniAppTabs(Array.isArray(args.tabs) ? args.tabs : []);
+        else if (name === "set_miniapp_profile_fields")
+          setMiniAppProfileFields(Array.isArray(args.fields) ? args.fields : []);
         else if (name === "add_miniapp_item") addMiniAppItem(args as any);
         else if (name === "add_miniapp_plan") addMiniAppPlan(args as any);
         else if (name === "clear_miniapp_items") clearMiniAppItems();
