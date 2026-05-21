@@ -61,27 +61,30 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
 
-  // Resolve flow → bot. Try both id (uuid) and slug.
+  // Resolve flow → bot. flows has no bot_id column; bots reference flows
+  // via bots.flow_id, so query the bots table directly.
   const isUuid = /^[0-9a-f-]{36}$/i.test(flowId);
   const { data: flow, error: flowErr } = isUuid
-    ? await supa.from("flows").select("id, bot_id").eq("id", flowId).maybeSingle()
-    : await supa.from("flows").select("id, bot_id").eq("slug", flowId).maybeSingle();
+    ? await supa.from("flows").select("id").eq("id", flowId).maybeSingle()
+    : await supa.from("flows").select("id").eq("slug", flowId).maybeSingle();
 
   if (flowErr || !flow) return json({ error: "flow not found" }, 404);
-  if (!flow.bot_id) {
-    // Flow exists but has no bot attached yet — Mini App was deployed
-    // as preview before bot was created. Treat as empty profile.
-    return json({ vars: {} });
-  }
 
-  // Load bot token, decrypt, validate initData.
   const { data: bot, error: botErr } = await supa
     .from("bots")
     .select("id, bot_token_encrypted")
-    .eq("id", flow.bot_id)
+    .eq("flow_id", flow.id)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (botErr || !bot || !bot.bot_token_encrypted) {
+  if (!bot) {
+    // Flow has no bot attached yet — Mini App was deployed as preview
+    // before the bot was created. Treat as empty profile.
+    return json({ vars: {} });
+  }
+
+  if (botErr || !bot.bot_token_encrypted) {
     return json({ error: "bot config missing" }, 404);
   }
 
