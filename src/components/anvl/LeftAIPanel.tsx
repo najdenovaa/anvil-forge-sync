@@ -160,6 +160,8 @@ function describeToolStep(name: string, args: Record<string, any>): string {
       return `Установил статистику (${Array.isArray(args.stats) ? args.stats.length : 0} блока)`;
     case "set_miniapp_tabs":
       return `Установил ${Array.isArray(args.tabs) ? args.tabs.length : 0} табов`;
+    case "set_miniapp_profile_fields":
+      return `Привязал ${Array.isArray(args.fields) ? args.fields.length : 0} полей профиля`;
     case "add_miniapp_item":
       return `Добавил элемент «${args.title ?? ""}»`;
     case "add_miniapp_plan":
@@ -1366,6 +1368,8 @@ function ToolOpsFeed({ ops, live = false }: { ops: ToolOp[]; live?: boolean }) {
         return t("ai.tools.set_preview");
       case "set_miniapp":
         return t("ai.tools.set_miniapp");
+      case "set_miniapp_profile_fields":
+        return `Mini App profile fields: ${Array.isArray(a.fields) ? a.fields.length : 0}`;
       default:
         return op.name;
     }
