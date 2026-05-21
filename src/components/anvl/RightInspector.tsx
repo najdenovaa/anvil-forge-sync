@@ -244,6 +244,113 @@ function MiniAppBuilderPane() {
   );
 }
 
+function parseTabsLines(value: string): MiniAppTabSpec[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, id, icon] = line.split("|").map((part) => part.trim());
+      return { label, id: id || "items", icon: icon || undefined };
+    })
+    .filter((tab) => tab.label && tab.id)
+    .slice(0, 4);
+}
+
+function parseProfileLines(value: string): MiniAppProfileField[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, keyOrValue, icon] = line.split("|").map((part) => part.trim());
+      const isTemplate = keyOrValue?.startsWith("{user_var.");
+      return {
+        label,
+        key: keyOrValue && !isTemplate ? keyOrValue : undefined,
+        value: keyOrValue && isTemplate ? keyOrValue : undefined,
+        icon: icon || undefined,
+      };
+    })
+    .filter((field) => field.label)
+    .slice(0, 8);
+}
+
+function MiniText({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none focus:border-foreground/30"
+      />
+    </label>
+  );
+}
+
+function MiniArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <textarea
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline min-h-20 w-full resize-none rounded-md bg-surface-elevated px-2 py-1.5 font-mono text-[11px] outline-none focus:border-foreground/30"
+      />
+    </label>
+  );
+}
+
+function MiniSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="hairline w-full rounded-md bg-surface-elevated px-2 py-1.5 text-[12px] outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function SettingsPane() {
   const { platform } = usePlatform();
   const { t } = useI18n();
