@@ -139,6 +139,111 @@ function ComponentsPane() {
   );
 }
 
+function MiniAppBuilderPane() {
+  const {
+    miniApp,
+    mergeMiniApp,
+    setMiniAppTabs,
+    setMiniAppProfileFields,
+    clearMiniAppItems,
+    addMiniAppItem,
+    setMiniAppCart,
+  } = useAnvlWorkspace();
+  const [draftItem, setDraftItem] = useState<MiniAppItem>({ title: "", meta: "", priceNumeric: undefined });
+
+  const tabsText = (miniApp.tabs ?? [])
+    .map((tab) => [tab.label, tab.id, tab.icon].filter(Boolean).join("|"))
+    .join("\n");
+  const profileText = (miniApp.profileFields ?? [])
+    .map((field) => [field.label, field.key ?? field.value, field.icon].filter(Boolean).join("|"))
+    .join("\n");
+
+  const setHero = (patch: Partial<NonNullable<typeof miniApp.hero>>) => {
+    mergeMiniApp({
+      hero: {
+        title: miniApp.hero?.title ?? miniApp.title ?? "Mini App",
+        cta: miniApp.hero?.cta ?? "Открыть",
+        ...miniApp.hero,
+        ...patch,
+      },
+    });
+  };
+
+  const addItem = () => {
+    const title = draftItem.title.trim();
+    if (!title) return;
+    addMiniAppItem({
+      title,
+      subtitle: draftItem.subtitle?.trim() || undefined,
+      meta: draftItem.meta?.trim() || undefined,
+      emoji: draftItem.emoji?.trim() || undefined,
+      badge: draftItem.badge?.trim() || undefined,
+      priceNumeric: typeof draftItem.priceNumeric === "number" ? draftItem.priceNumeric : undefined,
+    });
+    setDraftItem({ title: "", meta: "", priceNumeric: undefined });
+  };
+
+  return (
+    <div className="h-full overflow-y-auto px-3 py-3">
+      <SectionHeader title="Mini App builder" />
+      <MiniText label="Title" value={miniApp.title ?? ""} onChange={(title) => mergeMiniApp({ title })} />
+      <MiniText label="Subtitle" value={miniApp.subtitle ?? ""} onChange={(subtitle) => mergeMiniApp({ subtitle })} />
+      <div className="grid grid-cols-2 gap-2">
+        <MiniText label="Accent hex" value={miniApp.accentHex ?? ""} onChange={(accentHex) => mergeMiniApp({ accentHex })} placeholder="#16a34a" />
+        <MiniSelect label="Layout" value={miniApp.layout ?? "list"} options={["list", "grid", "compact"]} onChange={(layout) => mergeMiniApp({ layout: layout as MiniAppLayout })} />
+      </div>
+
+      <SectionHeader title="Hero" className="mt-4" />
+      <MiniText label="Hero title" value={miniApp.hero?.title ?? ""} onChange={(title) => setHero({ title })} />
+      <MiniText label="CTA" value={miniApp.hero?.cta ?? ""} onChange={(cta) => setHero({ cta })} />
+
+      <SectionHeader title="Tabs" className="mt-4" />
+      <MiniArea
+        label="One per line: label|id|icon"
+        value={tabsText}
+        placeholder="Главная|home|home\nУслуги|items|list\nПрофиль|profile|user"
+        onChange={(value) => setMiniAppTabs(parseTabsLines(value))}
+      />
+
+      <SectionHeader title="Profile fields" className="mt-4" />
+      <MiniArea
+        label="One per line: label|user_var key|icon"
+        value={profileText}
+        placeholder="Имя|user_name|user\nТелефон|user_phone|phone"
+        onChange={(value) => setMiniAppProfileFields(parseProfileLines(value))}
+      />
+
+      <SectionHeader title="Items" className="mt-4" />
+      <div className="mb-2 space-y-1">
+        {(miniApp.items ?? []).map((item, index) => (
+          <div key={`${item.title}-${index}`} className="hairline rounded-md bg-surface px-2 py-1.5">
+            <div className="truncate text-[11.5px] font-medium">{item.emoji} {item.title}</div>
+            <div className="truncate text-[10px] text-muted-foreground">{item.meta} {item.badge ? `· ${item.badge}` : ""}</div>
+          </div>
+        ))}
+      </div>
+      <div className="hairline space-y-2 rounded-lg bg-surface p-2">
+        <MiniText label="New item" value={draftItem.title} onChange={(title) => setDraftItem((cur) => ({ ...cur, title }))} placeholder="Аренда корта вечером" />
+        <div className="grid grid-cols-2 gap-2">
+          <MiniText label="Meta" value={draftItem.meta ?? ""} onChange={(meta) => setDraftItem((cur) => ({ ...cur, meta }))} placeholder="1200 ₽" />
+          <MiniText label="Price" value={draftItem.priceNumeric?.toString() ?? ""} onChange={(price) => setDraftItem((cur) => ({ ...cur, priceNumeric: price ? Number(price) : undefined }))} placeholder="1200" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={addItem} className="flex-1 rounded-md bg-foreground px-2 py-1.5 text-[12px] font-medium text-background">Add item</button>
+          <button onClick={clearMiniAppItems} className="rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-accent">Clear</button>
+        </div>
+      </div>
+
+      <SectionHeader title="Cart" className="mt-4" />
+      <div className="hairline space-y-2 rounded-lg bg-surface p-2">
+        <MiniSelect label="Enabled" value={miniApp.cart?.enabled ? "true" : "false"} options={["true", "false"]} onChange={(enabled) => setMiniAppCart({ ...miniApp.cart, enabled: enabled === "true" })} />
+        <MiniText label="sendAction" value={miniApp.cart?.sendAction ?? "booking"} onChange={(sendAction) => setMiniAppCart({ ...miniApp.cart, enabled: miniApp.cart?.enabled ?? true, sendAction })} />
+        <MiniText label="CTA label" value={miniApp.cart?.ctaLabel ?? "Оформить"} onChange={(ctaLabel) => setMiniAppCart({ ...miniApp.cart, enabled: miniApp.cart?.enabled ?? true, ctaLabel })} />
+      </div>
+    </div>
+  );
+}
+
 function SettingsPane() {
   const { platform } = usePlatform();
   const { t } = useI18n();
